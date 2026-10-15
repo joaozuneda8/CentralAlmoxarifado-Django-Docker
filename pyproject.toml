@@ -1,0 +1,40 @@
+[project]
+name = "central-almoxarifado"
+version = "0.1.0"
+description = "Central Almoxarifado SAEP — pedidos ao almoxarifado e saídas para o SCPI, em Django."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "concurrent-log-handler>=0.9.30",
+    "django>=6.0,<7",
+    "mysqlclient>=2.3.0",
+    "openpyxl>=3.1.5",
+    "playwright>=1.63.0",
+    "python-dotenv>=1.2.4",
+    "waitress>=3.0.2",
+    "whitenoise>=6.12.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["*/migrations/*", "docs", ".specify"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings_test"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-django>=4.14.0",
+    "ruff>=0.17.0",
+]

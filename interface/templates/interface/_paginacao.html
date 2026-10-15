@@ -1,0 +1,126 @@
+{% load interface_extras %}
+{% comment %}
+Paginação no vocabulário Clean (`componentes.css`, "Paginação"; docs/DESIGN.md). A estrutura veio do
+WMS-Almoxarifado (commit 70798439575da9d51547b0bc585b6a783b2e524c).
+
+Parâmetros:
+- `pagina`: um `Page` do `Paginator`.
+- `parametro`: nome do parâmetro de querystring (ex.: "pagina").
+- `rotulo`: `aria-label` do `<nav>`.
+Opcionais:
+- `rotulo_item`/`rotulo_item_plural`: substantivo do total ("N pedidos no total"); dois
+  parâmetros explícitos porque `pluralize` não serve para o português.
+- `ordem_texto`: ordenação vigente em texto, acrescentada ao resumo.
+- `htmx_alvo`/`htmx_indicador`: com os dois, Anterior/Próxima e os números também fazem troca
+  HTMX parcial (`hx-get`/`hx-target`/`hx-push-url`/`hx-indicator`); sem eles, navegação normal.
+- `ancora`: id de seção acrescentado como `#ancora` ao `href` de navegação normal.
+
+A primeira e a última página ficam sempre acessíveis, com reticências (`aria-hidden`) nos
+intervalos distantes (`intervalo_paginas`). A página atual é `<span aria-current="page">`; o
+estado nunca depende só de cor. Com uma página só, aparece só o resumo. As listas larga
+(`on_each_side=2`) e compacta (`on_each_side=1`, celular) são renderizadas juntas e alternadas
+por media query (`.paginacao-larga`/`.paginacao-compacta`); a escondida sai da árvore de
+acessibilidade. `href`/`hx-get` vêm de `querystring_pagina`, que troca só `parametro` e
+preserva os demais parâmetros (filtros, outras seções paginadas).
+
+Os `id`s de Anterior/Próxima (`pagina-anterior-{{ parametro }}`/`pagina-proxima-…`) e de
+cada número (`pagina-{{ parametro }}-N-larga|compacta`) são estáveis entre trocas HTMX e
+únicos na página: o HTMX devolve o foco do teclado pelo `id` depois do swap.
+{% endcomment %}
+<nav class="paginacao" aria-label="{{ rotulo }}">
+  <p class="paginacao-resumo">
+    Página {{ pagina.number }} de {{ pagina.paginator.num_pages|separador_milhar }} — {{ pagina.paginator.count|separador_milhar }}{% if rotulo_item %} {% if pagina.paginator.count == 1 %}{{ rotulo_item }}{% else %}{{ rotulo_item_plural|default:rotulo_item }}{% endif %}{% endif %} no total{% if ordem_texto %} · ordenado por {{ ordem_texto }}{% endif %}
+  </p>
+  {% if pagina.has_other_pages %}
+  <ul class="paginacao-lista">
+    <li>
+      {% if pagina.has_previous %}
+      {% querystring_pagina parametro pagina.previous_page_number as href_anterior %}
+      <a
+        id="pagina-anterior-{{ parametro }}"
+        class="paginacao-link"
+        href="{{ href_anterior }}{% if ancora %}#{{ ancora }}{% endif %}"
+        {% if htmx_alvo %}
+        hx-get="{{ href_anterior }}"
+        hx-target="{{ htmx_alvo }}"
+        hx-swap="innerHTML show:top"
+        hx-push-url="true"
+        hx-indicator="{{ htmx_indicador }}"
+        {% endif %}
+      >Anterior</a>
+      {% else %}
+      <span id="pagina-anterior-{{ parametro }}" class="paginacao-link paginacao-desativado" aria-disabled="true">Anterior</span>
+      {% endif %}
+    </li>
+    {% intervalo_paginas pagina as paginas_larga %}
+    {% for item in paginas_larga %}
+    <li class="paginacao-larga">
+      {% if item.reticencia %}
+      <span class="paginacao-reticencia" aria-hidden="true">…</span>
+      {% elif item.numero == pagina.number %}
+      <span id="pagina-{{ parametro }}-{{ item.numero }}-larga" class="paginacao-link paginacao-atual" aria-current="page" aria-label="Página {{ item.numero }}" tabindex="-1">{{ item.numero }}</span>
+      {% else %}
+      {% querystring_pagina parametro item.numero as href_pagina %}
+      <a
+        id="pagina-{{ parametro }}-{{ item.numero }}-larga"
+        class="paginacao-link"
+        href="{{ href_pagina }}{% if ancora %}#{{ ancora }}{% endif %}"
+        aria-label="Página {{ item.numero }}"
+        {% if htmx_alvo %}
+        hx-get="{{ href_pagina }}"
+        hx-target="{{ htmx_alvo }}"
+        hx-swap="innerHTML show:top"
+        hx-push-url="true"
+        hx-indicator="{{ htmx_indicador }}"
+        {% endif %}
+      >{{ item.numero }}</a>
+      {% endif %}
+    </li>
+    {% endfor %}
+    {% intervalo_paginas pagina 1 as paginas_compacta %}
+    {% for item in paginas_compacta %}
+    <li class="paginacao-compacta">
+      {% if item.reticencia %}
+      <span class="paginacao-reticencia" aria-hidden="true">…</span>
+      {% elif item.numero == pagina.number %}
+      <span id="pagina-{{ parametro }}-{{ item.numero }}-compacta" class="paginacao-link paginacao-atual" aria-current="page" aria-label="Página {{ item.numero }}" tabindex="-1">{{ item.numero }}</span>
+      {% else %}
+      {% querystring_pagina parametro item.numero as href_pagina %}
+      <a
+        id="pagina-{{ parametro }}-{{ item.numero }}-compacta"
+        class="paginacao-link"
+        href="{{ href_pagina }}{% if ancora %}#{{ ancora }}{% endif %}"
+        aria-label="Página {{ item.numero }}"
+        {% if htmx_alvo %}
+        hx-get="{{ href_pagina }}"
+        hx-target="{{ htmx_alvo }}"
+        hx-swap="innerHTML show:top"
+        hx-push-url="true"
+        hx-indicator="{{ htmx_indicador }}"
+        {% endif %}
+      >{{ item.numero }}</a>
+      {% endif %}
+    </li>
+    {% endfor %}
+    <li>
+      {% if pagina.has_next %}
+      {% querystring_pagina parametro pagina.next_page_number as href_proxima %}
+      <a
+        id="pagina-proxima-{{ parametro }}"
+        class="paginacao-link"
+        href="{{ href_proxima }}{% if ancora %}#{{ ancora }}{% endif %}"
+        {% if htmx_alvo %}
+        hx-get="{{ href_proxima }}"
+        hx-target="{{ htmx_alvo }}"
+        hx-swap="innerHTML show:top"
+        hx-push-url="true"
+        hx-indicator="{{ htmx_indicador }}"
+        {% endif %}
+      >Próxima</a>
+      {% else %}
+      <span id="pagina-proxima-{{ parametro }}" class="paginacao-link paginacao-desativado" aria-disabled="true">Próxima</span>
+      {% endif %}
+    </li>
+  </ul>
+  {% endif %}
+</nav>

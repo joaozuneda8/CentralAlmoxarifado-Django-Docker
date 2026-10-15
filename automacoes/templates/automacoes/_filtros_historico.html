@@ -1,0 +1,55 @@
+{% comment %}
+Filtros do histórico, no mesmo padrão do painel de pedidos (filtros.js): a busca na barra, o botão
+"Filtros" recolhe o painel com robô, situação e período, e os filtros ativos viram chips. Sem
+JavaScript, o painel fica aberto e "Filtrar" envia. A aba vai junto para o endereço gravado abrir a
+visão geral.
+{% endcomment %}
+<form class="filtros-recolhiveis" method="get" action="{% url 'automacoes:pagina' %}" data-filtros
+      hx-get="{% url 'automacoes:pagina' %}" hx-target="#historico" hx-push-url="true"
+      hx-trigger="change, input delay:400ms, submit">
+  <input type="hidden" name="aba" value="visao-geral">
+  <div class="filtros-barra">
+    <div class="filtros-campo filtros-busca">
+      <label class="visually-hidden" for="{{ filtros_historico.q.id_for_label }}">{{ filtros_historico.q.label }}</label>
+      <div class="campo-busca">
+        {% include "interface/_icone.html" with nome="busca" %}
+        {{ filtros_historico.q }}
+      </div>
+    </div>
+    <button type="button" class="botao botao-secundario filtros-alternar" data-filtros-alternar
+            aria-expanded="true" aria-controls="filtros-historico">
+      {% include "interface/_icone.html" with nome="filtro" %}<span>Filtros</span>
+      <span class="filtros-contagem" data-filtros-contagem hidden></span>
+      <span class="filtros-seta">{% include "interface/_icone.html" with nome="seta-baixo" %}</span>
+    </button>
+    <a class="botao botao-texto filtros-limpar" href="{% url 'automacoes:pagina' %}?aba=visao-geral#historico" data-filtros-limpar>Limpar filtros</a>
+  </div>
+
+  <ul class="filtros-chips" data-filtros-chips aria-label="Filtros ativos" hidden></ul>
+
+  <div class="filtros-painel" id="filtros-historico" data-filtros-painel>
+    <div class="filtros-grade">
+      <div class="filtros-campo">
+        <label class="campo-rotulo" for="{{ filtros_historico.robo.id_for_label }}">{{ filtros_historico.robo.label }}</label>
+        {{ filtros_historico.robo }}
+      </div>
+      <div class="filtros-campo">
+        <label class="campo-rotulo" for="{{ filtros_historico.situacao.id_for_label }}">{{ filtros_historico.situacao.label }}</label>
+        {{ filtros_historico.situacao }}
+      </div>
+      <fieldset class="filtros-campo filtros-periodo">
+        <legend class="campo-rotulo">Período</legend>
+        <div class="filtros-periodo-campos">
+          <label class="visually-hidden" for="{{ filtros_historico.de.id_for_label }}">{{ filtros_historico.de.label }}</label>
+          {{ filtros_historico.de }}
+          <span class="texto-suave" aria-hidden="true">até</span>
+          <label class="visually-hidden" for="{{ filtros_historico.ate.id_for_label }}">{{ filtros_historico.ate.label }}</label>
+          {{ filtros_historico.ate }}
+        </div>
+      </fieldset>
+    </div>
+    <div class="filtros-acoes">
+      <button type="submit" class="botao botao-secundario">Filtrar</button>
+    </div>
+  </div>
+</form>

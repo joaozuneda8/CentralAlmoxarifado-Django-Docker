@@ -1,0 +1,61 @@
+{% load pedidos_extras %}
+{% comment %}
+Busca de materiais (dentro do <form>); o "Seu pedido" fica em `_resumo_pedido.html`. Recebe `fluxo`, `url_materiais`,
+`url_carrinho`, `resultados`, `total`, `filtros`, `carrinho` e `codigos_erro`. Os botões
+"Adicionar" e "Remover" mandam o formulário inteiro (o HTMX inclui os valores do <form> em
+requisição não GET) e só o trecho do carrinho volta. O carrinho vive nos campos escondidos de
+`_carrinho.html`.
+
+Os resultados abrem num painel preso à busca (`pedidos.js`): ao focar, digitar ou trocar o
+filtro; fecha com Esc ou ao sair da área. Sem JavaScript o painel fica aberto na página. O painel
+fica fora de `#busca-materiais` para o `hx-include` da busca não levar as quantidades. O filtro de
+grupo fica acima da busca, recolhido; o painel abre logo abaixo da busca.
+Quando o passo tem largura para isso (container query em `pedidos.css`), a busca e o "Seu
+pedido" ficam lado a lado; senão, um embaixo do outro.
+{% endcomment %}
+<div class="busca-area" data-busca-area>
+<div id="busca-materiais" class="busca-materiais{% if not filtros %} busca-materiais-sem-filtro{% endif %}">
+  {% if filtros %}
+  {# Secundário à busca: recolhido num <details> (funciona sem JavaScript); o resumo mostra o grupo escolhido e o pedidos.js o fecha depois da escolha. #}
+  {# O "Limpar" só aparece com um grupo escolhido e o filtro fechado (pedidos.css); aberto, a árvore já tem "Todos os grupos". #}
+  <div class="busca-filtro-linha">
+    <details class="busca-filtro" data-busca-filtro>
+      <summary class="busca-filtro-alternar">
+        {% include "interface/_icone.html" with nome="filtro" %}<span class="busca-filtro-rotulo">Grupo e subgrupo:</span>
+        <span class="busca-filtro-valor" data-busca-filtro-valor>Todos</span>
+        <span class="busca-filtro-seta">{% include "interface/_icone.html" with nome="seta-baixo" %}</span>
+      </summary>
+      <div class="campo busca-filtro-campo">
+        <label class="visually-hidden" for="busca-filtro">Grupo e subgrupo</label>
+        {# data-dropdown-arvore: o dropdown.js mostra os grupos como pastas, com os subgrupos dentro. Os nomes aparecem só com a primeira letra maiúscula (frase); os valores seguem como no cadastro. Grupo com um único subgrupo de mesmo nome não tem filhos. #}
+        <select id="busca-filtro" class="campo-entrada" name="filtro" data-dropdown-arvore hx-get="{{ url_materiais }}"
+                hx-trigger="change" hx-target="#resultados" hx-include="#busca-materiais">
+          <option value="">Todos os grupos</option>
+          {% for grupo, subgrupos in filtros %}
+          <optgroup label="{{ grupo|frase }}">
+            <option value="{{ grupo }}">Todo o grupo {{ grupo|frase }}</option>
+            {% if subgrupos|length != 1 or subgrupos.0 != grupo %}{% for sub in subgrupos %}<option value="{{ grupo }} › {{ sub }}">{{ grupo|frase }} › {{ sub|frase }}</option>{% endfor %}{% endif %}
+          </optgroup>
+          {% endfor %}
+        </select>
+      </div>
+    </details>
+    <button type="button" class="botao botao-texto busca-filtro-limpar" data-busca-filtro-limpar>{% include "interface/_icone.html" with nome="fechar" %}Limpar</button>
+  </div>
+  {% endif %}
+  <div class="campo busca-principal">
+    <label class="campo-rotulo" for="busca-q">{% if fluxo.publico %}Buscar material pelo nome{% else %}Buscar material pelo nome ou código{% endif %}</label>
+    <div class="campo-busca">
+      {% include "interface/_icone.html" with nome="busca" %}
+      <input id="busca-q" class="campo-entrada" type="search" name="q" autocomplete="off" data-busca
+             placeholder="{% if fluxo.nome == "limpeza" %}Ex.: detergente, café{% else %}Ex.: luva, fita veda rosca{% if not fluxo.publico %}, 016.005.010{% endif %}{% endif %}"
+             aria-expanded="false" aria-controls="resultados"
+             hx-get="{{ url_materiais }}" hx-trigger="input changed delay:300ms, search"
+             hx-target="#resultados" hx-include="#busca-materiais">
+    </div>
+  </div>
+</div>
+<div id="resultados" class="busca-painel" aria-live="polite">{% include "pedidos/_resultados.html" %}</div>
+</div>
+{# Anúncio para o leitor de tela de cada material adicionado (pedidos.js); fora do #resultados, que o HTMX troca. #}
+<p class="visually-hidden" role="status" data-anuncio-adicionado></p>

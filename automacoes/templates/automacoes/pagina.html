@@ -1,0 +1,46 @@
+{% extends "interface/base_almoxarifado.html" %}
+{% load static %}
+
+{% block title %}Automações — Central Almoxarifado{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'catalogo/css/catalogo.css' %}">
+<link rel="stylesheet" href="{% static 'pedidos/css/pedidos.css' %}">{% endblock %}
+{% block extra_head %}<script src="{% static 'catalogo/js/importacoes.js' %}" defer></script>
+<script src="{% static 'pedidos/js/pedidos.js' %}" defer></script>{% endblock %}
+{% block heading %}Automações{% endblock %}
+{% block sub %}Robôs que trazem dados do SCPI e lançam as saídas atendidas.{% endblock %}
+
+{% block page %}
+{% comment %}
+Uma aba por lugar (o componente comum `[data-abas]`, com `?aba=`): a visão geral, o lançamento no
+SCPI e um formulário por robô de importação. Sem JavaScript, todos os painéis ficam à vista. As
+regiões que se recarregam sozinhas (situação, lançamento e histórico) são pedidas pelo `hx-get` de cada uma, e a
+view escolhe o trecho pelo cabeçalho HX-Target; os formulários ficam fora delas.
+{% endcomment %}
+<div class="abas" data-abas data-url="{% url 'automacoes:pagina' %}">
+  <div class="abas-lista" role="tablist" aria-label="Automações">
+    {% for chave, rotulo, estado in abas %}
+    <button type="button" role="tab" class="aba{% if chave == aba %} aba-ativa{% endif %}" id="aba-{{ chave }}" data-aba="{{ chave }}" aria-controls="painel-{{ chave }}" aria-selected="{% if chave == aba %}true{% else %}false{% endif %}" tabindex="{% if chave == aba %}0{% else %}-1{% endif %}">{{ rotulo }}{% if estado.nivel == "erro" or estado.nivel == "aviso" %} <span class="selo selo-{{ estado.nivel }} aba-selo">{% include "interface/_icone.html" with nome="alerta" %}<span class="aba-selo-texto">{{ estado.selo }}</span></span>{% elif estado.nivel == "andamento" %} <span class="selo selo-info aba-selo">{% include "interface/_icone.html" with nome="atualizar" %}<span class="aba-selo-texto">{{ estado.selo }}</span></span>{% endif %}</button>
+    {% endfor %}
+  </div>
+
+  <section role="tabpanel" id="painel-visao-geral" class="aba-painel{% if aba == 'visao-geral' %} aba-painel-ativo{% endif %}" aria-labelledby="aba-visao-geral">
+    <div class="pilha-larga">
+      {% include "catalogo/_situacao.html" %}
+      {# Fora da região recarregada da situação: os filtros não perdem o que foi digitado. #}
+      <section class="cartao pilha" aria-labelledby="titulo-historico">
+        <h2 class="cartao-titulo" id="titulo-historico">Histórico</h2>
+        {% include "automacoes/_filtros_historico.html" %}
+        {% include "automacoes/_historico.html" %}
+      </section>
+    </div>
+  </section>
+  <section role="tabpanel" id="painel-lancamento" class="aba-painel{% if aba == 'lancamento' %} aba-painel-ativo{% endif %}" aria-labelledby="aba-lancamento">
+    {% include "pedidos/_lancamentos.html" %}
+  </section>
+  {% for item in robos %}
+  <section role="tabpanel" id="painel-{{ item.robo.chave }}" class="aba-painel{% if aba == item.robo.chave %} aba-painel-ativo{% endif %}" aria-labelledby="aba-{{ item.robo.chave }}">
+    {% include "catalogo/_robo.html" %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

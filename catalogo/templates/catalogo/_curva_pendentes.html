@@ -1,0 +1,33 @@
+{% load interface_extras %}
+<div class="cartao">
+  <h2 class="cartao-titulo">Códigos pendentes de mapeamento</h2>
+  <p class="texto-secundario">Códigos com saída no período, sem par de/para, cujo material está oculto no cadastro do SCPI ou não existe nele. Se o equivalente novo também tem saídas, a importância do material está dividida entre os dois.</p>
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <thead>
+        <tr>
+          <th scope="col">Código</th>
+          <th scope="col">Descrição</th>
+          <th scope="col">Motivo</th>
+          <th scope="col">Ocorrências</th>
+          <th scope="col">Valor</th>
+          {% if user.is_staff %}<th scope="col"><span class="visually-hidden">Ação</span></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in dados.pendentes %}
+        <tr>
+          <td><span class="mono">{{ p.codigo }}</span></td>
+          <td>{{ p.descricao|default:"—" }}</td>
+          <td><span class="selo selo-aviso">{{ p.motivo }}</span></td>
+          <td>{{ p.ocorrencias|separador_milhar }}</td>
+          <td>{{ p.valor|dinheiro }}</td>
+          {% if user.is_staff %}<td><a class="botao botao-texto" href="{% url 'admin:catalogo_pardepara_add' %}?antigo={{ p.codigo|urlencode }}">Criar par</a></td>{% endif %}
+        </tr>
+        {% empty %}
+        <tr class="tabela-vazia"><td colspan="{% if user.is_staff %}6{% else %}5{% endif %}">{% if dados.reconciliacao.codigos_antes %}Nenhum código pendente.{% else %}Nenhuma saída no período.{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

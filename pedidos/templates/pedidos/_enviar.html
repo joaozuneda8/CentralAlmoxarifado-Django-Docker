@@ -1,0 +1,7 @@
+{% comment %}
+Botão de envio do formulário. Recebe `rotulo`, `rotulo_novo` (usado depois de uma divergência), `icone` e
+`divergente`. Aparece duas vezes (`_resumo_pedido.html` e no fim do formulário): o CSS mostra um
+só, conforme o "Seu pedido" esteja na coluna ao lado ou na gaveta. Nos formulários públicos com
+JavaScript, o do fim fica escondido e a gaveta o aciona.
+{% endcomment %}
+<button type="submit" class="botao botao-primario botao-bloco">{% include "interface/_icone.html" with nome=icone %}{% if divergente %}{{ rotulo_novo }}{% else %}{{ rotulo }}{% endif %}</button>

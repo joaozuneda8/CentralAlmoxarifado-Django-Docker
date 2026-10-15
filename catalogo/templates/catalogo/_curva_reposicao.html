@@ -1,0 +1,49 @@
+{% load interface_extras %}
+<div class="cartao">
+  <h2 class="cartao-titulo">Reposição</h2>
+  <p class="texto-secundario">Estoque de segurança = consumo diário × prazo de entrega. Ponto de pedido = consumo diário × prazo + estoque de segurança. Quanto pedir = consumo diário × cobertura alvo + estoque de segurança. O estoque soma o saldo do código canônico com o dos códigos antigos que apontam para ele.</p>
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <thead>
+        <tr>
+          <th scope="col">Código</th>
+          <th scope="col">Descrição</th>
+          <th scope="col">Consumo no período</th>
+          <th scope="col">Consumo diário</th>
+          <th scope="col">Estoque</th>
+          <th scope="col">Prazo de entrega (dias)</th>
+          <th scope="col">Cobertura alvo (dias)</th>
+          <th scope="col">Estoque de segurança</th>
+          <th scope="col">Ponto de pedido</th>
+          <th scope="col">Quanto pedir</th>
+          <th scope="col">Cobertura (dias)</th>
+          <th scope="col">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in dados.reposicao %}
+        <tr>
+          <td><span class="mono">{{ r.canonico }}</span></td>
+          <td>{{ r.descricao }}{% if r.unidade %} <span class="texto-secundario">{{ r.unidade }}</span>{% endif %}</td>
+          <td>{{ r.consumo|quantidade }}</td>
+          <td>{{ r.calculo.consumo_diario|quantidade }}</td>
+          <td>{{ r.estoque|quantidade }}</td>
+          <td>{{ r.prazo }}{% if r.prazo_proprio %} <span class="texto-secundario">(próprio)</span>{% endif %}</td>
+          <td>{{ r.cobertura }}{% if r.cobertura_propria %} <span class="texto-secundario">(própria)</span>{% endif %}</td>
+          <td>{{ r.calculo.estoque_seguranca|separador_milhar }}</td>
+          <td>{{ r.calculo.ponto_pedido|separador_milhar }}</td>
+          <td>{{ r.calculo.quanto_pedir|separador_milhar }}</td>
+          <td>{% if r.calculo.cobertura_dias is None %}<span class="texto-secundario">sem consumo</span>{% else %}{{ r.calculo.cobertura_dias|quantidade }}{% endif %}</td>
+          <td>
+            {% if r.calculo.situacao == "esgotado" %}<span class="selo selo-erro">Esgotado</span>
+            {% elif r.calculo.situacao == "comprar" %}<span class="selo selo-aviso">Comprar</span>
+            {% else %}<span class="selo selo-ok">Em estoque</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="tabela-vazia"><td colspan="12">Nenhuma saída no período.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

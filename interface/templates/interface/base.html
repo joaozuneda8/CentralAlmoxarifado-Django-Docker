@@ -1,0 +1,31 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Central Almoxarifado{% endblock %}</title>
+  {% comment %}
+  Base comum aos dois layouts. Só tema claro (spec da interface Clean). O `html.js` mostra o
+  botão do menu móvel. Scripts no <head> com `defer`, nunca no <body>: ao restaurar o
+  histórico o HTMX troca o <body> e re-executaria os scripts. O HTMX 4 troca o conteúdo mesmo
+  em resposta 4xx/5xx: o `noSwap` impede que uma falha apague o formulário montado.
+  {% endcomment %}
+  <script>document.documentElement.classList.add("js");if (matchMedia("(max-width: 767px)").matches) document.documentElement.setAttribute("data-gaveta", "");</script>
+  <meta name="htmx-config" content='{"noSwap":[204,304,"4xx","5xx"]}'>
+  <link rel="preload" href="{% static 'interface/fonts/dm-sans-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'interface/css/clean.css' %}">
+  <link rel="stylesheet" href="{% static 'interface/css/componentes.css' %}">
+  <link rel="stylesheet" href="{% static 'interface/css/layouts.css' %}">
+  {% block extra_css %}{% endblock %}
+  <script src="{% static 'interface/js/shell.js' %}" defer></script>
+  <script src="{% static 'interface/js/dropdown.js' %}" defer></script>
+  <script src="{% static 'interface/js/filtros.js' %}" defer></script>
+  <script src="{% static 'interface/js/abas.js' %}" defer></script>
+  <script src="{% static 'interface/vendor/htmx/htmx-4.0.0.min.js' %}" defer></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% block content %}{% endblock %}
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

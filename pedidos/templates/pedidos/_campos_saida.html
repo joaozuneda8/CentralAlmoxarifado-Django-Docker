@@ -1,0 +1,61 @@
+{% comment %}
+Campos de uma saída (atendimento e saída avulsa), numa grade compacta que se reorganiza pela
+largura do bloco. Recebe `campos` (valores), `funcionarios`, `centros` [(descrição, código)],
+`placas` [(placa, descrição)], `tipos`, `hoje`, `nao_lancar` e, no atendimento, `solicitante`
+e `tipo_fixo` (o tipo único, sem escolha). A placa vem antes do centro de custo porque decide
+o centro (pedidos.js).
+{% endcomment %}
+<div class="saida-campos">
+  <div class="grade-saida">
+    <div class="campo">
+      <label class="campo-rotulo" for="data">Data efetiva da saída *</label>
+      <input id="data" class="campo-entrada" type="date" name="data" max="{{ hoje }}" value="{{ campos.data }}">
+    </div>
+    <div class="campo grade-saida-largo">
+      <label class="campo-rotulo" for="recebedor">Recebedor *</label>
+      <div class="com-acao">
+        <input id="recebedor" class="campo-entrada" type="text" name="recebedor" list="funcionarios" maxlength="200" autocomplete="off" value="{{ campos.recebedor|default:'' }}">
+        {% if solicitante %}<button type="button" class="botao-suave acao-campo" data-preencher-recebedor data-nome="{{ solicitante }}" title="Quem recebe é o solicitante ({{ solicitante }})">{% include "interface/_icone.html" with nome="usuario" %}<span>Usar {{ solicitante }}</span></button>{% endif %}
+      </div>
+      <datalist id="funcionarios">{% for f in funcionarios %}<option value="{{ f }}">{% endfor %}</datalist>
+    </div>
+    <div class="campo">
+      <div class="campo-rotulo-linha">
+        <label class="campo-rotulo" for="tipo">Tipo Saída (SCPI) *</label>
+        {% if tipo_fixo %}<span class="campo-nota">{% include "interface/_icone.html" with nome="cadeado" %}fixo</span>{% endif %}
+      </div>
+      {% if tipo_fixo %}
+      <select id="tipo" class="campo-entrada" name="tipo" data-travado>
+        <option value="{{ tipo_fixo }}" selected>{{ tipo_fixo }}</option>
+      </select>
+      {% else %}
+      <select id="tipo" class="campo-entrada" name="tipo">
+        <option value="">Selecione…</option>
+        {% for t in tipos %}<option value="{{ t }}"{% if campos.tipo == t %} selected{% endif %}>{{ t }}</option>{% endfor %}
+      </select>
+      {% endif %}
+    </div>
+    <div class="campo">
+      <label class="campo-rotulo" for="placa">Veículo (placa)</label>
+      <select id="placa" class="campo-entrada mono" name="placa">
+        <option value="">Sem veículo</option>
+        {% for placa, descricao in placas %}<option value="{{ placa }}" data-centro="{{ descricao }}"{% if campos.placa == placa %} selected{% endif %}>{{ placa }} — {{ descricao }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="campo grade-saida-largo grade-saida-linha">
+      <div class="campo-rotulo-linha">
+        <label class="campo-rotulo" for="centro_custo">Centro de custo *</label>
+        <span id="centro_custo-dica" class="campo-nota" hidden>{% include "interface/_icone.html" with nome="cadeado" %}definido pela placa</span>
+      </div>
+      <select id="centro_custo" class="campo-entrada" name="centro_custo">
+        <option value="">Selecione…</option>
+        {% for descricao, codigo in centros %}<option value="{{ descricao }}"{% if campos.centro_custo == descricao %} selected{% endif %}>{{ descricao }} — {{ codigo }}</option>{% endfor %}
+      </select>
+    </div>
+    <label class="campo-check campo-check-caixa"><input type="checkbox" name="nao_lancar"{% if nao_lancar %} checked{% endif %}><span><strong>Não lançar no SCPI</strong><span class="campo-dica">material fora de estoque</span></span></label>
+    <div class="campo grade-saida-cheio">
+      <label class="campo-rotulo" for="obs-saida">Observações</label>
+      <textarea id="obs-saida" class="campo-entrada campo-linha" name="obs" maxlength="200" placeholder="Opcional">{{ campos.obs|default:'' }}</textarea>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,59 @@
+{% comment %}
+Lista do histórico (região #historico): as execuções de todos os robôs, da mais recente para a mais
+antiga, com a paginação comum. Enquanto alguma automação roda, recarrega a cada 5 s com a mesma
+query (filtros e página), para a execução em andamento mudar de situação sozinha.
+{% endcomment %}
+<div id="historico" class="pilha"{% if acompanhar_catalogo or acompanhar_lancamento %} hx-get="{% url 'automacoes:pagina' %}?{{ request.GET.urlencode }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+  {% with total=pagina_historico.paginator.count %}
+  {% if total %}
+  <div class="tabela-rolagem">
+    <table class="tabela tabela-historico">
+      <thead>
+        <tr>
+          <th scope="col">Robô</th>
+          <th scope="col">Início</th>
+          <th scope="col">Duração</th>
+          <th scope="col">Situação</th>
+          <th scope="col">Resumo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linha in pagina_historico %}
+        <tr>
+          <td class="historico-tipo">{{ linha.robo }}{% if linha.modo %}<span class="texto-secundario texto-pequeno">{{ linha.modo }}</span>{% endif %}</td>
+          <td class="tabela-data" title="{{ linha.inicio|date:'d/m/Y H:i' }}">{{ linha.inicio|date:"d/m H:i" }}</td>
+          <td class="tabela-data" data-rotulo="Duração">{{ linha.duracao }}</td>
+          <td><span class="selo selo-{{ linha.nivel }}">{{ linha.selo }}</span></td>
+          <td class="historico-resultado">
+            {% if linha.resumo %}<p>{{ linha.resumo }}{% if linha.iniciada_por %} <span class="texto-secundario">· {{ linha.iniciada_por }}</span>{% endif %}</p>{% endif %}
+            {% if linha.erro %}<p>{{ linha.erro }}</p>{% endif %}
+            {% if linha.erro_tecnico %}
+            <details class="aviso-itens">
+              <summary>Detalhes técnicos</summary>
+              <pre class="mono erro-tecnico">{{ linha.erro_tecnico }}</pre>
+            </details>
+            {% endif %}
+            {% if linha.avisos %}
+            <details class="aviso-itens">
+              <summary>{{ linha.n_avisos }} {% if linha.n_avisos == 1 %}aviso{% else %}avisos{% endif %}</summary>
+              <ul class="historico-avisos">{% for grupo in linha.avisos %}<li>{{ grupo.texto }}</li>{% endfor %}</ul>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "interface/_paginacao.html" with pagina=pagina_historico parametro="pagina" rotulo="Paginação do histórico" rotulo_item="execução" rotulo_item_plural="execuções" htmx_alvo="#historico" htmx_indicador="#historico" %}
+  {% if historico_filtrado %}<p class="texto-secundario texto-pequeno">{{ total }} {% if total == 1 %}execução filtrada{% else %}execuções filtradas{% endif %}.</p>{% endif %}
+  {% elif historico_filtrado %}
+  <div class="vazio">
+    <p>Nenhuma execução corresponde aos filtros.</p>
+    <a class="botao botao-texto" href="{% url 'automacoes:pagina' %}?aba=visao-geral#historico">Limpar filtros</a>
+  </div>
+  {% else %}
+  <p class="texto-secundario">Nenhuma execução ainda.</p>
+  {% endif %}
+  {% endwith %}
+</div><!-- /historico -->

@@ -1,0 +1,14 @@
+{% comment %}
+Lista da saúde do catálogo (`catalogo.saude.saude_do_catalogo`). O nível vai num selo com
+texto (estado nunca só por cor). Reutilizada pelo painel.
+{% endcomment %}
+<ul class="saude">
+  {% for item in saude %}
+  <li>
+    {% if item.nivel == "erro" %}<span class="selo selo-erro">Erro</span>
+    {% elif item.nivel == "aviso" %}<span class="selo selo-aviso">Aviso</span>
+    {% else %}<span class="selo selo-ok">OK</span>{% endif %}
+    <span>{{ item.texto }}</span>
+  </li>
+  {% endfor %}
+</ul>

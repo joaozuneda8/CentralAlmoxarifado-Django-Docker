@@ -1,0 +1,83 @@
+{% comment %}
+Execução avulsa de um robô de importação, com os parâmetros editáveis. Recebe `item` (robo, form,
+fonte) e `importacao_em_andamento`. Fica fora do trecho que o HTMX recarrega (situação), para não perder o
+que a pessoa digitou; o estado de andamento é atualizado pelo importacoes.js a cada recarga da situação.
+{% endcomment %}
+{% with robo=item.robo form=item.form fonte=item.fonte ultima=item.fonte.ultima %}
+<form method="post" action="{% url 'automacoes:importar' robo.chave %}" enctype="multipart/form-data" class="cartao pilha" data-robo-form>
+  {% csrf_token %}
+  <div>
+    <h2 class="cartao-titulo">{{ robo.rotulo }}</h2>
+    <p class="texto-secundario">{{ robo.descricao }}</p>
+  </div>
+
+  {# O estado vem antes dos parâmetros: é o que a pessoa precisa saber para decidir se roda. #}
+  {% if ultima %}
+  <div class="robo-ultima">
+    <p class="linha">{% include "catalogo/_selo_fonte.html" %}<span class="texto-secundario">Última execução: {{ ultima.inicio|date:"d/m/Y H:i" }}{% if fonte.nivel == "andamento" %}, em andamento.{% elif ultima.situacao == "SUCESSO" %}, {{ fonte.resumo_completo }}.{% else %}.{% if fonte.quando %} Os dados em uso são de {{ fonte.quando|date:"d/m/Y H:i" }}: {{ fonte.resumo_completo }}.{% endif %}{% endif %}</span></p>
+    {% if fonte.erro %}<p class="fonte-erro">{{ fonte.erro }}</p>{% endif %}
+    {% for grupo in fonte.avisos %}<p class="texto-secundario texto-pequeno">{{ grupo.texto }}</p>{% endfor %}
+  </div>
+  {% endif %}
+  {% if robo.chave == "estoque" %}
+  <div class="aviso aviso-info">{% include "interface/_icone.html" with nome="alerta" %}<p>Substitui todos os saldos: material que não vier no relatório fica com saldo 0.</p></div>
+  {% endif %}
+
+  {% if robo.chave == "saidas" %}
+  <div class="grade-2">
+    <div class="campo{% if form.desde.errors %} campo-com-erro{% endif %}">
+      <label class="campo-rotulo" for="{{ form.desde.id_for_label }}">{{ form.desde.label }}</label>
+      {{ form.desde }}
+      {% for erro in form.desde.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+    </div>
+    <div class="campo{% if form.ate.errors %} campo-com-erro{% endif %}">
+      <label class="campo-rotulo" for="{{ form.ate.id_for_label }}">{{ form.ate.label }}</label>
+      {{ form.ate }}
+      {% for erro in form.ate.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+    </div>
+  </div>
+  <p class="campo-dica linha">O padrão começa 7 dias antes do fim da última importação e vai até hoje.{% if form.padrao_periodo %} <button type="button" class="botao botao-texto" data-periodo-padrao data-desde="{{ form.padrao_periodo.0|date:'Y-m-d' }}" data-ate="{{ form.padrao_periodo.1|date:'Y-m-d' }}" hidden>Usar o padrão ({{ form.padrao_periodo.0|date:"d/m" }} a {{ form.padrao_periodo.1|date:"d/m" }})</button>{% endif %}</p>
+  {% endif %}
+  {% if robo.chave == "cadastro" %}
+  <p class="estado-carga">
+    {% if form.ultima_carga %}Última carga que deu certo: {{ form.ultima_carga.fim|default:form.ultima_carga.inicio|date:"d/m/Y H:i" }}, {% if form.ultima_carga.periodo_ate %}só os novos{% else %}completa{% endif %}.{% else %}Ainda não há carga. A primeira é sempre completa; prefira enviar o CSV com o cadastro inteiro.{% endif %}
+  </p>
+  <fieldset class="grupo-opcoes" data-robo-modos{% if not form.padrao %} data-sem-carga="1"{% endif %}>
+    <legend class="campo-rotulo">{{ form.modo.label }}</legend>
+    {% for opcao in form.modo %}
+    <label class="campo-check opcao-modo">{{ opcao.tag }}<span><strong>{{ opcao.choice_label }}</strong>
+      {% if opcao.data.value == "novos" %}<span class="campo-dica" data-dica-novos data-texto-csv="Não vale com CSV: o arquivo enviado é sempre o cadastro inteiro.">{% if form.padrao %}Cadastros novos desde {{ form.padrao.0|date:"d/m/Y" }} (7 dias antes da última carga) até hoje. Rápido e não oculta nenhum material.{% else %}Disponível depois da primeira carga.{% endif %}</span>
+      {% else %}<span class="campo-dica">Traz o cadastro inteiro, atualiza tudo e oculta os materiais que sumiram. Pode levar muitos minutos. Vale repetir de vez em quando.</span>{% endif %}
+    </span></label>
+    {% endfor %}
+    {% for erro in form.modo.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+  </fieldset>
+  {% if form.visiveis %}
+  <div class="aviso aviso-atencao" data-robo-risco>
+    {% include "interface/_icone.html" with nome="alerta" %}
+    <label class="campo-check">{{ form.forcar }}<span><strong>{{ form.forcar.label }}</strong><span class="campo-dica">Hoje há {{ form.visiveis|floatformat:"0g" }} {% if form.visiveis == 1 %}material visível{% else %}materiais visíveis{% endif %}. Se o novo cadastro tirar mais de 20% deles, a carga é recusada, a não ser que você marque esta caixa. Os que sumirem ficam ocultos.</span></span></label>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <fieldset class="grupo-opcoes">
+    <legend class="campo-rotulo">{{ form.origem.label }}</legend>
+    {% for opcao in form.origem %}<label class="campo-check">{{ opcao.tag }}<span>{{ opcao.choice_label }}</span></label>{% endfor %}
+    <div class="campo{% if form.arquivo.errors %} campo-com-erro{% endif %}" data-robo-arquivo>
+      <label class="campo-rotulo" for="{{ form.arquivo.id_for_label }}">{{ form.arquivo.label }}</label>
+      {{ form.arquivo }}
+      {% for erro in form.arquivo.errors %}<p class="campo-erro">{{ erro }}</p>{% endfor %}
+      <p class="campo-dica">Só .csv, até 25 MB. O arquivo é apagado quando a importação termina.</p>
+    </div>
+  </fieldset>
+
+  {% if form.non_field_errors %}<div class="aviso aviso-erro" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<div>{% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}</div></div>{% endif %}
+
+  <div class="acoes">
+    <button type="submit" class="botao botao-primario" data-robo-rodar{% if importacao_em_andamento %} disabled{% endif %}>{% include "interface/_icone.html" with nome="robo" %}<span data-robo-texto{% if robo.chave == "cadastro" %} data-rotulo-completo="Importar cadastro completo"{% endif %}>{{ robo.botao }}</span></button>
+    <span class="texto-secundario" data-robo-aviso{% if not importacao_em_andamento %} hidden{% endif %}>Importação em andamento</span>
+    <a class="botao botao-texto" href="{% url 'automacoes:pagina' %}?aba=visao-geral&amp;robo={{ robo.chave }}#historico">Ver histórico{% include "interface/_icone.html" with nome="seta-direita" %}</a>
+  </div>
+
+</form>
+{% endwith %}

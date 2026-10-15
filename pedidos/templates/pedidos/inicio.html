@@ -1,0 +1,25 @@
+{% extends "interface/base_publico.html" %}
+{% load static %}
+{% block title %}Pedir materiais — Central Almoxarifado{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'pedidos/css/pedidos.css' %}">{% endblock %}
+{% block rotulo %}Almoxarifado SAEP{% endblock %}
+{% block heading %}Pedir materiais ao almoxarifado{% endblock %}
+{% block sub %}Escolha o tipo de material. Cada tipo tem seu próprio formulário.{% endblock %}
+{% block page %}
+<div class="opcoes-formulario">
+  {% comment %}Títulos iguais aos `Fluxo.titulo` (pedidos/fluxos.py); exemplos entre os materiais mais pedidos de cada formulário.{% endcomment %}
+  <a class="cartao cartao-opcao" href="{% url 'pedidos:formulario' 'limpeza' %}">
+    {% include "interface/_icone.html" with nome="caixa" %}
+    <h2>Limpeza, copa e escritório</h2>
+    <span class="texto-secundario">Ex.: café, copo descartável, água sanitária, caneta</span>
+    <span class="cartao-opcao-seta">{% include "interface/_icone.html" with nome="seta-direita" %}</span>
+  </a>
+  <a class="cartao cartao-opcao" href="{% url 'pedidos:formulario' 'ab' %}">
+    {% include "interface/_icone.html" with nome="catalogo" %}
+    <h2>Ferramentas, peças e materiais</h2>
+    <span class="texto-secundario">Ex.: luva, botina, fita veda-rosca, cimento</span>
+    <span class="cartao-opcao-seta">{% include "interface/_icone.html" with nome="seta-direita" %}</span>
+  </a>
+</div>
+<p class="texto-suave texto-pequeno">Enviar um pedido não é a saída do material: o almoxarifado confere, separa e confirma o atendimento depois.</p>
+{% endblock %}

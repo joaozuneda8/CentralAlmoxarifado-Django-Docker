@@ -1,0 +1,12 @@
+{% comment %}
+Seção "Seu pedido": uma coluna própria ao lado dos passos, fixa ao rolar, com o botão de envio no
+rodapé do cartão. Quando não há largura para a coluna (passo com menos de 960px), o cartão some e
+o pedido vira a barra fixa e a gaveta de `_carrinho.html` (`pedidos.js`); o envio passa a ser o da
+gaveta, que aciona o do fim do formulário, escondido. Recebe `rotulo`, `rotulo_novo` e `icone` para o botão.
+{% endcomment %}
+<aside class="pedido-lado" aria-label="{{ fluxo.rotulo_carrinho }}">
+  <div class="pedido-resumo">
+    <div id="carrinho">{% include "pedidos/_carrinho.html" %}</div>
+    <div class="pedido-enviar">{% include "pedidos/_enviar.html" %}</div>
+  </div>
+</aside>

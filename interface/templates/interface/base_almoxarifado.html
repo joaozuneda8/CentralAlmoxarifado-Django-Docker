@@ -1,0 +1,25 @@
+{% extends "interface/base.html" %}
+{% comment %}
+Layout da área do almoxarifado (login obrigatório): barra lateral (`_menu.html`) e a área de
+trabalho com cabeçalho da página (rotulo, heading, sub, tools), mensagens e o bloco page.
+{% endcomment %}
+{% block body_class %}ritmo-almox{% endblock %}
+{% block content %}
+<a class="pular" href="#main">Pular para o conteúdo</a>
+<div class="app">
+  {% include "interface/_menu.html" %}
+  <main class="app-principal" id="main">
+    <header class="pagina-cabecalho">
+      <div>
+        {% block voltar %}<a class="link-voltar" href="{% url 'pedidos:painel' %}">{% include "interface/_icone.html" with nome="seta-esquerda" %}Voltar ao painel</a>{% endblock %}
+        <p class="rotulo-secao">{% block rotulo %}{% endblock %}</p>
+        <h1>{% block heading %}{% endblock %}</h1>
+        <p class="pagina-sub">{% block sub %}{% endblock %}</p>
+      </div>
+      <div class="pagina-acoes">{% block tools %}{% endblock %}</div>
+    </header>
+    {% include "interface/_mensagens.html" %}
+    {% block page %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

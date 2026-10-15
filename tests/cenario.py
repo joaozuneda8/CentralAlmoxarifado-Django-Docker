@@ -1,0 +1,242 @@
+"""Cenário de teste dos pedidos (os dados de `tests/cenario.cjs` do Apps Script).
+
+Módulo comum, sem pytest: também serve para preparar o banco local na conferência visual
+(`uv run python manage.py shell -c "from tests.cenario import montar_cenario; montar_cenario()"`).
+"""
+
+import threading
+import uuid
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.db import connection, transaction
+from django.utils import timezone
+
+from catalogo.models import CentroCusto, ItemLimpeza, Material, Opcao, SaidaSCPI
+from pedidos.models import Atendimento, ItemPedido, LinhaSaida, Pedido
+from pedidos.regras import AVULSA, LIMPEZA, DadosSaida, EnvioPedido, ItemEnviado
+
+MATERIAIS = [
+    # código, nome, grupo, estoque, oculto
+    ("023.001.002", "DETERGENTE NEUTRO", "LIMPEZA", "0", False),
+    ("008.001.002", "CAFÉ 500 G", "GÊNEROS", "0", False),
+    ("023.004.001", "PAPEL HIGIÊNICO", "LIMPEZA", "50", False),
+    ("016.005.010", "FITA VEDA ROSCA", "REDES DE ÁGUA", "10", False),
+    ("013.006.001", "BOTINA", "EPI", "2.5", False),
+    ("013.005.007", "LUVA NITRÍLICA", "EPI", "0", False),
+    ("000.000.900", "ITEM ANTIGO", "GERAL", "0", False),
+    ("030.004.001", "CAPACETE", "EPI", "9", True),
+]
+SAIDAS = {
+    "016.005.010": 3,
+    "013.006.001": 2,
+    "013.005.007": 1,
+    "000.000.900": 1,
+    "030.004.001": 1,
+    "023.004.001": 1,
+}
+
+
+def montar_cenario(*, com_estoque: bool = True) -> None:
+    """Listas, materiais, itens de limpeza, saídas do SCPI e centros de custo (idempotente)."""
+    opcoes = {
+        Opcao.Lista.FUNCIONARIO: ["Ana Exemplo", "João Fictício", "Motorista Teste"],
+        Opcao.Lista.CATEGORIA_LIMPEZA: ["Limpeza", "Copa/cozinha"],
+    }
+    for lista, valores in opcoes.items():
+        for ordem, valor in enumerate(valores):
+            Opcao.objects.update_or_create(
+                lista=lista, valor=valor, defaults={"ordem": ordem, "ativo": True}
+            )
+    agora = timezone.now() if com_estoque else None
+    materiais = {}
+    for codigo, nome, grupo, estoque, oculto in MATERIAIS:
+        materiais[codigo], _ = Material.objects.update_or_create(
+            codigo=codigo,
+            defaults={
+                "nome": nome,
+                "unidade": "UN",
+                "grupo": grupo,
+                "subgrupo": "SUB",
+                "oculto": oculto,
+                "duplicado": False,
+                "estoque": Decimal(estoque),
+                "estoque_em": agora,
+            },
+        )
+    limpeza = [
+        ("023.001.002", "Limpeza", ""),
+        ("008.001.002", "Copa/cozinha", "Pacote 500 g"),
+        ("023.004.001", "Limpeza", ""),
+    ]
+    for ordem, (codigo, categoria, unidade) in enumerate(limpeza):
+        ItemLimpeza.objects.update_or_create(
+            material=materiais[codigo],
+            defaults={"categoria": categoria, "unidade_exibida": unidade, "ordem": ordem},
+        )
+    for codigo, vezes in SAIDAS.items():
+        for n in range(vezes):
+            SaidaSCPI.objects.update_or_create(
+                id_requi=f"T{n}-{codigo}",
+                cadpro=codigo,
+                defaults={
+                    "data": timezone.localdate(),
+                    "qtd": Decimal(1),
+                    "valor": Decimal(1),
+                },
+            )
+    centros = [
+        ("ETA I", "12", None),
+        ("ETA II", "14", None),
+        ("Elevatória", "16", None),
+        ("OFICINA MECÂNICA", "20", None),
+        ("PICKUP 01", "31", "ABC1D23"),
+        ("RETRO A", "41", "XYZ9K99"),
+    ]
+    for descricao, codigo, placa in centros:
+        if not CentroCusto.objects.filter(descricao=descricao, codigo=codigo).exists():
+            CentroCusto.objects.create(descricao=descricao, codigo=codigo, placa=placa)
+
+
+def itens(*pares) -> tuple[ItemEnviado, ...]:
+    return tuple(ItemEnviado(c, q) for c, q in pares)
+
+
+def envio_limpeza(**extra) -> EnvioPedido:
+    campos = {
+        "solicitante": "Ana",
+        "destino": "ETA II",
+        "itens": itens(("023.001.002", "2"), ("008.001.002", "1,5")),
+    }
+    campos.update(extra)
+    return EnvioPedido(**campos)
+
+
+def envio_ab(**extra) -> EnvioPedido:
+    campos = {
+        "solicitante": "Bruno",
+        "destino": "Elevatória",
+        "itens": itens(("016.005.010", "3")),
+    }
+    campos.update(extra)
+    return EnvioPedido(**campos)
+
+
+def saida(**extra) -> DadosSaida:
+    campos = {
+        "data": "2026-10-09",
+        "recebedor": "João",
+        "centro_custo": "ETA II",
+        "tipo": "BALCÃO",
+        "placa": "",
+    }
+    campos.update(extra)
+    return DadosSaida(**campos)
+
+
+def registrar(origem, envio, **kw):
+    """`registrar_pedido` com um identificador novo. Nos testes, o TELEGRAM_* vazio faz o
+    aviso dar "sem_configuracao" sem acessar a rede."""
+    from pedidos.servicos import registrar_pedido
+
+    return registrar_pedido(origem, uuid.uuid4(), envio, **kw)
+
+
+def criar_pedido(
+    *,
+    ip=None,
+    solicitante="Ana",
+    criado_em=None,
+    origem=LIMPEZA,
+    numero=None,
+    itens=(("023.001.002", "2"),),
+    atendido=False,
+    entregues=None,
+    linhas=(),
+    usuario=None,
+    recebedor="João",
+):
+    """Pedido gravado direto pelo ORM (sem passar pelas regras), para montar cenários.
+
+    Com `atendido`, grava o atendimento (entregues iguais aos pedidos, salvo `entregues`) e
+    uma `LinhaSaida` do primeiro item para cada par (status, requisição) de `linhas`."""
+    from pedidos.servicos import proximo_numero, travar_sequencia
+
+    if numero is None:
+        with transaction.atomic():
+            numero = proximo_numero(travar_sequencia(), origem)
+    pedido = Pedido.objects.create(
+        id=uuid.uuid4(),
+        numero=numero,
+        origem=origem,
+        ip=ip,
+        solicitante=solicitante,
+        destino="ETA II",
+        criado_em=criado_em or timezone.now(),
+        registrado_por=usuario if origem == AVULSA else None,
+    )
+    entregues = entregues or [None] * len(itens)
+    criados = [
+        ItemPedido.objects.create(
+            pedido=pedido,
+            codigo=codigo,
+            material=f"MATERIAL {codigo}",
+            unidade="UN",
+            qtd_pedida=Decimal(qtd.replace(",", ".")),
+            qtd_entregue=(Decimal((entregue or qtd).replace(",", ".")) if atendido else None),
+        )
+        for (codigo, qtd), entregue in zip(itens, entregues, strict=True)
+    ]
+    if atendido:
+        if usuario is None:
+            usuario, _ = get_user_model().objects.get_or_create(username="00099")
+        atendimento = Atendimento.objects.create(
+            id=uuid.uuid4(),
+            pedido=pedido,
+            data_efetiva=timezone.localdate(),
+            recebedor=recebedor,
+            centro_custo="ETA II",
+            tipo_saida="BALCÃO",
+            atendido_por=usuario,
+        )
+        for seq, (status, requisicao) in enumerate(linhas, start=1):
+            LinhaSaida.objects.create(
+                atendimento=atendimento,
+                seq=seq,
+                data=atendimento.data_efetiva,
+                qtd=criados[0].qtd_pedida,
+                codigo=criados[0].codigo,
+                descricao=criados[0].material,
+                recebedor=recebedor,
+                centro_custo="ETA II",
+                tipo_saida="BALCÃO",
+                lote=numero,
+                status=status,
+                requisicao_scpi=requisicao,
+            )
+    return pedido
+
+
+def em_paralelo(*funcoes) -> list:
+    """Roda as funções ao mesmo tempo (uma thread e uma conexão cada) e devolve os resultados."""
+    barreira = threading.Barrier(len(funcoes))
+    resultados: list = [None] * len(funcoes)
+    erros: list = []
+
+    def rodar(i, funcao):
+        try:
+            barreira.wait()
+            resultados[i] = funcao()
+        except Exception as exc:  # repassado ao teste
+            erros.append(exc)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=rodar, args=(i, f)) for i, f in enumerate(funcoes)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    if erros:
+        raise erros[0]
+    return resultados

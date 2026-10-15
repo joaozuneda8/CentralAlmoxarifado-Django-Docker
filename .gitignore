@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+logs/
+backups/
+staticfiles/
+media/
+.pw-profile/
+output/
+*.sqlite3
+.DS_Store

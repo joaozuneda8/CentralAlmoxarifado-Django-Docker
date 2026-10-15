@@ -1,0 +1,22 @@
+{% comment %}
+Mensagens de `django.contrib.messages` no vocabulário Clean (`componentes.css`, "Avisos").
+
+O mapeamento dos níveis fica aqui, não em `MESSAGE_TAGS`: erro vira `.aviso-erro` com
+`role="alert"`; sucesso, atenção e informação viram `.aviso-ok/-atencao/-info` com
+`role="status"`. Cada mensagem fica visível até a próxima navegação (nunca some sozinha).
+{% endcomment %}
+{% if messages %}
+<div class="pilha mensagens">
+  {% for message in messages %}
+  {% if message.tags == 'error' %}
+  <div class="aviso aviso-erro" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<p>{{ message }}</p></div>
+  {% elif message.tags == 'success' %}
+  <div class="aviso aviso-ok" role="status">{% include "interface/_icone.html" with nome="check" %}<p>{{ message }}</p></div>
+  {% elif message.tags == 'warning' %}
+  <div class="aviso aviso-atencao" role="status">{% include "interface/_icone.html" with nome="alerta" %}<p>{{ message }}</p></div>
+  {% else %}
+  <div class="aviso aviso-info" role="status"><p>{{ message }}</p></div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}

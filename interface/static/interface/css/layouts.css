@@ -1,0 +1,107 @@
+/* Layouts: público (sem login) e casca da área do almoxarifado; impressão. */
+
+.pular { position: absolute; left: var(--esp-2); top: -100px; z-index: 10; padding: var(--esp-1) var(--esp-2); background: var(--texto); color: var(--fundo); border-radius: var(--raio-controle); }
+.pular:focus { top: var(--esp-2); color: var(--fundo); }
+
+.marca { display: inline-flex; align-items: center; gap: 10px; font-family: var(--fonte-titulo); font-weight: 600; letter-spacing: -0.01em; color: var(--texto); }
+.marca:hover { color: var(--texto); text-decoration: none; }
+.marca .icone { width: 22px; height: 22px; }
+.link-discreto { color: var(--texto-secundario); font-size: 0.95em; }
+.link-discreto:hover { color: var(--texto); }
+/* Link de volta (bloco `voltar` dos dois layouts): acima do rótulo do cabeçalho, na cor dos links,
+   com área de toque de 44px; o recuo de cima compensa a folga do toque. */
+.link-voltar {
+  display: inline-flex; align-items: center; gap: 6px; justify-self: start; min-height: 44px;
+  margin-top: calc(var(--esp-1) * -1); font-size: 14px;
+}
+.pagina-cabecalho .link-voltar { margin-bottom: var(--esp-1); }
+.publico-cabecalho .link-voltar { margin-bottom: calc(var(--esp-1) * -1); }
+
+/* Público */
+.publico-topo { border-bottom: 1px solid var(--borda); background: var(--fundo); }
+.publico-topo-interno, .publico-conteudo, .publico-rodape { width: 100%; max-width: 720px; margin-inline: auto; padding-inline: var(--esp-3); }
+.publico-topo-interno { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); min-height: 64px; }
+.publico-conteudo { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--entre-blocos); padding-block: var(--esp-8) var(--esp-12); }
+.publico-cabecalho { display: grid; gap: var(--esp-2); }
+.publico-sub { color: var(--texto-secundario); font-size: 1.05em; max-width: 36em; }
+.publico-sub:empty { display: none; }
+.publico-rodape { padding-block: var(--esp-4); border-top: 1px solid var(--borda); color: var(--texto-suave); font-size: 0.875em; }
+@media (max-width: 640px) {
+  .publico-topo-interno, .publico-conteudo, .publico-rodape { padding-inline: var(--esp-2); }
+  .publico-conteudo { padding-block: var(--esp-4) var(--esp-8); }
+}
+
+/* Página pública larga (formulário de pedido): no desktop cabe a busca ao lado do pedido; os
+   campos dos outros passos mantêm a largura de leitura. */
+@media (min-width: 1024px) {
+  .pagina-larga .publico-topo-interno, .pagina-larga .publico-conteudo, .pagina-larga .publico-rodape { max-width: 1080px; }
+  .pagina-larga .passo-corpo > .campo { max-width: 560px; }
+}
+
+/* Casca do almoxarifado */
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; background: var(--superficie); }
+.app-lateral { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; background: var(--fundo); border-right: 1px solid var(--borda); }
+.app-lateral-topo { display: flex; align-items: center; justify-content: space-between; padding: 20px var(--esp-3); }
+.app-menu-botao { display: none; }
+.app-menu-botao .app-menu-fechar, .app-menu-botao[aria-expanded="true"] .app-menu-abrir { display: none; }
+.app-menu-botao[aria-expanded="true"] .app-menu-fechar { display: inline-flex; }
+.app-lateral-painel { display: flex; flex: 1; flex-direction: column; justify-content: space-between; min-height: 0; padding: var(--esp-1) var(--esp-2) var(--esp-3); overflow-y: auto; }
+.app-menu { display: grid; gap: 2px; }
+.app-menu-item {
+  position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border-radius: var(--raio-controle); color: var(--texto-secundario); font-weight: 500;
+  transition: background-color var(--transicao), color var(--transicao);
+}
+.app-menu-item:hover { background: var(--superficie); color: var(--texto); text-decoration: none; }
+.app-menu-item[aria-current="page"] { background: var(--superficie); color: var(--texto); }
+.app-menu-item[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: var(--destaque); }
+.app-conta { display: grid; gap: var(--esp-meio); padding: var(--esp-2) 12px 0; border-top: 1px solid var(--borda); }
+.app-conta-nome { font-weight: 500; }
+.app-conta form { margin-top: var(--esp-1); }
+.app-principal { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--entre-blocos); padding: var(--esp-4) var(--esp-4) var(--esp-8); }
+/* Com a barra fixa do pedido (saída avulsa no tablet e no celular), o espaço dela fica no pé do
+   conteúdo, não no do <body>: somado ao min-height de 100vh da .app, ele rolava a página mesmo
+   quando tudo cabia na tela. */
+.js[data-gaveta] body:has(.app [data-carrinho]) { padding-bottom: 0; }
+.js[data-gaveta] .app:has([data-carrinho]) .app-principal { padding-bottom: 88px; }
+.pagina-cabecalho { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--esp-2); }
+.pagina-cabecalho > div:first-child { display: grid; gap: var(--esp-meio); }
+.pagina-sub { color: var(--texto-secundario); }
+.pagina-sub:empty { display: none; }
+.pagina-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+
+/* Com a barra lateral ao lado (acima de 1286px), a barra e a gaveta do pedido começam depois dela,
+   para não cobrir a conta e o botão de sair. */
+@media (min-width: 1287px) {
+  .js[data-gaveta] .app .carrinho-barra { left: 248px; }
+  .js[data-gaveta] .app .carrinho-gaveta[open] { left: 248px; width: calc(100% - 248px); }
+}
+
+/* Até 1286px a barra lateral (248px) vira o cabeçalho com o botão de menu: é a largura que o
+   formulário precisa (960px de passos, mais margens e a barra de rolagem) para manter a coluna do
+   pedido ao lado, em vez de mandá-la para a gaveta. */
+@media (max-width: 1286px) {
+  /* Duas linhas (barra e conteúdo): a sobra de altura é da segunda, senão a barra estica. */
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .app-lateral { position: sticky; z-index: 5; height: auto; border-right: 0; border-bottom: 1px solid var(--borda); }
+  .app-lateral-topo { padding: 12px var(--esp-4); }
+  .js .app-menu-botao { display: inline-flex; }
+  .js .app-lateral:not([data-aberto]) .app-lateral-painel { display: none; }
+  .app-lateral-painel { padding-top: 0; }
+  .app-principal { padding-bottom: var(--esp-6); }
+}
+@media (max-width: 900px) {
+  .app-lateral-topo { padding: 12px var(--esp-2); }
+  .app-principal { padding: var(--esp-3) var(--esp-2) var(--esp-6); }
+}
+
+/* Impressão: só o conteúdo, sem casca, sem fundos */
+@media print {
+  .app-lateral, .pagina-cabecalho, .mensagens, .publico-topo, .publico-rodape, .pular,
+  .nao-imprimir, .so-tela { display: none !important; }
+  .app { display: block; background: none; }
+  .app-principal { padding: 0; }
+  body { background: #ffffff; color: #000000; }
+  .rotulo-secao, .dados dt, .texto-suave, .texto-secundario { color: #000000; }
+  .cartao { box-shadow: none; border-color: #cccccc; }
+}

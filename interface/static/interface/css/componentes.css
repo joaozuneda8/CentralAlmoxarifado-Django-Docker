@@ -1,0 +1,480 @@
+/* Componentes do Clean (docs/DESIGN.md). Só usa os tokens de clean.css. */
+
+/* Botões */
+.botao {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--esp-1);
+  min-height: var(--altura-controle); padding: var(--esp-1) 20px;
+  border: 1px solid transparent; border-radius: var(--raio-controle);
+  font-family: var(--fonte-texto); font-size: 0.95em; font-weight: 500; line-height: 1.3;
+  text-align: center; text-decoration: none; cursor: pointer;
+  transition: background-color var(--transicao), border-color var(--transicao),
+    color var(--transicao), transform var(--transicao);
+}
+.botao:hover { text-decoration: none; }
+.botao:active { transform: scale(0.98); }
+.botao[disabled], .botao[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none; }
+.botao-primario { background: var(--destaque); color: var(--destaque-texto); }
+.botao-primario:hover { background: var(--destaque-hover); color: var(--destaque-texto); }
+.botao-secundario { background: var(--fundo); border-color: var(--borda); color: var(--texto); }
+.botao-secundario:hover { background: var(--superficie); color: var(--texto); }
+.botao-texto { min-height: 0; padding: var(--esp-meio) var(--esp-1); background: none; color: var(--texto-secundario); }
+.botao-texto:hover { background: var(--superficie); color: var(--texto); }
+.botao-perigo, .botao-perigo:hover { color: var(--erro-texto); }
+.botao-icone { width: var(--altura-controle); padding: 0; }
+@media (max-width: 640px) { .botao-bloco { width: 100%; } }
+
+/* Campos */
+.campo { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 6px; }
+.campo-rotulo { font-size: 0.875em; font-weight: 500; color: var(--texto); }
+.campo-entrada {
+  width: 100%; min-height: var(--altura-controle); padding: 10px 14px;
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-controle);
+  transition: border-color var(--transicao), box-shadow var(--transicao);
+}
+.campo-entrada::placeholder { color: var(--texto-suave); }
+.campo-entrada:hover { border-color: var(--texto-suave); }
+.campo-entrada:focus { outline: none; border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-superficie); }
+textarea.campo-entrada { min-height: 96px; resize: vertical; }
+select.campo-entrada { padding-right: 36px; }
+.campo-dica { font-size: 0.85em; color: var(--texto-secundario); }
+.campo-erro { font-size: 0.85em; color: var(--erro-texto); }
+.campo-com-erro .campo-entrada { border-color: var(--erro-texto); }
+.campo-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.campo-check input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--destaque); }
+/* Campos de uma saída, compactos: a grade escolhe as colunas pela largura do próprio bloco
+   (container query), porque a barra lateral e o resumo do pedido mudam o espaço. Quatro colunas
+   com o recebedor e o centro de custo em duas e as observações na linha toda; duas colunas (o
+   tablet), aos pares na ordem do formulário, com o centro de custo na linha toda; uma. */
+.saida-campos { container-type: inline-size; }
+.grade-saida { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px var(--esp-2); align-items: start; }
+@container (min-width: 480px) {
+  .grade-saida { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grade-saida-linha { grid-column: 1 / -1; }
+  /* No atendimento, o recebedor tem o "Usar <solicitante>" dentro: na metade, sobraria pouco para
+     digitar. Ele fica na linha toda, o tipo sobe para o lado da data e a placa e o centro de
+     custo ficam aos pares. */
+  .grade-saida-largo:has(.acao-campo) { grid-column: 1 / -1; }
+  .grade-saida:has(.acao-campo) { grid-auto-flow: row dense; }
+  .grade-saida:has(.acao-campo) .grade-saida-linha { grid-column: auto; }
+  /* A caixa "Não lançar" fica ao lado de campos com rótulo: começa onde começam os controles (o
+     recuo é a linha do .campo-rotulo mais o gap de 6px do .campo) e estica até o fim da linha da
+     grade, na altura do controle mais alto ao lado. */
+  .grade-saida > .campo-check-caixa { align-self: stretch; margin-top: 27px; }
+}
+@container (min-width: 760px) {
+  .grade-saida { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* O centro de custo também: a regra das duas colunas (aos pares com a placa) é mais específica e
+     valeria aqui. */
+  .grade-saida-largo, .grade-saida-largo:has(.acao-campo),
+  .grade-saida:has(.acao-campo) .grade-saida-linha { grid-column: span 2; }
+  .grade-saida:has(.acao-campo) { grid-auto-flow: row; }
+  .grade-saida-cheio { grid-column: 1 / -1; }
+}
+.campo-rotulo-linha { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-1); }
+.campo-nota { display: inline-flex; align-items: center; gap: var(--esp-meio); font-size: 12px; color: var(--texto-suave); white-space: nowrap; }
+.campo-nota[hidden] { display: none; }
+.campo-nota .icone { width: 12px; height: 12px; }
+.campo-check-caixa {
+  align-items: center; align-self: end; min-height: var(--altura-controle); padding: 0 12px;
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-controle);
+  font-size: 0.875em; transition: border-color var(--transicao);
+}
+.campo-check-caixa:hover { border-color: var(--texto-suave); }
+.campo-check-caixa input { margin-top: 0; width: 16px; height: 16px; flex: none; }
+.campo-check-caixa > span { line-height: 1.25; }
+.campo-check-caixa .campo-dica { display: block; font-size: 11px; line-height: 1.25; }
+/* Uma linha só; ao focar, abre para escrever com folga. */
+textarea.campo-linha { min-height: var(--altura-controle); height: var(--altura-controle); padding-block: 9px; resize: none; line-height: 1.4; overflow: hidden; transition: height 0.2s ease, border-color var(--transicao), box-shadow var(--transicao); }
+textarea.campo-linha:focus { height: 84px; }
+@media (prefers-reduced-motion: reduce) { textarea.campo-linha { transition: none; } }
+/* Botão suave: ação secundária em azul sutil (mesmo tom do selo-info), com ícone. */
+.botao-suave {
+  display: inline-flex; align-items: center; gap: 6px; height: calc(var(--altura-controle) - 8px); padding: 0 10px;
+  background: var(--destaque-superficie); border: 1px solid transparent; border-radius: 6px;
+  font-size: 0.8125em; font-weight: 500; color: var(--info-texto); cursor: pointer;
+  transition: background-color var(--transicao), border-color var(--transicao), transform var(--transicao);
+}
+.botao-suave > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.botao-suave .icone { width: 14px; height: 14px; }
+.botao-suave:hover { background: #dde8ff; border-color: rgba(37, 99, 235, 0.25); }
+.botao-suave:active { transform: scale(0.97); }
+/* Atalho dentro do campo (ex.: "Usar <solicitante>"), à esquerda da seta do dropdown. */
+.com-acao { position: relative; }
+.com-acao:has(.acao-campo:not([hidden])) .campo-entrada { padding-right: calc(min(170px, 40%) + 46px); }
+.acao-campo[hidden] { display: none; }
+.acao-campo { position: absolute; right: 40px; top: 50%; transform: translateY(-50%); z-index: 1; max-width: min(170px, 40%); }
+.acao-campo:active { transform: translateY(-50%) scale(0.97); }
+/* Grupo de opções (radios) com um campo opcional embaixo, como a origem dos dados dos robôs. */
+.grupo-opcoes { display: grid; gap: var(--esp-1); margin: 0; padding: 0; border: 0; min-width: 0; }
+.grupo-opcoes legend { margin-bottom: var(--esp-1); padding: 0; }
+.campo-check input[type="radio"] { border-radius: 50%; }
+.campo-busca { position: relative; }
+.campo-busca .icone { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--texto-suave); pointer-events: none; }
+.campo-busca .campo-entrada { padding-left: 42px; }
+
+/* Dropdown (dropdown.js): select e campo com lista no estilo do painel de resultados da busca.
+   O <select> e o <input> originais ficam na página (escondidos) e guardam o valor. */
+.dropdown { position: relative; }
+.dropdown-gatilho {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--esp-1);
+  text-align: left; cursor: pointer;
+}
+.dropdown-valor { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown-gatilho:disabled { background: var(--superficie); color: var(--texto-secundario); cursor: not-allowed; }
+.dropdown-gatilho:disabled:hover { border-color: var(--borda); }
+.dropdown-gatilho:disabled .dropdown-seta { opacity: 0.4; }
+.dropdown-vazio .dropdown-valor { color: var(--texto-secundario); }
+.dropdown-seta { display: inline-flex; flex: none; color: var(--texto-suave); transition: transform var(--transicao); }
+.dropdown[data-aberto] .dropdown-seta { transform: rotate(180deg); color: var(--destaque); }
+.dropdown[data-aberto] > .campo-entrada { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-superficie); }
+/* block: sem a folga de linha de um inline-block, o wrapper tem a altura do campo e a seta fica no centro. */
+.dropdown-combo { display: block; padding-right: 44px; }
+.dropdown-seta-campo { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.dropdown[data-aberto] .dropdown-seta-campo { transform: translateY(-50%) rotate(180deg); }
+
+.dropdown-painel {
+  position: absolute; left: 0; top: 100%; z-index: 20; margin-top: var(--esp-1);
+  min-width: max(100%, 17rem); max-width: min(30rem, calc(100vw - 2 * var(--esp-2)));
+  flex-direction: column; max-height: min(60vh, 22rem); overflow: hidden;
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
+  box-shadow: var(--sombra-elevada);
+}
+.dropdown-painel:not([hidden]) { display: flex; }
+.dropdown-cabecalho { display: grid; gap: var(--esp-1); padding: 10px var(--esp-2); border-bottom: 1px solid var(--borda); background: var(--fundo); }
+.dropdown-topo p { white-space: nowrap; }
+.dropdown-topo { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-meio) var(--esp-2); }
+.dropdown-lista { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; outline: none; }
+.dropdown-grupo { padding: 10px var(--esp-2) 6px; background: var(--superficie); border-bottom: 1px solid var(--borda); }
+.dropdown-opcao {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2);
+  padding: 14px var(--esp-2); border-bottom: 1px solid var(--borda); cursor: pointer;
+}
+.dropdown-opcao:last-child { border-bottom: 0; }
+.dropdown-texto { min-width: 0; overflow-wrap: anywhere; }
+.dropdown-check { display: inline-flex; flex: none; color: var(--destaque); visibility: hidden; }
+.dropdown-opcao[data-ativa] { background: var(--superficie); }
+.dropdown-opcao[aria-selected="true"] { background: var(--destaque-superficie); color: var(--destaque-hover); font-weight: 500; }
+.dropdown-opcao[aria-selected="true"] .dropdown-check { visibility: visible; }
+.dropdown-sem-opcoes { padding: 14px var(--esp-2); }
+/* Árvore (data-dropdown-arvore): linhas mais baixas; à esquerda, a quantidade de subgrupos da
+   pasta (ou o ramo ├─ └─ do filho, em fonte mono); à direita, o botão que abre a pasta, com borda
+   e a seta para baixo que gira ao abrir: um alvo separado do resto da linha, que escolhe. */
+.dropdown-arvore .dropdown-opcao { justify-content: flex-start; gap: var(--esp-1); padding: 8px 10px 8px 12px; min-height: 52px; }
+.dropdown-arvore .dropdown-texto { flex: 1 1 auto; }
+.dropdown-qtd {
+  flex: none; width: 28px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--borda); border-radius: var(--raio-pilula); background: var(--fundo);
+  color: var(--texto-secundario); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.dropdown-qtd-vazia { border: 0; background: none; }
+.dropdown-ramo { flex: none; width: 28px; text-align: center; font-family: var(--fonte-mono); color: var(--texto-suave); }
+.dropdown-alternar {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 36px;
+  border: 1px solid var(--borda); border-radius: var(--raio-controle); background: var(--fundo); color: var(--texto);
+  transition: background-color var(--transicao), border-color var(--transicao);
+}
+.dropdown-alternar:hover { background: var(--superficie); border-color: var(--texto-suave); }
+.dropdown-alternar .icone { width: 18px; height: 18px; stroke-width: 2; transition: transform var(--transicao); }
+.dropdown-opcao[aria-expanded="true"] > .dropdown-alternar { background: var(--superficie); border-color: var(--texto-suave); }
+.dropdown-opcao[aria-expanded="true"] > .dropdown-alternar .icone { transform: rotate(180deg); }
+.dropdown-arvore .dropdown-filho { padding-left: 26px; border-bottom-color: transparent; }
+.dropdown-arvore .dropdown-filho:has(+ :not(.dropdown-filho)), .dropdown-arvore .dropdown-filho:last-child { border-bottom-color: var(--borda); }
+
+/* Cartões */
+.cartao {
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
+  box-shadow: var(--sombra-cartao); padding: var(--recheio-cartao);
+}
+.cartao-titulo { margin-bottom: var(--esp-2); }
+.cartao-sutil { background: var(--superficie); box-shadow: none; }
+.cartao-opcao {
+  display: grid; gap: var(--esp-1); color: inherit; text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.cartao-opcao:hover { color: inherit; text-decoration: none; transform: translateY(-2px); box-shadow: var(--sombra-hover); }
+.cartao-opcao .icone { width: 24px; height: 24px; }
+.cartao-opcao-seta { margin-top: var(--esp-1); color: var(--destaque); transition: transform var(--transicao); }
+.cartao-opcao:hover .cartao-opcao-seta { transform: translateX(4px); }
+
+/* Abas (abas.js): pasta. A aba ativa é branca e se funde ao primeiro cartão do painel, que vira o
+   corpo da pasta; os demais cartões do painel ficam embaixo, soltos. Sem JavaScript, os painéis
+   ficam todos à vista, empilhados, e a lista de abas não aparece. */
+.abas { display: grid; gap: var(--esp-4); }
+.abas-lista { display: none; }
+.js .abas { gap: 0; }
+/* A lista desce 1px sobre o cartão: a aba ativa cobre a borda de cima dele. O recuo (maior que o raio
+   do cartão) tira a primeira aba da curva do canto. overflow-y: hidden: sem ele, a rolagem lateral
+   do celular também rolaria na vertical. */
+.js .abas-lista {
+  position: relative; z-index: 1; display: flex; gap: 2px; margin-bottom: -1px; padding-inline: var(--esp-2);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+.js .abas-lista::-webkit-scrollbar { display: none; }
+/* Abas que não cabem (celular): a rolagem para no começo de uma aba, e a borda do lado em que ainda
+   há abas some num degradê (o abas.js marca `data-mais-inicio`/`data-mais-fim`), para mostrar que
+   a lista continua. */
+.js .abas-lista { scroll-snap-type: x proximity; scroll-padding-inline: var(--esp-2); }
+.js .abas-lista > .aba { scroll-snap-align: start; }
+.js .abas-lista[data-mais-fim] { mask-image: linear-gradient(to left, transparent, #000 var(--esp-4)); }
+.js .abas-lista[data-mais-inicio] { mask-image: linear-gradient(to right, transparent, #000 var(--esp-4)); }
+.js .abas-lista[data-mais-inicio][data-mais-fim] {
+  mask-image: linear-gradient(to right, transparent, #000 var(--esp-4), #000 calc(100% - var(--esp-4)), transparent);
+}
+.aba {
+  display: inline-flex; align-items: center; gap: var(--esp-1); min-height: var(--altura-controle); padding: 0 var(--esp-2);
+  background: rgba(15, 14, 12, 0.04); border: 1px solid var(--borda); border-bottom: 0;
+  border-radius: var(--raio-controle) var(--raio-controle) 0 0;
+  font: inherit; font-weight: 500; color: var(--texto-secundario); cursor: pointer; white-space: nowrap;
+  transition: color var(--transicao), background var(--transicao);
+}
+/* As não selecionadas também são abas da pasta: cinza, atrás da ativa, apoiadas na borda do cartão. */
+.aba:hover { color: var(--texto); background: rgba(15, 14, 12, 0.08); }
+/* Estado pela forma (aba aberta, ligada ao cartão) e pelo filete azul em cima, não só pela cor. */
+.aba-ativa, .aba-ativa:hover { background: var(--fundo); border-color: var(--borda); color: var(--texto); box-shadow: inset 0 2px 0 var(--destaque); }
+.aba:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--destaque); }
+.js .aba-painel:not(.aba-painel-ativo) { display: none; }
+/* Selo dentro da aba: com texto na tela larga; abaixo de 1024px só o ícone (o texto fica para o
+   leitor de tela), para as abas caberem no tablet. O ícone é a forma do estado, não só a cor. */
+.aba-selo .icone { display: none; width: 14px; height: 14px; }
+@media (max-width: 1024px) {
+  .aba-selo { padding: 3px; }
+  .aba-selo .icone { display: block; }
+  .aba-selo-texto {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap;
+  }
+}
+
+/* Selos (estado sempre com texto) */
+.selo {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px;
+  border-radius: var(--raio-pilula); font-size: 0.8em; font-weight: 500; line-height: 1.6; white-space: nowrap;
+}
+.selo-ok { background: var(--ok-superficie); color: var(--ok-texto); }
+.selo-aviso { background: var(--aviso-superficie); color: var(--aviso-texto); }
+.selo-erro { background: var(--erro-superficie); color: var(--erro-texto); }
+.selo-info { background: var(--info-superficie); color: var(--info-texto); }
+.selo-neutro { background: var(--neutro-superficie); color: var(--neutro-texto); border: 1px solid var(--borda); }
+
+/* Avisos */
+.aviso {
+  display: flex; gap: var(--esp-1); align-items: flex-start;
+  padding: 14px var(--esp-2); border-radius: var(--raio-controle); font-size: 0.95em;
+}
+.aviso > .icone { margin-top: 3px; }
+.aviso ul { margin-top: var(--esp-meio); }
+.aviso-ok { background: var(--ok-superficie); color: var(--ok-texto); }
+.aviso-atencao { background: var(--aviso-superficie); color: var(--aviso-texto); }
+.aviso-erro { background: var(--erro-superficie); color: var(--erro-texto); }
+.aviso-info { background: var(--info-superficie); color: var(--info-texto); }
+.aviso:empty { display: none; }
+
+/* Tabela */
+.tabela-rolagem { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tabela { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+.tabela th {
+  padding: var(--celula-v) var(--celula-h); text-align: left; white-space: nowrap;
+  font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--texto-suave); border-bottom: 1px solid var(--borda);
+}
+.tabela td { padding: var(--celula-v) var(--celula-h); border-bottom: 1px solid var(--borda); vertical-align: top; }
+.tabela tbody tr { transition: background-color var(--transicao); }
+.tabela tbody tr:hover { background: var(--superficie); }
+.tabela tbody tr:last-child td { border-bottom: 0; }
+.tabela-data { white-space: nowrap; color: var(--texto-secundario); }
+.tabela-vazia td { text-align: center; color: var(--texto-secundario); padding: var(--esp-4); }
+
+/* Paginação */
+.paginacao { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2); margin-top: var(--esp-2); }
+.paginacao-resumo { font-size: 0.875em; color: var(--texto-secundario); }
+.paginacao-lista { display: flex; flex-wrap: wrap; gap: var(--esp-meio); list-style: none; margin: 0; padding: 0; }
+.paginacao-link {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; padding: 0 10px;
+  border: 1px solid var(--borda); border-radius: var(--raio-controle); background: var(--fundo); color: var(--texto); font-size: 0.9em;
+}
+a.paginacao-link:hover { background: var(--superficie); color: var(--texto); text-decoration: none; }
+.paginacao-atual { background: var(--texto); border-color: var(--texto); color: var(--fundo); }
+.paginacao-desativado { color: var(--texto-suave); }
+.paginacao-reticencia { padding: 0 var(--esp-meio); color: var(--texto-suave); align-self: center; }
+.paginacao-compacta { display: none; }
+@media (max-width: 640px) { .paginacao-larga { display: none; } .paginacao-compacta { display: list-item; } }
+
+/* Filtros */
+.filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--esp-2); }
+/* A coluna da grade também precisa de minmax(0, 1fr): sem ela, o texto longo de um filtro preenchido alarga a coluna além do campo e o controle passa por cima do vizinho. */
+.filtros-campo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; flex: 1 1 160px; min-width: 0; }
+.filtros-campo:first-child { flex-basis: 240px; }
+.filtros-acoes { display: flex; align-items: center; gap: var(--esp-2); }
+/* Com JavaScript os filtros se aplicam sozinhos (hx-trigger); o botão fica só como reserva sem ele. */
+.js .filtros-acoes .botao { display: none; }
+
+/* Filtros recolhíveis (filtros.js): barra com a busca e o botão "Filtros"; o painel abre embaixo
+   e, fechado, os filtros ativos aparecem como chips. Sem JavaScript, o painel fica aberto e o
+   botão some. */
+.filtros-recolhiveis { display: grid; gap: var(--esp-2); }
+.filtros-barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+.filtros-busca { flex: 1 1 280px; }
+.filtros-alternar { flex: none; gap: var(--esp-1); }
+.filtros-alternar[aria-expanded="true"] { background: var(--superficie); }
+.filtros-seta { display: inline-flex; color: var(--texto-suave); transition: transform var(--transicao); }
+.filtros-alternar[aria-expanded="true"] .filtros-seta { transform: rotate(180deg); }
+.filtros-contagem {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: var(--raio-pilula); background: var(--destaque); color: var(--destaque-texto);
+  font-size: 12px; font-weight: 600; line-height: 1;
+}
+.filtros-contagem[hidden] { display: none; }
+.filtros-limpar[hidden] { display: none; }
+html:not(.js) .filtros-alternar { display: none; }
+.filtros-chips { display: flex; flex-wrap: wrap; gap: var(--esp-1); list-style: none; margin: 0; padding: 0; }
+.filtros-chips[hidden] { display: none; }
+.filtros-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px 0 12px;
+  border: 1px solid var(--borda); border-radius: var(--raio-pilula); background: var(--superficie);
+  color: var(--texto); font: inherit; font-size: 0.875em; cursor: pointer;
+  transition: background-color var(--transicao), border-color var(--transicao);
+}
+.filtros-chip .icone { width: 14px; height: 14px; color: var(--texto-secundario); }
+.filtros-chip:hover { background: var(--fundo); border-color: var(--texto-suave); }
+.filtros-chip:hover .icone { color: var(--texto); }
+.filtros-painel { display: grid; gap: var(--esp-2); padding-top: var(--esp-2); border-top: 1px solid var(--borda); }
+.filtros-painel[hidden] { display: none; }
+@starting-style { .filtros-painel { opacity: 0; transform: translateY(-4px); } }
+.filtros-painel { transition: opacity var(--transicao), transform var(--transicao); }
+.filtros-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--esp-2); align-items: end; }
+.filtros-periodo { grid-column: span 2; margin: 0; padding: 0; border: 0; min-width: 0; }
+.filtros-periodo-campos { display: flex; align-items: center; gap: var(--esp-1); }
+.filtros-periodo legend { padding: 0; margin-bottom: 6px; }
+.filtros-periodo-campos .campo-entrada { flex: 1 1 0; min-width: 0; }
+/* No celular as duas datas não cabem lado a lado sem cortar: uma embaixo da outra. */
+@media (max-width: 640px) {
+  .filtros-periodo { grid-column: auto; }
+  .filtros-periodo-campos { flex-direction: column; align-items: stretch; gap: var(--esp-meio); }
+  .filtros-periodo-campos > span { font-size: 0.875em; }
+}
+
+/* Dica flutuante: o texto aparece sobre o controle com o cursor em cima (ou ao tocar, ou com o
+   foco). Funciona com botão desabilitado: o :hover vem do contêiner. Quem tem o texto liga o
+   controle a ele com aria-describedby. */
+.dica-flutuante { position: relative; }
+.dica-flutuante-texto {
+  position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 30;
+  width: max-content; max-width: min(18rem, calc(100vw - 2 * var(--esp-2)));
+  padding: 8px 12px; border-radius: var(--raio-controle); background: var(--texto); color: var(--fundo);
+  font-size: 12.5px; font-weight: 400; line-height: 1.45; box-shadow: 0 8px 30px rgba(0, 0, 0, .09);
+  /* Escondida fica fora do layout (display: none): com visibility ela ainda alargava a página no celular. */
+  display: none; pointer-events: none;
+}
+.dica-flutuante-texto::after {
+  content: ""; position: absolute; top: 100%; left: 20px;
+  border: 6px solid transparent; border-top-color: var(--texto);
+}
+.dica-flutuante:hover .dica-flutuante-texto,
+.dica-flutuante:focus-within .dica-flutuante-texto { display: block; animation: dica-surge var(--transicao) 120ms both; }
+/* Dica alinhada ao fim (borda direita) do controle: para controle encostado na borda direita, a dica não sai da página. */
+.dica-flutuante-fim .dica-flutuante-texto { left: auto; right: 0; }
+.dica-flutuante-fim .dica-flutuante-texto::after { left: auto; right: 20px; }
+@keyframes dica-surge { from { opacity: 0; transform: translateY(4px); } }
+@media (max-width: 640px) { .dica-flutuante-texto { max-width: 15rem; } }
+
+/* Passos numerados */
+.passo { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--esp-1) var(--esp-3); }
+.passo-numero { font-family: var(--fonte-titulo); font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: var(--texto-suave); }
+.passo-cabecalho { display: grid; gap: var(--esp-meio); align-content: start; }
+.passo-corpo { grid-column: 2; display: grid; gap: var(--esp-2); }
+@media (max-width: 640px) { .passo { grid-template-columns: minmax(0, 1fr); } .passo-corpo { grid-column: 1; } }
+/* No tablet, na área interna (saída avulsa), o número fica ao lado do título e o corpo usa a
+   largura toda do cartão, sem a coluna de 64px só para o número. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .app .passo { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: var(--esp-2) 12px; }
+  .app .passo-numero { font-size: 24px; }
+  .app .passo-corpo { grid-column: 1 / -1; }
+}
+
+/* Lista de materiais e quantidade */
+.lista-materiais { list-style: none; margin: 0; padding: 0; border: 1px solid var(--borda); border-radius: var(--raio-cartao); max-height: 30rem; overflow-y: auto; }
+.material { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-2); padding: 14px var(--esp-2); border-bottom: 1px solid var(--borda); }
+.material:last-child { border-bottom: 0; }
+.material-dados { display: grid; gap: 2px; flex: 1 1 15rem; min-width: 0; }
+.material-dados strong { font-weight: 500; }
+.material-titulo { display: flex; align-items: center; gap: var(--esp-1); min-width: 0; }
+.material-titulo strong { min-width: 0; overflow-wrap: anywhere; }
+/* Linha de baixo do material (código, unidade e classe). O "no pedido" vai no botão: "Alterar (N)". */
+.material-info { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-meio) var(--esp-1); min-width: 0; }
+.material-acao { display: flex; align-items: center; gap: var(--esp-1); }
+.material-bloqueado .material-dados strong { color: var(--texto-secundario); }
+.quantidade { display: inline-flex; align-items: center; border: 1px solid var(--borda); border-radius: var(--raio-controle); background: var(--fundo); }
+/* A quantidade é o que a pessoa confere: número em Geist 600, algarismos de largura fixa e os
+   sinais de − e + no traço mais grosso, na cor do texto (no cinza secundário pareciam apagados). */
+.quantidade:hover { border-color: var(--texto-suave); }
+.quantidade .botao-icone { min-height: 0; width: 40px; height: var(--altura-controle); border: 0; background: none; color: var(--texto); }
+.quantidade .botao-icone .icone { stroke-width: 2; }
+.quantidade .botao-icone:hover { background: var(--superficie); color: var(--texto); }
+.quantidade-campo {
+  width: 64px; min-height: var(--altura-controle); border: 0; border-inline: 1px solid var(--borda); text-align: center; background: none;
+  font-family: var(--fonte-titulo); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--texto);
+}
+.quantidade-campo:focus { outline: none; box-shadow: inset 0 0 0 2px var(--destaque); }
+
+/* Resultados da busca: rótulo próprio, para não se confundir com "Seu pedido". */
+.resultados-cabecalho { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--esp-meio) var(--esp-2); margin-bottom: var(--esp-1); }
+
+/* Carrinho ("Seu pedido"). Sem JavaScript, ou com espaço para a coluna ao lado dos passos
+   (pedidos.css): cartão azul na página. Sem esse espaço (menos de 960px; celular, tablet, ou tela
+   com barra lateral), vira barra fixa no rodapé e gaveta (<dialog>). Quem decide é o
+   `data-gaveta` no <html>: o <head> o põe no celular e o pedidos.js o acompanha pela largura da
+   área dos passos (ResizeObserver). */
+.carrinho { display: grid; margin-top: var(--esp-2); }
+.carrinho-barra { display: none; }
+.carrinho-barra-resumo { display: inline-flex; align-items: center; gap: var(--esp-1); font-weight: 500; color: var(--destaque-hover); }
+.carrinho-gaveta {
+  display: grid; gap: var(--esp-2); position: static; width: auto; max-width: none; max-height: none; margin: 0;
+  padding: var(--esp-3); color: inherit; background: var(--destaque-superficie);
+  border: 1px solid var(--destaque); border-radius: var(--raio-cartao);
+}
+.carrinho-cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-1); }
+.carrinho-titulo { display: inline-flex; align-items: center; gap: var(--esp-1); color: var(--destaque-hover); }
+.carrinho-so-gaveta { display: none; }
+.carrinho-lista { list-style: none; margin: 0; padding: 0; display: grid; }
+.carrinho-linha {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-meio) var(--esp-2);
+  padding: 10px 0; border-top: 1px solid var(--borda);
+}
+.carrinho-linha-erro { padding-left: 12px; box-shadow: inset 3px 0 0 var(--erro-texto); }
+.carrinho-barra-pulso { animation: pulso-barra 0.6s ease; }
+@keyframes pulso-barra { from { background: var(--destaque-superficie); } to { background: var(--fundo); } }
+
+.js[data-gaveta] .carrinho { margin-top: 0; }
+.js[data-gaveta] .carrinho-barra {
+  display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  align-items: center; justify-content: space-between; gap: var(--esp-1);
+  padding: 12px var(--esp-2) calc(12px + env(safe-area-inset-bottom));
+  background: var(--fundo); border-top: 1px solid var(--destaque); box-shadow: var(--sombra-elevada);
+}
+.js[data-gaveta] body:has([data-carrinho]) { padding-bottom: 88px; }
+.js[data-gaveta] .carrinho-gaveta:not([open]) { display: none; }
+.js[data-gaveta] .carrinho-gaveta[open] {
+  position: fixed; inset: auto 0 0 0; width: 100%; max-height: 85vh; overflow-y: auto;
+  padding: var(--esp-3) var(--esp-2) calc(var(--esp-3) + env(safe-area-inset-bottom));
+  background: var(--fundo); border: 0; border-radius: var(--raio-cartao) var(--raio-cartao) 0 0;
+  box-shadow: var(--sombra-elevada);
+}
+.js[data-gaveta] .carrinho-gaveta::backdrop { background: rgba(15, 14, 12, 0.4); }
+.js[data-gaveta] .carrinho-so-gaveta { display: inline-flex; }
+.js[data-gaveta] .carrinho-so-gaveta.botao-bloco { width: 100%; }
+
+/* Estado vazio */
+.vazio { display: grid; justify-items: center; gap: var(--esp-1); padding: var(--esp-6) var(--esp-3); text-align: center; color: var(--texto-secundario); }
+.vazio-titulo { font-family: var(--fonte-titulo); font-weight: 600; color: var(--texto); }
+
+/* Dados (rótulo e valor) */
+.dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--esp-2) var(--esp-3); }
+.dados dt { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-suave); }
+.dados dd { overflow-wrap: anywhere; }
+
+/* Ações de formulário */
+.acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); }
+
+@media (max-width: 640px) {
+  .botao, .campo-entrada, .paginacao-link { min-height: 44px; }
+}

@@ -1,0 +1,25 @@
+{% extends "interface/base.html" %}
+{% comment %}
+Layout público (sem login), pensado primeiro para o celular: cabeçalho só com a marca (o link
+da área do almoxarifado fica no rodapé, para não chamar o funcionário), coluna central de 720px. Blocos: voltar (o link de volta, acima do rótulo), rotulo, heading, sub, page, rodape.
+{% endcomment %}
+{% block body_class %}ritmo-publico{% endblock %}
+{% block content %}
+<a class="pular" href="#main">Pular para o conteúdo</a>
+<header class="publico-topo">
+  <div class="publico-topo-interno">
+    <a class="marca" href="{% url 'pedidos:inicio' %}">{% include "interface/_icone.html" with nome="caixa" %}<span>Central Almoxarifado</span></a>
+  </div>
+</header>
+<main class="publico-conteudo" id="main">
+  <header class="publico-cabecalho">
+    {% block voltar %}{% endblock %}
+    <p class="rotulo-secao">{% block rotulo %}{% endblock %}</p>
+    <h1>{% block heading %}{% endblock %}</h1>
+    <p class="publico-sub">{% block sub %}{% endblock %}</p>
+  </header>
+  {% include "interface/_mensagens.html" %}
+  {% block page %}{% endblock %}
+</main>
+<footer class="publico-rodape">{% block rodape %}Almoxarifado SAEP · <a class="link-discreto" href="{% url 'login' %}">Área do almoxarifado</a>{% endblock %}</footer>
+{% endblock %}

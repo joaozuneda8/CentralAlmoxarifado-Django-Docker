@@ -1,0 +1,56 @@
+{% extends "interface/base_almoxarifado.html" %}
+{% load static interface_extras %}
+{% block title %}{{ pedido.numero }} — Central Almoxarifado{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'pedidos/css/pedidos.css' %}">{% endblock %}
+{% block extra_head %}<script src="{% static 'pedidos/js/pedidos.js' %}" defer></script>{% endblock %}
+{# O número e a origem já estão no recibo logo abaixo. #}
+{% block heading %}{% if pedido.origem == "AVULSA" %}Detalhes da saída{% else %}Detalhes do pedido{% endif %}{% endblock %}
+{% block tools %}
+{# Imprime esta página (pedidos.js o mostra); sem JavaScript, imprime-se pelo navegador e a confirmação já fica à vista. #}
+{% if pedido.atendimento_ou_none %}<button type="button" class="botao botao-primario" data-imprimir hidden>{% include "interface/_icone.html" with nome="impressora" %}Imprimir recibo</button>{% endif %}
+{% if pedido.origem == "AVULSA" %}<a class="botao botao-secundario" href="{% url 'pedidos:avulsa' %}">{% include "interface/_icone.html" with nome="mais" %}Registrar outra saída</a>{% endif %}
+{% endblock %}
+
+{% block page %}
+<div class="pilha-larga">
+  {% with a=pedido.atendimento_ou_none %}
+  <p class="texto-secundario texto-pequeno nao-imprimir">
+    {% if pedido.origem == "AVULSA" and pedido.registrado_por %}Registrado por {{ pedido.registrado_por.get_full_name|default:pedido.registrado_por.username }} ({{ pedido.registrado_por.username }}).
+    {% elif a %}Atendido por {{ a.atendido_por.get_full_name|default:a.atendido_por.username }} em {{ a.atendido_em|date:"d/m/Y H:i" }}.{% endif %}
+  </p>
+  {% if a and not a.recibo_impresso_em %}
+  {# Depois de imprimir, a confirmação de que o recibo saiu na impressora (pedidos.js a mostra). #}
+  <form method="post" action="{% url 'pedidos:marcar_impressos' %}" class="confirmacao-impressao nao-imprimir">
+    {% csrf_token %}
+    <input type="hidden" name="atendimento" value="{{ a.id }}">
+    <input type="hidden" name="voltar" value="{{ request.get_full_path }}">
+    <div class="aviso aviso-atencao" role="note">{% include "interface/_icone.html" with nome="alerta" %}<p><strong>O recibo saiu na impressora?</strong> Confirme para marcá-lo como impresso. Sem a confirmação, ele continua na lista de recibos pendentes.</p></div>
+    <button type="submit" class="botao botao-primario">{% include "interface/_icone.html" with nome="check" %}Saiu na impressora — marcar como impresso</button>
+  </form>
+  {% endif %}
+  {% endwith %}
+
+  <article class="folha-recibo">{% include "pedidos/_recibo.html" %}</article>
+
+  {% if pedido.situacao_scpi.chave == "atencao" %}
+  <p class="nao-imprimir"><a href="{% url 'automacoes:pagina' %}?aba=lancamento#travas">Resolver em Automações</a></p>
+  {% endif %}
+
+  {% if atendivel %}
+  <section class="cartao nao-imprimir atendimento">
+    <h2 class="cartao-titulo">Confirmar atendimento</h2>
+    <form id="form-atendimento" method="post" action="{% url 'pedidos:atender' pedido.numero %}" class="pilha-larga">
+      {% csrf_token %}
+      <input type="hidden" name="atendimento_id" value="{{ atendimento_id }}">
+      {% include "pedidos/_campos_saida.html" with solicitante=pedido.solicitante %}
+      {% if mensagem %}
+      <div class="aviso aviso-erro" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<div><p>{{ mensagem }}</p>{% if erros %}<ul>{% for erro in erros %}<li>{{ erro.texto }}</li>{% endfor %}</ul>{% endif %}</div></div>
+      {% endif %}
+      <div class="rodape-saida">
+        <button type="submit" class="botao botao-primario">{% include "interface/_icone.html" with nome="check" %}Confirmar e registrar saída</button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

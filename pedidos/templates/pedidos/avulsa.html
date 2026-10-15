@@ -1,0 +1,46 @@
+{% extends "interface/base_almoxarifado.html" %}
+{% load static %}
+{% block title %}Saída avulsa — Central Almoxarifado{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'pedidos/css/pedidos.css' %}">{% endblock %}
+{% block extra_head %}<script src="{% static 'pedidos/js/pedidos.js' %}" defer></script>{% endblock %}
+{% block rotulo %}Origem: avulsa{% endblock %}
+{% block heading %}Saída avulsa{% endblock %}
+{% block sub %}Saída registrada direto pelo almoxarifado, sem pedido anterior. Cada material vira uma linha de saída, lançada depois no SCPI pelo robô.{% endblock %}
+
+{% block page %}
+{% if indisponivel %}
+<div class="aviso aviso-atencao" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<p>O cadastro de materiais não está disponível. Veja a página Catálogo.</p></div>
+{% else %}
+<form method="post" action="{% url 'pedidos:avulsa' %}" class="pilha-larga">
+  {% csrf_token %}
+  <input type="hidden" name="envio_id" value="{{ envio_id }}">
+
+  {% if mensagem %}
+  <div class="aviso aviso-erro" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<div><p>{{ mensagem }}</p>{% if erros %}<ul>{% for erro in erros %}<li>{{ erro.texto }}</li>{% endfor %}</ul>{% endif %}</div></div>
+  {% endif %}
+
+  <div class="pedido-layout">
+  <div class="pedido-grade">
+  <div class="pedido-passos pilha-larga">
+  <section class="passo cartao">
+    <span class="passo-numero" aria-hidden="true">01</span>
+    <div class="passo-cabecalho"><h2>Dados da saída</h2></div>
+    <div class="passo-corpo">{% include "pedidos/_campos_saida.html" %}</div>
+  </section>
+
+  <section class="passo cartao">
+    <span class="passo-numero" aria-hidden="true">02</span>
+    <div class="passo-cabecalho"><h2>Materiais</h2><p class="texto-secundario">Decimais com vírgula (ex.: 1,5).</p></div>
+    <div class="passo-corpo">{% include "pedidos/_materiais.html" %}</div>
+  </section>
+  </div>
+  {% include "pedidos/_resumo_pedido.html" with rotulo="Registrar saída" rotulo_novo="Já conferi as saídas — registrar como nova saída" icone="saida" %}
+  </div>
+  </div>
+
+  <div class="acoes acoes-final">
+    {% include "pedidos/_enviar.html" with rotulo="Registrar saída" rotulo_novo="Já conferi as saídas — registrar como nova saída" icone="saida" %}
+  </div>
+</form>
+{% endif %}
+{% endblock %}

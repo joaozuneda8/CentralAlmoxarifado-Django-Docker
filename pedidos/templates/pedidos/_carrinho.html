@@ -1,0 +1,69 @@
+{% comment %}
+"Seu pedido" (na saída avulsa, "Materiais da saída": os textos vêm do `fluxo`). No celular (com JavaScript), a barra fica fixa no rodapé e o pedido abre numa
+gaveta (`<dialog>`, `pedidos.js`); no desktop, ou sem JavaScript, a barra some e o pedido aparece
+na página. Os campos `item_codigo` (escondido) e `item_qtd` (a quantidade, editável aqui) são
+o carrinho: o <dialog> fica dentro do <form>, então eles vão no envio mesmo com a gaveta
+fechada. Mudar a quantidade manda "alterar" com a última válida ("anterior"), para onde a linha
+volta se o servidor recusar. `data-carrinho-alerta` faz o JS abrir a gaveta para
+mostrar o erro ou aviso de quem acabou de adicionar.
+
+A barra conta os materiais e leva a "Revisar e enviar" (sem material, só diz isso), e a gaveta
+envia: `data-carrinho-enviar` é um botão comum que o pedidos.js liga ao botão de envio do fim do
+formulário (o rótulo do caso divergente vem de lá). Igual nos formulários públicos e na saída avulsa.
+{% endcomment %}
+<div class="carrinho" data-carrinho>
+  <div class="carrinho-barra">
+    {% if carrinho.linhas %}
+    <span class="carrinho-barra-resumo carrinho-barra-contagem"><span class="carrinho-barra-rotulo">{{ fluxo.rotulo_carrinho }}</span><span>{{ carrinho.linhas|length }} {% if carrinho.linhas|length == 1 %}material{% else %}materiais{% endif %}</span>{% if codigos_erro %}<span class="selo selo-erro">Corrigir</span>{% endif %}</span>
+    <button type="button" class="botao botao-primario" data-carrinho-abrir aria-haspopup="dialog" aria-controls="carrinho-gaveta" aria-expanded="false">{% include "interface/_icone.html" with nome="caixa-check" %}{{ fluxo.rotulo_revisar }}</button>
+    {% else %}
+    <span class="carrinho-barra-resumo carrinho-barra-vazia">{% include "interface/_icone.html" with nome="caixa" %}<span>Nenhum material adicionado</span></span>
+    {% endif %}
+  </div>
+  <dialog id="carrinho-gaveta" class="carrinho-gaveta" aria-labelledby="carrinho-titulo">
+    <div class="carrinho-cabecalho">
+      <h3 id="carrinho-titulo" class="carrinho-titulo">{% include "interface/_icone.html" with nome="caixa" %}<span>{{ fluxo.rotulo_carrinho }} ({{ carrinho.linhas|length }})</span></h3>
+      <button type="button" class="botao botao-texto botao-icone carrinho-so-gaveta" data-carrinho-fechar aria-label="Fechar">{% include "interface/_icone.html" with nome="fechar" %}</button>
+    </div>
+    {% if carrinho.erro %}<div class="aviso aviso-erro" role="alert" data-carrinho-alerta>{% include "interface/_icone.html" with nome="alerta" %}<p>{{ carrinho.erro }}</p></div>{% endif %}
+    {% if carrinho.aviso %}<div class="aviso aviso-atencao" role="status" data-carrinho-alerta>{% include "interface/_icone.html" with nome="alerta" %}<p>{{ carrinho.aviso }}</p></div>{% endif %}
+    {% if carrinho.linhas %}
+    <ul class="carrinho-lista">
+      {% for linha in carrinho.linhas %}
+      <li class="carrinho-linha{% if linha.codigo in codigos_erro %} carrinho-linha-erro{% endif %}" data-codigo="{{ linha.codigo }}" data-qtd="{{ linha.texto }}{% if linha.item.unidade %} {{ linha.item.unidade }}{% endif %}">
+        <input type="hidden" name="item_codigo" value="{{ linha.codigo }}">
+        <span class="material-dados"><strong>{{ linha.item.nome|default:linha.codigo }}</strong>{% if not fluxo.publico %}<span class="mono texto-secundario texto-pequeno">{{ linha.codigo }}</span>{% endif %}{% if linha.codigo in codigos_erro %}<span><span class="selo selo-erro">Corrigir</span></span>{% endif %}</span>
+        {% comment %}
+        A quantidade aparece como texto, com "Alterar", que abre o − / + com "Confirmar" e o botão de
+        fechar (pedidos.js); o campo só manda a alteração no "Confirmar" (evento
+        `confirmar-quantidade`). Sem JavaScript, só o campo fica à vista (sem o − / +) e vai com o envio.
+        {% endcomment %}
+        <span class="linha carrinho-acoes" data-alterar>
+          <span class="carrinho-qtd-texto"><strong>{{ linha.texto }}</strong>{% if linha.item.unidade %} {{ linha.item.unidade }}{% endif %}</span>
+          <button type="button" class="botao botao-secundario carrinho-alterar" data-alterar-abrir aria-expanded="false" aria-controls="carrinho-qtd-area-{{ forloop.counter }}" aria-label="Alterar a quantidade de {{ linha.item.nome|default:linha.codigo }}">Alterar</button>
+          <span class="carrinho-qtd-area" id="carrinho-qtd-area-{{ forloop.counter }}">
+            <label class="visually-hidden" for="carrinho-qtd-{{ forloop.counter }}">Quantidade de {{ linha.item.nome|default:linha.codigo }}{% if linha.item.unidade %} ({{ linha.item.unidade }}){% endif %}</label>
+            <span class="quantidade">
+              <button type="button" id="carrinho-menos-{{ forloop.counter }}" class="botao botao-icone" data-quantidade="menos" aria-label="Diminuir {{ linha.item.nome|default:linha.codigo }}">{% include "interface/_icone.html" with nome="menos" %}</button>
+              <input id="carrinho-qtd-{{ forloop.counter }}" class="quantidade-campo" type="text" name="item_qtd" value="{{ linha.texto }}" inputmode="{% if fluxo.inteiro %}numeric{% else %}decimal{% endif %}" autocomplete="off" data-qtd-carrinho
+                     hx-post="{{ url_carrinho }}" hx-target="#carrinho" hx-trigger="confirmar-quantidade" hx-vals='{"alterar": "{{ linha.codigo|escapejs }}", "anterior": "{{ linha.texto|escapejs }}"}'>
+              <button type="button" id="carrinho-mais-{{ forloop.counter }}" class="botao botao-icone" data-quantidade="mais" aria-label="Aumentar {{ linha.item.nome|default:linha.codigo }}">{% include "interface/_icone.html" with nome="mais" %}</button>
+            </span>
+            {% if linha.item.unidade %}<span class="texto-secundario">{{ linha.item.unidade }}</span>{% endif %}
+            <button type="button" class="botao botao-primario carrinho-confirmar" data-alterar-confirmar aria-label="Confirmar a quantidade de {{ linha.item.nome|default:linha.codigo }}">Confirmar</button>
+            <button type="button" class="botao botao-texto botao-icone carrinho-cancelar" data-alterar-cancelar aria-label="Cancelar">{% include "interface/_icone.html" with nome="fechar" %}</button>
+          </span>
+          <button type="button" class="botao botao-texto botao-perigo carrinho-remover" hx-post="{{ url_carrinho }}" hx-target="#carrinho"
+                  hx-vals='{"remover": "{{ linha.codigo|escapejs }}"}' aria-label="Remover {{ linha.item.nome|default:linha.codigo }}">{% include "interface/_icone.html" with nome="lixeira" %}Remover</button></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="texto-secundario">Nenhum material adicionado ainda.</p>
+    {% endif %}
+    <div class="carrinho-acoes-gaveta carrinho-so-gaveta">
+      {% if carrinho.linhas %}<button type="button" class="botao botao-primario botao-bloco" data-carrinho-enviar>{% include "interface/_icone.html" with nome=fluxo.icone_enviar %}<span data-carrinho-enviar-rotulo>{{ fluxo.rotulo_enviar }}</span></button>{% endif %}
+      <button type="button" class="botao {% if carrinho.linhas %}botao-secundario{% else %}botao-primario{% endif %} botao-bloco" data-carrinho-continuar>Adicionar mais materiais</button>
+    </div>
+  </dialog>
+</div>

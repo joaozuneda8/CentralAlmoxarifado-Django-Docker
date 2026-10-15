@@ -1,0 +1,126 @@
+{% extends "interface/base_almoxarifado.html" %}
+{% load static %}
+{% block title %}Painel — Central Almoxarifado{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'catalogo/css/catalogo.css' %}">
+<link rel="stylesheet" href="{% static 'pedidos/css/pedidos.css' %}">
+{% endblock %}
+{# O painel é o ponto de partida: sem o "Voltar ao painel" do base_almoxarifado. #}
+{% block voltar %}{% endblock %}
+{% block rotulo %}Pedidos{% endblock %}
+{% block heading %}Painel{% endblock %}
+{% block sub %}Pedidos dos dois formulários e saídas avulsas.{% endblock %}
+
+{% block page %}
+<div class="pilha-larga">
+  <section class="cartao atalhos">
+    <div class="atalhos-topo">
+      <h2 class="cartao-titulo">Atalhos</h2>
+    </div>
+    <div class="atalhos-grade">
+      <div class="atalho{% if pedidos_aguardando %} atalho-pendente{% endif %}">
+        <p class="atalho-numero">{{ pedidos_aguardando }}</p>
+        <div class="atalho-corpo">
+          <p class="atalho-rotulo">{% if pedidos_aguardando %}{{ pedidos_aguardando|pluralize:"pedido aguardando atendimento,pedidos aguardando atendimento" }}{% else %}Nenhum pedido aguardando.{% endif %}</p>
+          {% if pedidos_aguardando %}<a class="botao botao-primario" href="{% url 'pedidos:painel' %}?situacao=aguardando">{% include "interface/_icone.html" with nome="caixa-check" %}Atender</a>
+          {% else %}<span class="botao botao-secundario" aria-disabled="true">{% include "interface/_icone.html" with nome="caixa-check" %}Atender</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="atalho{% if recibos_pendentes %} atalho-pendente{% endif %}">
+        <p class="atalho-numero">{{ recibos_pendentes }}</p>
+        <div class="atalho-corpo">
+          <p class="atalho-rotulo">{% if recibos_pendentes %}{{ recibos_pendentes|pluralize:"recibo para imprimir,recibos para imprimir" }}{% else %}Nenhum recibo pendente.{% endif %}</p>
+          {% if recibos_pendentes %}<a class="botao botao-primario" href="{% url 'pedidos:painel' %}?recibo=pendente">{% include "interface/_icone.html" with nome="impressora" %}Imprimir</a>
+          {% else %}<span class="botao botao-secundario" aria-disabled="true">{% include "interface/_icone.html" with nome="impressora" %}Imprimir</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="atalho{% if lancamento_pendentes %} atalho-pendente{% endif %}">
+        <p class="atalho-numero">{{ lancamento_pendentes }}</p>
+        <div class="atalho-corpo">
+          <p class="atalho-rotulo">{% if lancamento_pendentes %}{{ lancamento_pendentes|pluralize:"requisição aguardando o robô,requisições aguardando o robô" }}{% else %}Nada aguardando o robô.{% endif %}</p>
+          {% if lancamento_travados %}<a class="selo selo-aviso atalho-alerta" href="{% url 'automacoes:pagina' %}?aba=lancamento#travas">{% include "interface/_icone.html" with nome="alerta" %}{{ lancamento_travados }} para conferir</a>{% endif %}
+          {% if lancamento_em_andamento %}<span class="texto-secundario texto-pequeno">Lançamento em andamento</span>{% endif %}
+          {# Bloqueado pelo LANCAMENTO_REAL, o motivo aparece numa dica sobre o botão (cursor, toque ou foco); o aria-describedby a liga ao botão, que fica aria-disabled e type="button" para continuar recebendo o foco pelo Tab sem enviar nada. #}
+          <form method="post" action="{% url 'automacoes:lancar' %}" class="atalho-acao{% if not lancamento_real %} dica-flutuante{% endif %}">
+            {% csrf_token %}
+            {# Primário só quando dá para lançar: desabilitado, o azul apagado parecia clicável. #}
+            <button type="{% if lancamento_real %}submit{% else %}button{% endif %}" class="botao {% if lancamento_pendentes and lancamento_real and not lancamento_em_andamento %}botao-primario{% else %}botao-secundario{% endif %}"{% if not lancamento_real %} aria-disabled="true" aria-describedby="dica-lancamento-real"{% elif lancamento_em_andamento or not lancamento_pendentes %} disabled{% endif %}>{% include "interface/_icone.html" with nome="robo" %}Lançar no SCPI{% if not lancamento_real %}{% include "interface/_icone.html" with nome="cadeado" %}{% endif %}</button>
+            {% if not lancamento_real %}<span class="dica-flutuante-texto" role="tooltip" id="dica-lancamento-real">Lançamento real bloqueado até a virada: só a simulação roda (LANCAMENTO_REAL no .env).</span>{% endif %}
+          </form>
+        </div>
+      </div>
+
+      <div class="atalho atalho-ativo">
+        <p class="atalho-numero atalho-mais">{% include "interface/_icone.html" with nome="mais" %}</p>
+        <div class="atalho-corpo">
+          <p class="atalho-rotulo">Registrar uma saída direto, sem pedido anterior.</p>
+          <a class="botao botao-primario" href="{% url 'pedidos:avulsa' %}">{% include "interface/_icone.html" with nome="saida" %}Saída avulsa</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="cartao">
+    {# filtros.js: o botão "Filtros" recolhe o painel e os filtros ativos viram chips. Sem JavaScript, o painel fica aberto. #}
+    <form class="filtros-recolhiveis" method="get" action="{% url 'pedidos:painel' %}" data-filtros
+          hx-get="{% url 'pedidos:painel' %}" hx-target="#lista-pedidos" hx-push-url="true"
+          hx-trigger="change, input delay:400ms, submit">
+      <div class="filtros-barra">
+        <div class="filtros-campo filtros-busca">
+          <label class="visually-hidden" for="{{ filtros.q.id_for_label }}">{{ filtros.q.label }}</label>
+          <div class="campo-busca">
+            {% include "interface/_icone.html" with nome="busca" %}
+            {{ filtros.q }}
+          </div>
+        </div>
+        <button type="button" class="botao botao-secundario filtros-alternar" data-filtros-alternar
+                aria-expanded="true" aria-controls="filtros-painel">
+          {% include "interface/_icone.html" with nome="filtro" %}<span>Filtros</span>
+          <span class="filtros-contagem" data-filtros-contagem hidden></span>
+          <span class="filtros-seta">{% include "interface/_icone.html" with nome="seta-baixo" %}</span>
+        </button>
+        <a class="botao botao-texto filtros-limpar" href="{% url 'pedidos:painel' %}" data-filtros-limpar>Limpar filtros</a>
+      </div>
+
+      <ul class="filtros-chips" data-filtros-chips aria-label="Filtros ativos" hidden></ul>
+
+      <div class="filtros-painel" id="filtros-painel" data-filtros-painel>
+        <div class="filtros-grade">
+          {% for campo in filtros %}{% if campo.name != "q" and campo.name != "de" and campo.name != "ate" %}
+          <div class="filtros-campo">
+            <label class="campo-rotulo" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+            {{ campo }}
+          </div>
+          {% endif %}{% endfor %}
+          <fieldset class="filtros-campo filtros-periodo">
+            <legend class="campo-rotulo">Período</legend>
+            <div class="filtros-periodo-campos">
+              <label class="visually-hidden" for="{{ filtros.de.id_for_label }}">{{ filtros.de.label }}</label>
+              {{ filtros.de }}
+              <span class="texto-suave" aria-hidden="true">até</span>
+              <label class="visually-hidden" for="{{ filtros.ate.id_for_label }}">{{ filtros.ate.label }}</label>
+              {{ filtros.ate }}
+            </div>
+          </fieldset>
+        </div>
+        <div class="filtros-acoes">
+          <button type="submit" class="botao botao-secundario">Filtrar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div id="lista-pedidos" class="cartao">{% include "pedidos/_painel_lista.html" %}</div>
+
+  {# Secundária no painel: cada item fica em até duas linhas (pedidos.css); o texto inteiro está no catálogo. #}
+  <section class="cartao saude-painel">
+    <div class="saude-painel-topo">
+      <h2 class="cartao-titulo">Saúde do catálogo</h2>
+      <a class="botao botao-texto" href="{% url 'automacoes:pagina' %}">Ver automações{% include "interface/_icone.html" with nome="seta-direita" %}</a>
+    </div>
+    {% if saude %}{% include "catalogo/_saude.html" %}{% else %}<p class="linha texto-secundario">{% include "interface/_icone.html" with nome="check" %}Catálogo em dia.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

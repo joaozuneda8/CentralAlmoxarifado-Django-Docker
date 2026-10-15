@@ -1,0 +1,601 @@
+/* Pedidos: o que é próprio desta app. Componentes comuns ficam em interface/css. */
+
+.opcoes-formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--esp-3); }
+.busca-materiais { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+
+/* "Seu pedido" numa seção própria: coluna ao lado dos passos, fixa ao rolar, com o botão de envio
+   no rodapé do cartão. Só com 960px de largura (o mesmo limite do pedidos.js, que vira o pedido
+   em barra e gaveta quando falta espaço); sem isso, os passos e o cartão ficam em uma coluna. */
+.pedido-layout { container-type: inline-size; }
+.pedido-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--entre-blocos); }
+.pedido-resumo {
+  display: flex; flex-direction: column; gap: var(--esp-2); padding: var(--esp-3);
+  background: var(--destaque-superficie); border: 1px solid var(--destaque); border-radius: var(--raio-cartao);
+}
+html:not([data-gaveta]) .pedido-resumo .carrinho { margin-top: 0; }
+html:not([data-gaveta]) .pedido-resumo .carrinho-gaveta { padding: 0; background: none; border: 0; border-radius: 0; }
+.pedido-enviar { margin-top: auto; }
+/* Na coluna, a lista é compacta e rola dentro do cartão; o título fica fixo no topo. (Na gaveta,
+   no celular, os alvos de toque seguem com 44px.) */
+html:not([data-gaveta]) .pedido-resumo > #carrinho { scrollbar-width: thin; }
+html:not([data-gaveta]) .pedido-resumo .carrinho-cabecalho { position: sticky; top: 0; z-index: 1; padding-bottom: var(--esp-1); background: var(--destaque-superficie); }
+html:not([data-gaveta]) .pedido-resumo .carrinho-linha { padding: 8px 0; gap: var(--esp-meio) var(--esp-1); }
+html:not([data-gaveta]) .pedido-resumo .quantidade .botao-icone { width: 30px; height: 30px; }
+html:not([data-gaveta]) .pedido-resumo .quantidade-campo { width: 44px; min-height: 30px; font-size: 15px; }
+html:not([data-gaveta]) .acoes-final { display: none; }
+/* Formulários públicos e saída avulsa: no celular, o envio é pela gaveta ("Revisar e enviar" →
+   "Enviar pedido"), então o botão do fim some também ali. Ele fica na página, porque a gaveta envia
+   por meio dele (rótulo do caso divergente) e, sem JavaScript, é o único envio. */
+.js .acoes-final { display: none; }
+@container (min-width: 960px) {
+  .pedido-grade { grid-template-columns: minmax(0, 1fr) 340px; gap: var(--esp-3); }
+  /* O cartão não manda na altura da linha (a coluna dos passos manda): ele preenche a coluna e
+     gruda ao rolar; a lista rola dentro dele. */
+  .pedido-lado { contain: size; min-height: 26rem; }
+  .pedido-resumo { position: sticky; top: var(--esp-3); height: 100%; max-height: calc(100dvh - 2 * var(--esp-3)); }
+  .pedido-resumo > #carrinho { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+}
+/* Na gaveta, o cartão some: ficam a barra fixa e a gaveta; o envio é o da gaveta (formulários
+   públicos) ou o botão do fim do formulário (saída avulsa). */
+.js[data-gaveta] .pedido-grade { display: block; }
+.js[data-gaveta] .pedido-resumo { display: block; padding: 0; background: none; border: 0; }
+.js[data-gaveta] .pedido-enviar { display: none; }
+
+/* Busca de materiais em destaque; os resultados abrem num painel preso a ela (pedidos.js).
+   Sem JavaScript, o painel fica na página. */
+.busca-area { position: relative; }
+.busca-materiais .campo-rotulo { font-size: 1rem; font-weight: 600; }
+/* Filtro de grupo (acima da busca): secundário, recolhido num <details> cujo resumo é um botão
+   compacto com o grupo escolhido (em destaque quando há um); aberto, mostra o seletor embaixo. */
+.busca-filtro-linha { display: flex; align-items: flex-start; gap: var(--esp-1); }
+.busca-filtro { min-width: 0; max-width: 100%; }
+.busca-filtro[open] { flex: 1 1 100%; }
+.busca-filtro-limpar { flex: none; min-height: 44px; gap: 6px; padding: 0 12px; }
+.busca-filtro-limpar .icone { width: 16px; height: 16px; }
+.busca-filtro:not(.busca-filtro-ativo) + .busca-filtro-limpar, .busca-filtro[open] + .busca-filtro-limpar { display: none; }
+.busca-filtro-alternar {
+  display: inline-flex; align-items: center; gap: var(--esp-1); max-width: 100%; min-height: 44px; padding: 0 12px 0 14px;
+  border: 1px solid var(--borda); border-radius: var(--raio-controle); background: var(--fundo);
+  color: var(--texto-secundario); font-size: 0.9375em; cursor: pointer; list-style: none; user-select: none;
+  transition: background-color var(--transicao), border-color var(--transicao), color var(--transicao);
+}
+.busca-filtro-alternar::-webkit-details-marker { display: none; }
+.busca-filtro-alternar:hover { background: var(--superficie); }
+.busca-filtro-alternar .icone { flex: none; width: 18px; height: 18px; }
+.busca-filtro-rotulo { flex: none; }
+.busca-filtro-valor { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--texto); }
+.busca-filtro-seta { display: inline-flex; color: var(--texto-suave); transition: transform var(--transicao); }
+.busca-filtro[open] .busca-filtro-seta { transform: rotate(180deg); }
+.busca-filtro[open] .busca-filtro-alternar { background: var(--superficie); }
+.busca-filtro-ativo .busca-filtro-alternar { border-color: rgba(37, 99, 235, 0.35); background: var(--destaque-superficie); color: var(--destaque-hover); }
+.busca-filtro-ativo .busca-filtro-valor { color: var(--destaque-hover); }
+.busca-filtro-campo { margin-top: var(--esp-1); }
+/* No celular, o rótulo "Grupo e subgrupo:" cede espaço ao valor escolhido. */
+@media (max-width: 480px) { .busca-filtro-ativo .busca-filtro-rotulo { display: none; } }
+.busca-principal .campo-busca .icone { left: 16px; width: 22px; height: 22px; color: var(--destaque); }
+.busca-principal .campo-entrada { min-height: 56px; padding-left: 50px; font-size: 18px; border: 2px solid var(--destaque); }
+.busca-principal .campo-entrada:focus { box-shadow: 0 0 0 4px var(--destaque-superficie); }
+.busca-painel { margin-top: var(--esp-1); }
+.busca-painel .lista-materiais { max-height: none; }
+.js .busca-painel {
+  position: absolute; left: 0; right: 0; top: var(--busca-base, 100%); z-index: 15;
+  max-height: min(60vh, 32rem, var(--busca-limite, 100vh)); overflow-y: auto;
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
+  box-shadow: var(--sombra-elevada);
+}
+.js .busca-painel:not(.aberto) { display: none; }
+/* Abre surgindo de perto da busca e fecha pelo mesmo caminho, mais rápido (pedidos.js põe
+   `fechando` e só tira o `aberto` no fim da animação). Sem movimento, abre e fecha direto. */
+.js .busca-painel.aberto { animation: painel-surge 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.js .busca-painel.fechando { animation: painel-some 0.12s ease-in forwards; pointer-events: none; }
+@keyframes painel-surge { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes painel-some { to { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .js .busca-painel.aberto, .js .busca-painel.fechando { animation: none; } }
+/* Na tela estreita (pedidos.js), o painel entra no fluxo logo abaixo da busca em vez de flutuar:
+   a página cresce com ele, a busca consegue subir até o topo mesmo perto do fim da página e o
+   espaço reservado à barra "Seu pedido" vale também para ele, sem folga inventada no pé. Relativo,
+   não estático: os absolutos de dentro (rótulos escondidos) seguem presos a ele e ao seu recorte. */
+.js[data-gaveta] .busca-painel { position: relative; top: auto; z-index: auto; }
+.js .busca-painel .resultados-cabecalho {
+  position: sticky; top: 0; z-index: 1; margin: 0; padding: 10px var(--esp-2);
+  background: var(--fundo); border-bottom: 1px solid var(--borda);
+}
+.js .busca-painel .lista-materiais { border: 0; border-radius: 0; }
+.carrinho-qtd { white-space: nowrap; font-weight: 500; }
+.numero-pedido { white-space: nowrap; }
+
+.sucesso-pedido { display: grid; justify-items: center; gap: var(--esp-2); text-align: center; animation: subir 0.4s ease both; }
+.sucesso-pedido .acoes { justify-content: center; }
+.pagina-larga .sucesso-pedido { width: 100%; max-width: 720px; margin-inline: auto; }
+.sucesso-icone { display: inline-flex; width: 48px; height: 48px; align-items: center; justify-content: center; border-radius: 50%; background: var(--superficie); color: var(--texto); }
+.sucesso-icone .icone { width: 24px; height: 24px; }
+.sucesso-numero { font-size: 40px; font-weight: 500; line-height: 1.1; letter-spacing: -0.01em; color: var(--texto); }
+
+/* Recibo (detalhe e impressão) e atendimento */
+/* Na tela, o recibo são dois cartões: o cabeçalho com a situação e a lista de materiais. */
+.recibo { display: grid; gap: var(--entre-blocos); }
+.recibo-bloco { display: grid; gap: var(--esp-3); }
+/* Na tela, os dados do envio ficam à direita do cabeçalho, no espaço ao lado do número; sem
+   largura para os dois, descem para baixo dele. No papel, ficam abaixo (regras de @media print). */
+.recibo-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--esp-2) var(--esp-4); }
+.recibo-topo > .pilha { flex: 1 1 340px; min-width: 0; }
+.recibo-topo > .dados { flex: 0 1 460px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* A observação é texto livre: ocupa a linha toda dos dados, embaixo dos campos curtos. */
+.recibo .dados-largo { grid-column: 1 / -1; }
+/* No tablet e no celular, o cabeçalho e os dados não cabem lado a lado: os dados descem e usam a
+   largura toda, em quantas colunas couberem (quatro no tablet, duas no celular). */
+@media screen and (max-width: 1024px) {
+  .recibo-topo > .pilha, .recibo-topo > .dados { flex-basis: 100%; }
+  .recibo-topo > .dados { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
+}
+.recibo-numero { font-size: 28px; }
+.recibo-numero .mono { font-size: 1em; font-weight: 500; }
+.recibo-quadros { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--esp-2); }
+.recibo-quadro { display: grid; gap: var(--esp-1); justify-items: start; align-content: start; padding: var(--esp-2); }
+.recibo-quadro-topo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1) var(--esp-2); }
+/* Cartão da situação do pedido, sempre com a mesma ênfase leve (também depois do recibo impresso):
+   borda azul sutil com filete à esquerda, rótulo em preto e os passos em cor cheia (o fundo segue o
+   cinza do cartão). Estado nunca só por cor: os passos e o selo dizem o que fazer. */
+.recibo-quadro-destaque { border-color: rgba(37, 99, 235, 0.28); box-shadow: inset 3px 0 0 var(--destaque); }
+.recibo-quadro-destaque .rotulo-secao { color: var(--texto); }
+.recibo-quadro-destaque .recibo-passos { color: var(--texto); }
+.recibo-passos { margin: 0; padding-left: 1.2em; }
+.recibo-passos li + li { margin-top: var(--esp-meio); }
+.recibo-itens { font-size: 0.9em; }
+.recibo-itens th, .recibo-itens td { padding: calc(var(--esp-meio) + 2px) var(--esp-1); line-height: 1.4; }
+.recibo-itens td { vertical-align: middle; }
+/* Na tela, o campo de 38px da quantidade entregue tem a mesma folga das linhas das outras tabelas
+   (--celula-v): sem ela, o campo encosta nas divisórias. No papel, segue compacto. */
+@media screen { .recibo-itens td { padding-block: var(--celula-v); } }
+.recibo-itens-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-meio) var(--esp-2); }
+
+/* Quantidade entregue direto na tabela (atendimento): campo em destaque, com − e +, e o estado
+   sempre em texto ao lado. O estado (data-estado) vem do pedidos.js; sem JavaScript, fica só o campo. */
+.recibo-itens { --entrega-caixa: 112px; --entrega-passo: 22px; --entrega-confirmar: calc(var(--altura-controle) - 8px); }
+/* No atendimento, Pedido e Entregue encolhem até o conteúdo e a sobra da largura vai toda para o
+   nome do material. A entrega fica à direita da célula: com o "Confirmar" de largura fixa, as caixas
+   se alinham entre as linhas, e o estado à esquerda usa só o que precisa. */
+@media screen {
+  .recibo-itens:has(.recibo-th-entregue) :is(th, td):not(:first-child) { width: 1%; }
+  .recibo-itens td.recibo-entregue, .recibo-itens .recibo-th-entregue { text-align: right; }
+}
+/* O título fica centrado sobre a caixa do campo (a primeira coisa da célula), não sobre a célula toda. */
+.recibo-itens .recibo-th-entregue { color: var(--texto); }
+.recibo-th-entregue > span { display: inline-block; width: var(--entrega-caixa); text-align: center; }
+/* O título fica sobre a caixa: à direita, afastado o tanto do "Confirmar" (que só existe com JavaScript). */
+@media screen { .js .recibo-th-entregue > span { margin-right: calc(var(--entrega-confirmar) + var(--esp-1)); } }
+.recibo-itens tbody tr:has(.entrega-campo:focus) td { background: var(--destaque-superficie); }
+.recibo-itens tbody tr:has(.entrega-campo:focus) td:first-child { box-shadow: inset 3px 0 0 var(--destaque); padding-left: 10px; }
+/* A silhueta do campo: o número num bloco alto no centro e o − e o + em abas mais baixas, ligados por
+   um ombro em curva. O contorno é um SVG de 112 x 38 (_entrega_formas.html), e as cores vêm de variáveis
+   que mudam com o estado, então borda, fundo e ícones trocam de cor suavemente. */
+.entrega {
+  --borda-c: var(--destaque); --fundo-c: var(--destaque-superficie); --cor-passo: var(--destaque);
+  display: inline-flex; align-items: center; gap: var(--esp-1);
+}
+.entrega[data-estado="parcial"] { --borda-c: #c9891a; --fundo-c: var(--aviso-superficie); --cor-passo: var(--aviso-texto); }
+.entrega[data-estado="zero"] { --borda-c: var(--borda); --fundo-c: var(--superficie); --cor-passo: var(--texto-secundario); }
+.entrega[data-estado="acima"], .entrega[data-estado="invalido"], .entrega.entrega-erro {
+  --borda-c: var(--erro-texto); --fundo-c: var(--erro-superficie); --cor-passo: var(--erro-texto);
+}
+/* Confirmada com tudo o que foi pedido, a caixa fica no verde do "Total": pronto, nada a fazer. */
+.entrega[data-confirmado][data-estado="total"] { --borda-c: var(--ok-texto); --fundo-c: var(--ok-superficie); --cor-passo: var(--ok-texto); }
+.entrega-caixa { position: relative; display: flex; flex: none; align-items: center; width: var(--entrega-caixa); height: 38px; transition: filter 0.2s ease; }
+.entrega-caixa:focus-within { filter: drop-shadow(0 0 3px rgba(37, 99, 235, 0.55)); }
+.entrega-forma { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.entrega-forma .corpo { fill: var(--fundo-c); stroke: var(--borda-c); stroke-width: 1; transition: fill 0.2s ease, stroke 0.2s ease; }
+.entrega-forma .barra { fill: var(--borda-c); stroke: none; transition: fill 0.2s ease; }
+.entrega-caixa:focus-within .corpo { fill: var(--fundo); }
+.entrega-passo {
+  position: relative; z-index: 1; flex: none; display: grid; place-items: center; width: var(--entrega-passo); height: 26px;
+  padding: 0; border: 0; background: none; color: var(--cor-passo); cursor: pointer; transition: color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.entrega-passo .icone { width: 12px; height: 12px; stroke-width: 1.75; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* Disco que nasce atrás do ícone no hover e no foco do teclado; ao apertar, o ícone encolhe e o disco aperta. */
+.entrega-passo::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+  background: currentColor; opacity: 0; transform: scale(0.5);
+  transition: opacity 0.2s ease, transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.entrega-passo:hover::before, .entrega-passo:focus-visible::before { opacity: 0.14; transform: scale(1); }
+.entrega-passo:active::before { opacity: 0.24; transform: scale(0.88); transition-duration: 0.08s; }
+.entrega-passo:active .icone { transform: scale(0.8); }
+.entrega-passo:focus-visible { box-shadow: none; }
+.entrega-campo {
+  position: relative; z-index: 1; flex: 1 1 0; min-width: 0; height: 34px; padding: 0; border: 0; background: none; text-align: center;
+  font-family: var(--fonte-mono); font-size: 22px; font-weight: 600; line-height: 1; color: var(--texto);
+}
+.entrega-campo:focus-visible { box-shadow: none; }
+/* A unidade do SCPI fica dentro do campo, colada ao número como na coluna Pedido (o vão de um
+   espaço): número e unidade andam juntos, centrados entre o − e o +. O campo tem a largura dos
+   dígitos (`ch`, exato na fonte mono; o pedidos.js acompanha a digitação). A unidade desce até a
+   linha de base do número. */
+.entrega-caixa:has(.entrega-un) .entrega-campo { flex: 0 0 auto; width: 3ch; max-width: 3.5ch; margin-left: auto; }
+.entrega-un {
+  position: relative; z-index: 1; top: 4px; margin: 0 auto 0 0.3em;
+  font-size: 0.875em; color: var(--texto-secundario); pointer-events: none;
+}
+.entrega-campo-longo { font-size: 16px; }
+.entrega-caixa:has(.entrega-un) .entrega-campo-longo { max-width: 5ch; }
+.entrega-campo.mudou { animation: bump-entrega 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes bump-entrega { 0% { transform: none; } 35% { transform: translateY(-2px) scale(1.06); } 100% { transform: none; } }
+/* O estado fica antes da caixa, logo depois da coluna Pedido, para pedido, estado e entregue se lerem
+   em sequência, colado à caixa. Cada estado fica numa linha só, salvo o parcial, que pode quebrar
+   em "Parcial ·" e "faltam N": com a coluna encolhida até o conteúdo, ele alargaria a coluna toda. */
+.entrega-estado {
+  display: none; order: -1; justify-content: flex-end; text-align: right;
+  font-size: 12px; font-weight: 500; color: var(--ok-texto);
+}
+.entrega-estado > [data-estado] { display: none; align-items: center; gap: var(--esp-meio); white-space: nowrap; }
+.entrega-estado > [data-estado="parcial"] { white-space: normal; }
+.entrega-estado > [data-estado="parcial"] > span { white-space: nowrap; }
+/* O ícone vai em linha com o texto. */
+.entrega-estado .icone { width: 14px; height: 14px; margin-right: var(--esp-meio); vertical-align: -3px; stroke-width: 2; }
+/* Só com JavaScript o estado aparece; ele escolhe qual dos textos mostrar. */
+.js .entrega-estado { display: inline-flex; }
+.entrega[data-estado="total"] [data-estado="total"],
+.entrega[data-estado="parcial"] [data-estado="parcial"],
+.entrega[data-estado="zero"] [data-estado="zero"],
+.entrega[data-estado="acima"] [data-estado="acima"],
+.entrega[data-estado="invalido"] [data-estado="invalido"] { display: block; }
+.entrega[data-estado="parcial"] .entrega-estado { color: var(--aviso-texto); }
+.entrega[data-estado="zero"] .entrega-estado { color: var(--texto-secundario); }
+.entrega[data-estado="acima"] .entrega-estado, .entrega[data-estado="invalido"] .entrega-estado { color: var(--erro-texto); }
+/* Confirmada (pedidos.js), a quantidade vira um número fechado: some o − e o +, e o contorno com as
+   abas dá lugar a um retângulo nas cores do estado, na mesma largura (as colunas não se mexem). O
+   "Confirmar" vira "Alterar": o estado nunca fica só na forma. */
+/* Mesma largura para os dois: o estado ao lado não pula ao confirmar. */
+/* Só o check (o nome vai no aria-label e na dica): quadrado, da altura do botão suave. */
+.entrega-confirmar { flex: none; width: var(--entrega-confirmar); padding: 0; justify-content: center; }
+.entrega-confirmar .icone { width: 16px; height: 16px; }
+.entrega-confirmar[hidden], .entrega-alterar[hidden] { display: none; }
+/* Confirmada, o lugar do "Confirmar" fica guardado (as colunas não se mexem) e a caixa é o botão
+   que reabre a edição: o "Alterar" a cobre por inteiro, com o lápis à direita do número. */
+.entrega[data-confirmado] .entrega-confirmar[hidden] { display: inline-flex; visibility: hidden; }
+.entrega-alterar {
+  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 10px; background: none; border: 0; border-radius: var(--raio-controle); color: var(--cor-passo); cursor: pointer;
+}
+.entrega-alterar .icone { width: 14px; height: 14px; }
+.entrega-alterar:focus-visible { outline: none; }
+.entrega-alterar:hover { box-shadow: inset 0 0 0 1px var(--borda-c); }
+/* O display dos botões venceria o [hidden]: sem esta regra, o "Trocar" continuava à vista no item
+   já trocado, e todos apareciam sem JavaScript (que é quem os mostra). */
+[data-trocar][hidden], [data-adicionar-material][hidden], [data-desfazer-troca][hidden], [data-imprimir][hidden],
+[data-remover-adicionado][hidden] { display: none; }
+.entrega[data-confirmado] .entrega-passo, .entrega[data-confirmado] .entrega-forma { display: none; }
+/* Item trocado (ou em troca, com o painel aberto): fica com 0 até "Desfazer troca" (na linha do
+   acrescentado) ou o "Cancelar troca", travado e sem o lápis. */
+tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibility: hidden; }
+.entrega[data-confirmado] .entrega-caixa {
+  justify-content: center; border: 1px solid var(--borda-c); border-radius: var(--raio-controle); background: var(--fundo-c);
+}
+.entrega[data-confirmado] .entrega-campo { cursor: default; }
+.entrega[data-confirmado] .entrega-caixa:focus-within { filter: none; box-shadow: var(--anel-foco); }
+/* O primeiro campo pulsa duas vezes ao abrir a página, para mostrar onde preencher. */
+@keyframes pulso-entrega { from { filter: drop-shadow(0 0 0 rgba(37, 99, 235, 0.6)); } to { filter: drop-shadow(0 0 9px rgba(37, 99, 235, 0)); } }
+.recibo-itens tbody tr:first-child .entrega-caixa { animation: pulso-entrega 1.2s ease-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .recibo-itens tbody tr:first-child .entrega-caixa, .entrega-campo.mudou { animation: none; }
+  .entrega-passo::before, .entrega-passo .icone, .entrega-forma .corpo, .entrega-forma .barra { transition: none; }
+}
+/* O nome do material guarda uma largura mínima no tablet; no celular a tabela já rola de lado. */
+@media (min-width: 641px) and (max-width: 1024px) { .recibo-itens td:first-child { min-width: 12rem; } }
+.recibo-itens th:first-child, .recibo-itens td:first-child { padding-left: 0; }
+.recibo-itens td:not(:first-child) { white-space: nowrap; }
+.recibo-itens strong { font-weight: 500; }
+/* Na tela, o nome do material é o que se lê primeiro: maior e mais encorpado que o código. No papel, segue compacto. */
+@media screen { .recibo-itens strong { font-size: 1.12em; font-weight: 600; } }
+.recibo-codigo { margin-right: var(--esp-meio); color: var(--texto-secundario); }
+/* Quantidade: quem monta o pedido lê o material e logo em seguida quanto separar. O número tem o
+   mesmo estilo do campo da quantidade entregue (mono, 600), para pedido e entregue se compararem de
+   relance; a unidade fica menor e apagada, igual nas duas colunas. */
+.recibo-qtd { font-family: var(--fonte-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.recibo-un { font-size: 0.875em; color: var(--texto-secundario); }
+@media screen { .recibo-qtd { font-size: 1.4em; line-height: 1; } }
+/* Grupos do recibo (pedido com material acrescentado pelo almoxarifado): linha de grupo com o
+   rótulo ou o selo, e as notas da troca ("Trocado por", "No lugar de") embaixo do nome. No
+   atendimento, a linha de grupo dos acrescentados só aparece quando há algum. */
+.recibo-grupo th {
+  padding-top: var(--esp-2); text-transform: none; letter-spacing: normal; color: var(--texto-secundario);
+  border-top: 1px solid var(--borda);
+}
+.tabela tbody tr.recibo-grupo:hover { background: none; }
+#adicionados:not(:has(tr[data-adicionado])) .recibo-grupo { display: none; }
+.recibo-nota { display: block; margin-top: 2px; font-size: 12px; color: var(--texto-secundario); }
+/* Troca e acréscimo no atendimento: o painel de busca (pedidos.js o abre) e a dica do
+   "Adicionar material", que some junto com o botão sem JavaScript. */
+.atendimento-painel { display: grid; gap: var(--esp-2); }
+.atendimento-painel[hidden] { display: none; }
+.atendimento-painel-titulo { font-weight: 600; color: var(--texto); }
+.atendimento-painel .acoes { justify-content: flex-end; }
+.atendimento-painel .acoes[hidden] { display: none; }
+/* "Trocar" vira "Cancelar troca" com o painel aberto: só a legenda da vez aparece, para o hover ter
+   o tamanho dela (ao lado do código, nada depois do botão se mexe). */
+/* Na célula do material, ao lado do código (a troca é do material, não da quantidade), como o
+   "Desfazer troca" e o "Remover" dos acrescentados. */
+.recibo-trocar { min-height: 0; padding-block: 2px; margin-left: var(--esp-meio); vertical-align: middle; color: var(--info-texto); }
+.recibo-trocar:hover { background: var(--destaque-superficie); color: var(--info-texto); }
+/* "Desfazer troca" e "Remover" tiram o que o almoxarifado acrescentou: no vermelho, como o "Cancelar troca". */
+.recibo-trocar:is([data-desfazer-troca], [data-remover-adicionado]) { color: var(--erro-texto); }
+.recibo-trocar:is([data-desfazer-troca], [data-remover-adicionado]):hover { background: var(--erro-superficie); color: var(--erro-texto); }
+/* No atendimento, o nome do material ganha a linha toda, embaixo do código e do "Trocar": no
+   tablet, ao lado do código, ele quebrava a cada palavra. */
+@media screen { .recibo-itens:has(.recibo-th-entregue) td:first-child strong { display: block; margin-top: 2px; } }
+[data-trocar] > span { display: inline-flex; align-items: center; gap: inherit; }
+[data-trocar] .trocar-cancelar,
+[data-trocar][aria-expanded="true"] .trocar-abrir { display: none; }
+[data-trocar][aria-expanded="true"] .trocar-cancelar { display: inline-flex; }
+/* Na troca, o painel abre numa linha logo abaixo do material (pedidos.js): com o tamanho de letra
+   do cartão, não o da tabela, e no máximo a largura visível da rolagem, preso à esquerda (no
+   celular a tabela rola de lado e o painel fica à vista). */
+.tabela tbody tr.atendimento-painel-linha:hover { background: none; }
+.recibo-itens .atendimento-painel-linha > td { padding-block: var(--esp-1) var(--esp-2); }
+.recibo-itens .atendimento-painel { position: sticky; left: 0; max-width: var(--painel-largura, none); font-size: calc(1em / 0.9); }
+@media screen { .recibo-itens .atendimento-painel strong { font-size: inherit; font-weight: 600; } }
+/* Troca aberta: a linha do material e o painel viram um bloco só, na superfície de informação e
+   com a barra do destaque à esquerda, como o item atual do menu. O painel perde o cartão próprio
+   e o texto entra alinhado ao nome do material. */
+.recibo-itens tr[data-em-troca] > td,
+.recibo-itens tr[data-em-troca] + .atendimento-painel-linha > td { background: var(--info-superficie); }
+.recibo-itens tr[data-em-troca] > td { border-bottom-color: transparent; }
+.recibo-itens tr[data-em-troca] > td:first-child,
+.recibo-itens tr[data-em-troca] + .atendimento-painel-linha > td { padding-left: var(--esp-2); box-shadow: inset 3px 0 0 var(--destaque); }
+.recibo-itens tr[data-em-troca] + .atendimento-painel-linha > td { padding-right: var(--esp-2); }
+.recibo-itens tr[data-em-troca] + .atendimento-painel-linha .atendimento-painel {
+  max-width: calc(var(--painel-largura, 100%) - 2 * var(--esp-2)); padding: 0; background: none; border: 0; border-radius: 0;
+}
+/* "Cancelar troca" desfaz o que o painel começou: no vermelho do erro, para não parecer a ação de seguir. */
+.recibo-itens tr[data-em-troca] [data-trocar][aria-expanded="true"] { color: var(--erro-texto); }
+.recibo-itens tr[data-em-troca] [data-trocar][aria-expanded="true"]:hover { background: var(--erro-superficie); }
+/* O botão suave tem a cor da superfície de informação: no bloco da troca, ganha o fundo branco. */
+.recibo-itens tr[data-em-troca] .botao-suave { background: var(--fundo); border-color: var(--borda); }
+[data-adicionar-area]:has([data-adicionar-material][hidden]) .campo-dica { display: none; }
+.recibo-saida { display: grid; gap: var(--esp-2); padding-top: var(--esp-3); border-top: 1px solid var(--borda); }
+/* Assinaturas lado a lado, só no papel (na tela não há o que assinar); a linha é desenhada aqui
+   e se ajusta à largura. */
+.assinaturas { display: none; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--esp-4); margin-top: var(--esp-2); }
+.assinaturas p { display: flex; align-items: flex-end; gap: var(--esp-1); min-height: 48px; white-space: nowrap; }
+.assinaturas p::after { content: ""; flex: 1; border-bottom: 1px solid currentColor; }
+/* A confirmação de impressão só aparece depois de Imprimir (pedidos.js); sem JavaScript, fica à vista. */
+.confirmacao-impressao { display: grid; justify-items: start; gap: var(--esp-2); }
+.js .confirmacao-impressao:not([data-visivel]) { display: none; }
+.confirmacao-impressao .aviso { width: 100%; }
+@media print {
+  .folha-recibo, .recibo-bloco { border: 0; border-radius: 0; box-shadow: none; padding: 0; background: none; }
+  .recibo .selo { border: 1px solid #999999; background: none; color: #000000; }
+  .recibo-codigo { color: #000000; }
+  /* Recibo compacto no papel: o máximo de materiais numa folha só. */
+  @page { size: A4; margin: 10mm; }
+  .folha-recibo { font-size: 12px; }
+  .recibo, .recibo-bloco { gap: 10px; }
+  .recibo .pilha { gap: var(--esp-meio); }
+  .recibo-numero { font-size: 18px; }
+  .recibo-topo { display: grid; gap: 10px; }
+  .recibo .dados { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--esp-meio) var(--esp-2); }
+  .recibo .dados dt { font-size: 9px; }
+  .recibo-subtitulo { font-size: 12px; }
+  .recibo-itens { font-size: 11px; }
+  .entrega-passo, .entrega-estado { display: none; }
+  .entrega-caixa, .entrega[data-confirmado] .entrega-caixa { width: auto; height: auto; border: 0; background: none; }
+  .entrega-forma { display: none; }
+  .recibo-itens th { padding: 2px 6px; font-size: 9px; }
+  .recibo-itens td { padding: 1px 6px; line-height: 1.3; }
+  .recibo-itens th:first-child, .recibo-itens td:first-child { padding-left: 0; }
+  .recibo-saida { gap: var(--esp-meio); padding-top: var(--esp-1); }
+  .recibo-grupo th { padding: 4px 6px 1px 0; font-size: 9px; }
+  .recibo-nota { margin-top: 0; font-size: 9px; color: #000000; }
+  .assinaturas { display: grid; margin-top: var(--esp-1); }
+  .assinaturas p { min-height: 40px; }
+}
+
+/* Automações, aba Lançamento no SCPI: log do robô e resolução das travas */
+.log-execucao {
+  max-height: 20rem; overflow: auto; margin: 0; padding: var(--esp-2);
+  font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--superficie); border: 1px solid var(--borda); border-radius: 8px;
+}
+.trava { display: grid; gap: var(--esp-2); }
+.trava-cabecalho { display: grid; gap: var(--esp-1); }
+.resolucao { display: grid; gap: var(--esp-2); padding-top: var(--esp-2); border-top: 1px solid var(--borda); }
+.resolucao-requisicao { display: grid; gap: var(--esp-1); }
+.resolucao-linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+.resolucao-linha .campo-entrada { width: 11rem; max-width: 100%; }
+/* Andamento: a frase em destaque, os contadores em linha e o técnico recolhido. */
+.andamento-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-1); }
+.andamento-topo .cartao-titulo { margin: 0; }
+.andamento-frase { margin: 0; font-size: 1.0625em; font-weight: 500; color: var(--texto); }
+.contadores { display: flex; flex-wrap: wrap; gap: var(--esp-meio) var(--esp-1); margin: 0; padding: 0; list-style: none; }
+.pilha-curta { display: grid; gap: var(--esp-meio); min-width: 0; }
+.pilha-curta p { margin: 0; overflow-wrap: anywhere; }
+.detalhe-tecnico > summary { width: fit-content; cursor: pointer; color: var(--texto-secundario); font-size: 0.875em; }
+.detalhe-tecnico[open] > summary { margin-bottom: var(--esp-1); }
+
+/* "Não lançar" em dois passos: o <summary> parece um botão de texto; aberto, o aviso e a
+   confirmação ficam embaixo, separados por um filete. */
+.confirmar-nao-lancar > summary { list-style: none; width: fit-content; cursor: pointer; }
+.confirmar-nao-lancar > summary::-webkit-details-marker { display: none; }
+.confirmar-nao-lancar[open] > summary { background: var(--erro-superficie); }
+.confirmar-nao-lancar-painel { display: grid; gap: var(--esp-2); margin-top: var(--esp-1); padding-top: var(--esp-2); border-top: 1px solid var(--borda); }
+
+/* Rodapé do atendimento: o botão e o aviso do lote na mesma linha. */
+.rodape-saida { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2); padding-top: var(--esp-2); border-top: 1px solid var(--borda); }
+
+/* Atalhos do painel: cartões compactos, com o número à esquerda e o rótulo, os avisos e o botão
+   numa coluna ao lado. Com pendência, a mesma linguagem do cartão de situação (borda azul sutil e
+   filete à esquerda); em dia, o cartão fica apagado e o botão, desabilitado. As ações extras
+   (simular, atualizar o catálogo) ficam na linha do título. */
+.atalhos-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-1) var(--esp-2); margin-bottom: var(--esp-2); }
+.atalhos-topo .cartao-titulo { margin: 0; }
+.atalhos-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.atalho {
+  --atalho-recuo: calc(2.25rem + 12px); /* coluna do número + o vão: onde começa o corpo */
+  display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); gap: 12px; padding: 14px var(--esp-2);
+  background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
+}
+/* Os cartões da linha têm a mesma altura (a grade estica) e o botão vai para o pé do corpo: os
+   botões ficam alinhados mesmo com rótulos de uma ou duas linhas. */
+.atalho-corpo { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.atalho-corpo > .botao, .atalho-corpo > .atalho-acao { margin-top: auto; }
+.atalho-numero { margin: 0; font-family: var(--fonte-titulo); font-size: 26px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: var(--texto-suave); }
+.atalho-mais .icone { width: 24px; height: 24px; stroke-width: 1.5; }
+.atalho-rotulo { margin: 0 0 4px; font-size: 0.9375em; line-height: 1.4; color: var(--texto-secundario); }
+.atalho .botao { min-height: 34px; padding: 0 12px; gap: 6px; font-size: 0.875em; }
+.atalho .botao .icone { width: 16px; height: 16px; }
+/* Com algo a fazer (`atalho-pendente`) ou sempre à mão (`atalho-ativo`, a saída avulsa): filete azul. */
+.atalho-pendente, .atalho-ativo { border-color: rgba(37, 99, 235, 0.28); box-shadow: inset 3px 0 0 var(--destaque); }
+.atalho-pendente .atalho-numero, .atalho-ativo .atalho-numero { color: var(--texto); }
+.atalho-pendente .atalho-rotulo, .atalho-ativo .atalho-rotulo { color: var(--texto); }
+.atalho .botao[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+/* A dica do "Lançar no SCPI" tem a largura do conteúdo do cartão, nunca mais: no cartão da
+   última coluna, ancorada no botão e mais larga que ele, passaria da borda da tela. */
+.atalho .dica-flutuante { align-self: stretch; }
+.atalho .dica-flutuante-texto { left: calc(-1 * var(--atalho-recuo)); width: calc(100% + var(--atalho-recuo)); max-width: none; }
+.atalho .dica-flutuante-texto::after { left: calc(var(--atalho-recuo) + 20px); }
+.atalho-alerta { text-decoration: none; }
+.atalho-alerta:hover { text-decoration: none; }
+.atalho-alerta .icone { width: 14px; height: 14px; }
+@media (max-width: 640px) { .atalhos-grade { gap: var(--esp-1); } }
+
+/* Saúde do catálogo no painel: secundária, cada item em até duas linhas; o texto inteiro fica na
+   página do catálogo. */
+.saude-painel-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-1); margin-bottom: var(--esp-2); }
+.saude-painel-topo .cartao-titulo { margin: 0; }
+.saude-painel-topo .botao { gap: 6px; }
+.saude-painel .saude li > span:last-child {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+  font-size: 0.9375em; color: var(--texto-secundario); overflow-wrap: anywhere;
+}
+
+/* Lista do painel. A linha inteira leva ao detalhe (o link do Nº se estende sobre ela, selos
+   incluídos: nenhum deles tem ação própria). As colunas de texto têm largura mínima, para o
+   nome não quebrar palavra por palavra. */
+#lista-pedidos { container-type: inline-size; }
+.tabela-pedidos tbody tr { position: relative; }
+.tabela-pedidos .col-numero a::after { content: ""; position: absolute; inset: 0; }
+.tabela-pedidos .col-numero a:focus-visible { outline: none; }
+.tabela-pedidos .col-numero a:focus-visible::after { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: var(--raio-controle); }
+.tabela-pedidos .col-pessoa { min-width: 11rem; }
+.tabela-pedidos .col-destino { min-width: 13rem; }
+/* Estreita (celular, ou tela pequena com a barra lateral): cada pedido vira um cartão. */
+@container (max-width: 720px) {
+  .tabela-pedidos thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .tabela-pedidos, .tabela-pedidos tbody { display: block; }
+  .tabela-pedidos tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--esp-1); padding: 14px var(--esp-1); border-bottom: 1px solid var(--borda); }
+  .tabela-pedidos tbody tr:last-child { border-bottom: 0; }
+  .tabela-pedidos td { display: block; padding: 0; border: 0; min-width: 0; }
+  /* Sem o cabeçalho, o que não se explica sozinho ganha rótulo: quem pediu e o destino. */
+  .tabela-pedidos td[data-rotulo]::before { content: attr(data-rotulo) ": "; color: var(--texto-secundario); }
+  .tabela-pedidos .col-numero { order: 1; flex: 1 1 auto; font-weight: 500; }
+  .tabela-pedidos .col-data { order: 2; font-size: 0.875em; }
+  .tabela-pedidos .col-pessoa { order: 3; flex-basis: 100%; }
+  .tabela-pedidos .col-destino { order: 4; flex-basis: 100%; font-size: 0.875em; color: var(--texto-secundario); }
+  .tabela-pedidos .col-origem { order: 5; }
+  .tabela-pedidos .col-situacao { order: 6; }
+  .tabela-pedidos .col-scpi { order: 7; }
+}
+/* No tablet, cabe tudo na primeira linha: o Nº com os selos ao lado e a data à direita; embaixo,
+   quem pediu e o destino. No celular, os selos ficam embaixo, como acima. */
+@container (min-width: 481px) and (max-width: 720px) {
+  .tabela-pedidos .col-numero { flex: none; margin-right: var(--esp-meio); }
+  .tabela-pedidos .col-origem { order: 2; }
+  .tabela-pedidos .col-situacao { order: 3; }
+  .tabela-pedidos .col-scpi { order: 4; }
+  .tabela-pedidos .col-data { order: 5; margin-left: auto; }
+  .tabela-pedidos .col-pessoa { order: 6; margin-top: 2px; }
+  .tabela-pedidos .col-destino { order: 7; }
+}
+.botao-suave[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Formulário do lançamento: os dois botões e o limite numa linha que quebra no celular. */
+.lancar-acao { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1) var(--esp-3); }
+.lancar-botoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+/* "Só as primeiras [N] requisições" é uma frase só: não quebra no meio. */
+.lancar-limite { display: flex; align-items: center; gap: var(--esp-1); white-space: nowrap; }
+.lancar-limite .campo-rotulo { margin: 0; }
+.lancar-limite .campo-entrada { width: 5.5rem; }
+.lancar-motivo { flex-basis: 100%; margin: 0; color: var(--texto-secundario); }
+/* A fila do robô, separada dos botões por um filete. */
+.fila-robo { padding-top: var(--esp-2); border-top: 1px solid var(--borda); }
+.fila-total { margin: 0; font-weight: 500; }
+.fila-robo td .mono { white-space: nowrap; }
+
+/* Barra do pedido no celular sem material: só o texto, na altura de quando há botão (a folga da
+   busca e o recuo do rodapé contam com ela). */
+.carrinho-barra-vazia { min-height: var(--altura-controle); color: var(--texto-secundario); font-weight: 400; }
+/* Gaveta dos formulários públicos: "Enviar pedido" (principal) sobre "Adicionar mais materiais". */
+.carrinho-acoes-gaveta { flex-direction: column; gap: var(--esp-1); }
+.js[data-gaveta] .carrinho-acoes-gaveta { display: flex; margin-top: var(--esp-2); }
+/* Contagem em duas linhas curtas ("Seu pedido" / "N materiais"), para o "Revisar e enviar" caber
+   inteiro na tela de 375px. */
+.carrinho-barra-contagem { display: grid; gap: 0; min-width: 0; line-height: 1.25; white-space: nowrap; }
+.carrinho-barra-contagem .selo { justify-self: start; }
+.carrinho-barra-rotulo { font-size: 0.8em; font-weight: 400; color: var(--texto-secundario); }
+.carrinho-barra [data-carrinho-abrir] { flex: none; white-space: nowrap; }
+
+/* Envio recusado: resumo no topo (focável, com link para o campo de cada erro) e o erro repetido
+   embaixo do campo, com ícone (estado nunca só por cor). */
+.resumo-erros:focus { outline: none; box-shadow: var(--anel-foco); }
+.resumo-erros-titulo { font-weight: 600; }
+.resumo-erros a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.formulario-pedido .campo-erro { display: flex; align-items: flex-start; gap: 6px; font-weight: 500; }
+.formulario-pedido .campo-erro .icone { width: 16px; height: 16px; margin-top: 1px; }
+.formulario-pedido .campo-com-erro .campo-entrada:focus { box-shadow: 0 0 0 3px var(--erro-superficie); }
+
+/* "Não é você? Limpar" (nome e destino lembrados), discreto e com área de toque de 44px. */
+.botao-esquecer { justify-self: start; min-height: var(--altura-controle); padding-left: 0; text-decoration: underline; text-underline-offset: 2px; }
+.botao-esquecer[hidden] { display: none; }
+
+/* "Adicionado" no lugar do "Adicionar" por 2 s. */
+.botao-adicionado { color: var(--ok-texto); background: var(--ok-superficie); border-color: transparent; }
+
+/* Tela de sucesso: o que foi pedido, para a pessoa conferir (ou guardar um print). */
+.sucesso-itens { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 480px; text-align: left; border-top: 1px solid var(--borda); }
+.sucesso-itens li { display: flex; justify-content: space-between; gap: var(--esp-2); padding: 10px 0; border-bottom: 1px solid var(--borda); }
+.sucesso-itens span { flex: 1 1 60%; }
+.sucesso-itens strong { flex: 0 1 auto; text-align: right; }
+/* Sem espaço na linha (tela estreita), o "Adicionar" desce em vez de sair do painel. */
+.lista-materiais .material-acao { flex-wrap: wrap; }
+
+/* Adicionar em dois passos (formulários públicos, pedidos.js): fechado, só o "Adicionar"; aberto, a
+   quantidade com "Confirmar" (ou "Atualizar") e o ✕ ocupam a linha toda. Sem JavaScript, a
+   quantidade fica à vista e o ✕ e o "Adicionar" de abrir não aparecem. */
+.material-qtd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+.material-abrir, .material-cancelar { display: none; }
+.js [data-adicionar] .material-abrir { display: inline-flex; }
+/* Largura fixa (a do rótulo mais largo, "Adicionado"/"Atualizado"): trocar o rótulo não estreita
+   o nome ao lado nem muda a altura da linha. */
+.material-abrir { flex: none; width: 7.5em; padding-inline: var(--esp-1); white-space: nowrap; }
+.js [data-adicionar] .material-qtd { display: none; }
+.js [data-adicionar].aberto { flex-basis: 100%; }
+.js [data-adicionar].aberto .material-abrir { display: none; }
+.js [data-adicionar].aberto .material-qtd { display: flex; width: 100%; }
+.js [data-adicionar].aberto .material-cancelar { display: inline-flex; width: var(--altura-controle); min-height: var(--altura-controle); }
+.js [data-adicionar].aberto [data-adicionar-confirmar] { flex: 1 1 0; min-width: 0; padding-inline: var(--esp-1); }
+.js [data-adicionar].aberto .material-qtd { flex-wrap: nowrap; }
+/* Fechado, o "Adicionar" fica ao lado do nome, sem uma linha só para ele. */
+.js .material:has([data-adicionar]:not(.aberto)) { flex-wrap: nowrap; align-items: flex-start; }
+.js .material:has([data-adicionar]:not(.aberto)) .material-dados { flex: 1 1 0; }
+/* O − / + só funciona com o pedidos.js: sem JavaScript, fica só o campo da quantidade. */
+html:not(.js) [data-quantidade] { display: none; }
+
+/* Saída avulsa (um passo): o botão de adicionar também não muda de largura com o "Adicionado". */
+.material-acao:not([data-adicionar]) [data-adicionar-confirmar] { min-width: 7.5em; white-space: nowrap; }
+
+/* Quantidade de cada linha do pedido em dois passos (formulários públicos, pedidos.js): fechada,
+   o texto ("3 UN") com "Alterar" e "Remover"; aberta, o − / + com "Confirmar" e ✕, que ocupam a
+   linha. Sem JavaScript, o campo fica à vista (vai com o envio). */
+.carrinho-qtd-area { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+.carrinho-qtd-texto, .carrinho-alterar, .carrinho-confirmar, .carrinho-cancelar { display: none; }
+.carrinho-qtd-texto { min-width: 4.5em; }
+.carrinho-qtd-texto strong { font-family: var(--fonte-titulo); font-weight: 600; font-variant-numeric: tabular-nums; }
+.js [data-alterar] .carrinho-qtd-texto { display: inline-block; }
+.js [data-alterar] .carrinho-alterar { display: inline-flex; min-height: 36px; padding: 4px 14px; }
+.js [data-alterar] .carrinho-qtd-area { display: none; }
+.js [data-alterar].aberto .carrinho-qtd-texto,
+.js [data-alterar].aberto .carrinho-alterar,
+.js [data-alterar].aberto .carrinho-remover { display: none; }
+.js [data-alterar].aberto .carrinho-qtd-area { display: flex; flex-wrap: nowrap; width: 100%; }
+.js [data-alterar].aberto .carrinho-confirmar { display: inline-flex; flex: 1 1 0; min-width: 0; padding-inline: var(--esp-1); }
+.js [data-alterar].aberto .carrinho-cancelar { display: inline-flex; width: var(--altura-controle); min-height: var(--altura-controle); }

@@ -1,0 +1,110 @@
+{% comment %}
+Visão geral de Automações: a linha do lançamento no SCPI e uma por fonte de dados do SCPI, com o botão
+"Atualizar agora", o que precisa de conferência e os números dos formulários. Enquanto houver importação em andamento (ou
+logo depois do clique ou do fim de uma), o HTMX recarrega este trecho a cada 5 s (a view devolve só
+ele quando recebe `HX-Request`). Os botões ficam aqui dentro para voltar a ser habilitados quando a
+importação termina.
+{% endcomment %}
+<section id="situacao-catalogo" class="pilha-larga" data-em-andamento="{% if importacao_em_andamento %}1{% else %}0{% endif %}"{% if acompanhar_catalogo %} hx-get="{% url 'automacoes:pagina' %}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+  <div class="cartao">
+    <div class="situacao-topo">
+      <div>
+        <h2 class="cartao-titulo">Robôs</h2>
+        <p class="situacao-resumo" role="status">{% if importacao_em_andamento and not situacao.em_andamento %}Iniciando a importação…{% else %}{{ resumo_geral|default:situacao.resumo }}{% endif %}</p>
+      </div>
+      <form method="post" action="{% url 'automacoes:atualizar' %}" class="situacao-acao dica-flutuante dica-flutuante-fim">
+        {% csrf_token %}
+        <button type="submit" class="botao botao-primario" aria-describedby="atualizar-o-que-faz"{% if importacao_em_andamento %} disabled{% endif %}>{% include "interface/_icone.html" with nome="atualizar" %}Atualizar agora</button>
+        <span class="dica-flutuante-texto" role="tooltip" id="atualizar-o-que-faz">Traz os cadastros novos, o saldo de estoque e as saídas dos últimos dias.</span>
+      </form>
+    </div>
+
+    {% comment %}Uma linha por fonte: estado, fonte, o que está em uso (número em destaque), quando e
+    uma ação. O erro fica embaixo da linha, com o caminho para resolver ("Tentar de novo", na aba do
+    robô).{% endcomment %}
+    <div class="fontes-cabecalho" aria-hidden="true"><span>Estado</span><span>Fonte</span><span>O que está em uso</span><span>Atualizado</span></div>
+    <ul class="fontes">
+      {% with linha=linha_lancamento %}{% if linha %}
+      <li class="fonte">
+        <span class="fonte-estado"><span class="selo selo-{% if linha.nivel == 'andamento' %}info{% else %}{{ linha.nivel }}{% endif %}">{{ linha.selo }}</span></span>
+        <span class="fonte-nome">{{ linha.rotulo }}</span>
+        <span class="fonte-em-uso">{{ linha.resumo }}{% if linha.complemento %} <span class="texto-secundario">· {{ linha.complemento }}</span>{% endif %}</span>
+        <span class="fonte-quando texto-secundario">{% if linha.quando %}<time datetime="{{ linha.quando|date:'c' }}" title="{{ linha.quando|date:'d/m/Y H:i' }}">{{ linha.ha_quanto }}</time>{% else %}—{% endif %}</span>
+        <span class="fonte-acao">{% if linha.nivel != "andamento" or not linha.acao_discreta %}<a href="{{ linha.acao_url }}" data-abrir-aba="lancamento"{% if linha.acao_discreta %} class="fonte-acao-discreta"{% endif %}>{{ linha.acao_rotulo }}{% include "interface/_icone.html" with nome="seta-direita" %}</a>{% endif %}</span>
+        {% if linha.erro %}<p class="fonte-erro">{% include "interface/_icone.html" with nome="alerta" %}<span>{{ linha.erro }}</span></p>{% endif %}
+      </li>
+      {% endif %}{% endwith %}
+      {% for fonte in situacao.fontes %}
+      <li class="fonte">
+        <span class="fonte-estado">{% include "catalogo/_selo_fonte.html" %}</span>
+        <span class="fonte-nome">{{ fonte.rotulo }}</span>
+        <span class="fonte-em-uso">{{ fonte.resumo }}{% if fonte.complemento %} <span class="texto-secundario">· {{ fonte.complemento }}</span>{% endif %}</span>
+        <span class="fonte-quando texto-secundario">{% if fonte.quando and fonte.ha_quanto %}<time datetime="{{ fonte.quando|date:'c' }}" title="{{ fonte.quando|date:'d/m/Y H:i' }}">{{ fonte.ha_quanto }}</time>{% else %}—{% endif %}</span>
+        <span class="fonte-acao">
+          {% if fonte.avisos %}{% with n=fonte.ultima.avisos|length %}<a href="#para-conferir">Ver {{ n }} {% if n == 1 %}aviso{% else %}avisos{% endif %}</a>{% endwith %}
+          {% elif fonte.tipo in tipos_com_aba and fonte.nivel != "andamento" %}{% with chave=fonte.tipo|lower %}<a href="{% url 'automacoes:pagina' %}?aba={{ chave }}" data-abrir-aba="{{ chave }}"{% if fonte.nivel == "ok" %} class="fonte-acao-discreta"{% endif %}>{% if fonte.nivel == "ok" or not fonte.ultima %}Importar{% else %}Tentar de novo{% endif %}{% include "interface/_icone.html" with nome="seta-direita" %}</a>{% endwith %}{% endif %}
+        </span>
+        {% if fonte.erro %}<p class="fonte-erro">{% include "interface/_icone.html" with nome="alerta" %}<span>{{ fonte.erro }}{% if fonte.quando %} Os dados acima continuam valendo.{% endif %}</span></p>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+
+    {# Rara (a implantação, ou refazer tudo): recolhida, com o que ela faz à vista e uma confirmação. #}
+    <details class="mais-opcoes">
+      <summary>Carga inicial completa</summary>
+      <form method="post" action="{% url 'automacoes:atualizar' %}" class="pilha">
+        {% csrf_token %}
+        <input type="hidden" name="modo" value="carga-inicial">
+        <p class="texto-secundario">Traz o cadastro inteiro, o estoque e as saídas desde {{ inicio_dados|date:"d/m/Y" }}. Os materiais que sumiram do SCPI ficam ocultos. Leva vários minutos: serve para a implantação ou para refazer tudo.</p>
+        <label class="campo-check"><input type="checkbox" name="confirmar" value="1" required><span>Estou ciente de que leva vários minutos e oculta os materiais que sumiram do SCPI.</span></label>
+        <div class="acoes"><button type="submit" class="botao botao-secundario"{% if importacao_em_andamento %} disabled{% endif %}>Iniciar carga inicial completa</button></div>
+      </form>
+    </details>
+  </div>
+
+  {% if situacao.tem_avisos %}
+  <div class="cartao" id="para-conferir">
+    <h2 class="cartao-titulo">Para conferir</h2>
+    <ul class="saude">
+      {% for fonte in situacao.fontes %}{% for grupo in fonte.avisos %}
+      <li>
+        <span class="selo selo-aviso">Aviso</span>
+        <div class="aviso-grupo">
+          <span><strong>{{ fonte.rotulo }}:</strong> {{ grupo.titulo }}{% if grupo.itens|length == 1 %}: <span class="mono">{{ grupo.itens.0 }}</span>{% endif %}</span>
+          {% if grupo.itens|length > 1 %}
+          <details class="aviso-itens">
+            <summary>Ver os {{ grupo.itens|length }}</summary>
+            <p class="mono">{{ grupo.itens|join:", " }}</p>
+          </details>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}{% endfor %}
+      {% for item in situacao.avisos %}
+      <li>
+        {% if item.nivel == "erro" %}<span class="selo selo-erro">Erro</span>{% else %}<span class="selo selo-aviso">Aviso</span>{% endif %}
+        <span>{{ item.texto }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="grade-2 formularios">
+    <div class="cartao cartao-sutil">
+      <p class="texto-secundario">Formulário de limpeza, copa e escritório</p>
+      <p class="metrica">{{ situacao.limpeza|floatformat:"0g" }} {% if situacao.limpeza == 1 %}item{% else %}itens{% endif %}</p>
+    </div>
+    <div class="cartao cartao-sutil">
+      <p class="texto-secundario">Formulário de ferramentas, peças e materiais</p>
+      {% if situacao.ab %}
+      <p class="metrica">{{ situacao.ab.itens|length|floatformat:"0g" }} {% if situacao.ab.itens|length == 1 %}item{% else %}itens{% endif %}</p>
+      <p class="campo-dica">De {{ situacao.ab.codigos|floatformat:"0g" }} códigos com saída no SCPI: {{ situacao.ab.na_limpeza|floatformat:"0g" }} já estão no formulário de limpeza e {{ situacao.ab.ocultos|floatformat:"0g" }} estão ocultos ou em grupo oculto.</p>
+      {% else %}
+      <p class="metrica">Indisponível</p>
+      <p class="campo-dica">Falta importar o saldo de estoque.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</section>

@@ -1,0 +1,120 @@
+/* Catálogo: lista da saúde (também usada no painel) e a faixa do botão. */
+.saude { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.saude li { display: flex; align-items: flex-start; gap: var(--esp-1); }
+.saude .selo { flex: none; margin-top: 2px; }
+.saude li > div { min-width: 0; }
+
+/* Situação: resumo e "Atualizar agora" no topo do cartão, uma linha por fonte de dados embaixo. */
+.situacao-topo { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--esp-2) var(--esp-4); }
+.situacao-topo .cartao-titulo { margin-bottom: var(--esp-meio); }
+.situacao-resumo { margin: 0; color: var(--texto-secundario); }
+/* O que o botão faz fica na dica flutuante (aria-describedby), não embaixo dele. */
+.situacao-acao { display: grid; justify-items: end; }
+@media (max-width: 640px) {
+  .situacao-acao { justify-items: stretch; width: 100%; }
+}
+/* Fontes: colunas com cabeçalho (estado primeiro, para bater o olho), o número em destaque e uma ação
+   por linha. O erro fica embaixo, alinhado com a fonte. */
+.fontes-cabecalho, .fonte {
+  display: grid; grid-template-columns: 7.5rem 9rem minmax(0, 1fr) 7.5rem 8.5rem;
+  gap: var(--esp-1) var(--esp-2); align-items: center;
+}
+.fontes-cabecalho {
+  margin-top: var(--esp-3); padding-bottom: var(--esp-1);
+  font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-suave);
+}
+.fontes { list-style: none; margin: 0; padding: 0; }
+.fonte { padding: 12px 0; border-top: 1px solid var(--borda); }
+.fonte-nome { font-weight: 500; }
+.fonte-em-uso { font-variant-numeric: tabular-nums; }
+.fonte-quando { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fonte-acao { justify-self: end; white-space: nowrap; }
+.fonte-acao a { display: inline-flex; align-items: center; gap: var(--esp-meio); }
+.fonte-acao .icone { width: 16px; height: 16px; }
+.fonte-acao-discreta { color: var(--texto-secundario); }
+.fonte-erro { grid-column: 2 / -1; display: flex; align-items: flex-start; gap: var(--esp-1); margin: 0; color: var(--erro-texto); }
+.fonte-erro .icone { flex: none; width: 16px; height: 16px; margin-top: 3px; }
+/* No celular, cada fonte vira um bloco: fonte e estado em cima (o nome à esquerda, alinhado entre as
+   linhas), número no meio, quando e ação embaixo, e o erro no fim. Sem o cabeçalho, que não teria mais
+   colunas para nomear. */
+@media (max-width: 640px) {
+  .fontes-cabecalho { display: none; }
+  .fontes { margin-top: var(--esp-2); }
+  .fonte { grid-template-columns: minmax(0, 1fr) auto; gap: var(--esp-meio) var(--esp-1); }
+  .fonte-nome { grid-row: 1; grid-column: 1; }
+  .fonte-estado { grid-row: 1; grid-column: 2; justify-self: end; }
+  .fonte-em-uso, .fonte-erro { grid-column: 1 / -1; }
+  .fonte-quando { grid-column: 1; }
+  .fonte-acao { grid-column: 2; }
+}
+
+/* Carga inicial completa: rara, recolhida no fim do cartão. */
+.mais-opcoes { margin-top: var(--esp-2); padding-top: var(--esp-2); border-top: 1px solid var(--borda); }
+.mais-opcoes summary, .aviso-itens summary {
+  display: inline-flex; align-items: center; cursor: pointer; color: var(--texto-secundario);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.mais-opcoes summary { min-height: var(--altura-controle); }
+.mais-opcoes summary:hover, .aviso-itens summary:hover { color: var(--texto); }
+.mais-opcoes summary:focus-visible, .aviso-itens summary:focus-visible { outline: none; box-shadow: var(--anel-foco); border-radius: 4px; }
+.mais-opcoes[open] summary { margin-bottom: var(--esp-2); }
+.mais-opcoes form { max-width: 40rem; }
+.mais-opcoes p { margin: 0; }
+
+/* Avisos agrupados e detalhes do histórico. */
+.aviso-grupo { display: grid; gap: var(--esp-meio); }
+.aviso-itens summary { font-size: 0.875em; }
+@media (max-width: 640px) { .aviso-itens summary { min-height: var(--altura-controle); } }
+.aviso-itens p, .aviso-itens ul { margin: var(--esp-meio) 0 0; overflow-wrap: anywhere; }
+
+/* Números dos formulários. */
+.formularios .cartao { display: grid; align-content: start; gap: var(--esp-meio); }
+.formularios p { margin: 0; }
+.metrica { font-family: var(--fonte-titulo); font-size: 1.6em; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .formularios { grid-template-columns: minmax(0, 1fr); } }
+
+/* Histórico: o erro técnico e os avisos ficam recolhidos; a coluna não espreme a tabela. */
+.tabela .tabela-numero { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.historico-tipo { white-space: nowrap; }
+.historico-tipo .texto-secundario { display: block; }
+.historico-resultado { min-width: 14rem; }
+.historico-resultado p { margin: var(--esp-meio) 0 0; }
+.historico-avisos { padding-left: 1.1em; }
+/* No celular, cada importação vira um bloco: quando e o quê em cima, o resultado embaixo, linhas e
+   duração com rótulo. Sem rolagem lateral escondendo o resultado. */
+@media (max-width: 640px) {
+  .tabela-historico thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .tabela-historico tbody tr {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--esp-meio) var(--esp-2);
+    padding: 12px 0; border-bottom: 1px solid var(--borda);
+  }
+  .tabela-historico tbody tr:last-child { border-bottom: 0; }
+  .tabela-historico td { padding: 0; border: 0; }
+  .tabela-historico .historico-tipo { white-space: normal; }
+  .tabela-historico .historico-resultado { grid-column: 1 / -1; min-width: 0; }
+  .tabela-historico td[data-rotulo] { text-align: left; color: var(--texto-secundario); font-size: 0.875em; }
+  .tabela-historico td[data-rotulo]::before { content: attr(data-rotulo) ": "; }
+  .tabela-historico .tabela-vazia { display: block; }
+}
+.erro-tecnico {
+  max-height: 16rem; overflow: auto; margin: var(--esp-meio) 0 0; padding: var(--esp-1);
+  background: var(--superficie); border-radius: var(--raio-controle); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+/* As abas da página (Situação e um robô por aba) vêm do componente comum (componentes.css). */
+[data-robo-arquivo][hidden], [data-robo-aviso][hidden], [data-periodo-padrao][hidden] { display: none; }
+
+/* Abas dos robôs: a última execução fica antes dos parâmetros. */
+.robo-ultima { display: grid; gap: var(--esp-meio); padding: var(--esp-2); background: var(--superficie); border-radius: var(--raio-controle); }
+.robo-ultima p { margin: 0; }
+.aviso p { margin: 0; }
+
+/* Cadastro: modo (só os novos ou recarga completa) em linhas selecionáveis. */
+.estado-carga { margin: 0; font-size: 0.8125em; color: var(--texto-secundario); }
+.opcao-modo { padding: var(--esp-2); border: 1px solid var(--borda); border-radius: var(--raio-controle); }
+.opcao-modo:hover { border-color: var(--texto-suave); }
+.opcao-modo:has(input:checked) { border-color: rgba(37, 99, 235, 0.45); background: var(--info-superficie); }
+.opcao-modo:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
+.opcao-modo .campo-dica { display: block; margin-top: 2px; }
+.aviso .campo-dica { display: block; margin-top: 2px; }
+.aviso[hidden] { display: none; }

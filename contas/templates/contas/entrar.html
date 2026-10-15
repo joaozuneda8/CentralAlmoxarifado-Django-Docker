@@ -1,0 +1,40 @@
+{% extends "interface/base.html" %}
+{% load static %}
+{% block title %}{% if form.errors %}Erro: {% endif %}Entrar — Central Almoxarifado{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'contas/css/entrar.css' %}">{% endblock %}
+{% block body_class %}ritmo-publico entrada-pagina{% endblock %}
+{% block content %}
+{% comment %}
+Login da área do almoxarifado: card centralizado no fundo off-white, sem barra lateral. A
+recusa é genérica (`FormularioEntrada`) e não diz se a matrícula existe. O erro de campo liga o
+widget ao `<auto_id>_error` por `aria-describedby`/`aria-invalid` (o Django os põe no widget).
+{% endcomment %}
+<main class="entrada" id="main">
+  <a class="marca" href="{% url 'pedidos:inicio' %}">{% include "interface/_icone.html" with nome="caixa" %}<span>Central Almoxarifado</span></a>
+  <div class="cartao entrada-cartao">
+    <div class="pilha">
+      <p class="rotulo-secao">Acesso restrito</p>
+      <h1>Área do almoxarifado</h1>
+    </div>
+    {% if form.non_field_errors %}
+    <div class="aviso aviso-erro" id="login-erro" role="alert">
+      {% include "interface/_icone.html" with nome="alerta" %}
+      <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+    </div>
+    {% endif %}
+    <form method="post" class="pilha">
+      {% csrf_token %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+      {% for campo in form %}
+      <div class="campo{% if campo.errors %} campo-com-erro{% endif %}">
+        <label class="campo-rotulo" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+        {{ campo }}
+        {% if campo.errors %}<p class="campo-erro" id="{{ campo.auto_id }}_error">{{ campo.errors.0 }}</p>{% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="botao botao-primario botao-bloco">Entrar</button>
+    </form>
+    <p class="texto-suave texto-pequeno">Esqueceu a senha? Procure o responsável pelo almoxarifado.</p>
+  </div>
+</main>
+{% endblock %}

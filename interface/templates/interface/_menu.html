@@ -1,0 +1,25 @@
+{% comment %}
+Barra lateral do almoxarifado. Até 1286px vira cabeçalho com o botão de menu
+(`interface/js/shell.js`), que mostra `menu` fechado e `fechar` aberto; sem JavaScript, a
+navegação fica aberta. Sair é só POST com CSRF, num único formulário.
+{% endcomment %}
+<aside class="app-lateral">
+  <div class="app-lateral-topo">
+    <a class="marca" href="{% url 'pedidos:painel' %}">{% include "interface/_icone.html" with nome="caixa" %}<span>Central Almoxarifado</span></a>
+    <button type="button" class="botao botao-texto botao-icone app-menu-botao" data-menu-toggle aria-expanded="false" aria-controls="menu-lateral" aria-label="Menu"><span class="app-menu-abrir">{% include "interface/_icone.html" with nome="menu" %}</span><span class="app-menu-fechar">{% include "interface/_icone.html" with nome="fechar" %}</span></button>
+  </div>
+  <div class="app-lateral-painel" id="menu-lateral">
+    <nav class="app-menu" aria-label="Seções">
+      {% for item in menu %}<a class="app-menu-item" href="{{ item.url }}"{% if item.atual %} aria-current="page"{% endif %}>{% include "interface/_icone.html" with nome=item.icone %}<span>{{ item.rotulo }}</span></a>
+      {% endfor %}
+    </nav>
+    <div class="app-conta">
+      <p class="app-conta-nome">{{ user.get_full_name|default:user.username }}</p>
+      <p class="mono texto-suave texto-pequeno">{{ user.username }}</p>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="botao botao-texto">{% include "interface/_icone.html" with nome="sair" %}Sair</button>
+      </form>
+    </div>
+  </div>
+</aside>

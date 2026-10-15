@@ -1,0 +1,2 @@
+{# Selo da situação de uma fonte de dados (`catalogo.saude.Fonte`), sempre com texto. #}
+{% if fonte.nivel == "erro" %}<span class="selo selo-erro">{{ fonte.selo }}</span>{% elif fonte.nivel == "aviso" %}<span class="selo selo-aviso">{{ fonte.selo }}</span>{% elif fonte.nivel == "andamento" %}<span class="selo selo-info">{{ fonte.selo }}</span>{% else %}<span class="selo selo-ok">{{ fonte.selo }}</span>{% endif %}

@@ -1,0 +1,34 @@
+<!--
+  Tarefa "Estoque" do Agendador: de segunda a sexta, a cada 30 minutos entre 07:00 e 17:01.
+  Em XML porque o /D do schtasks usa os nomes dos dias no idioma do Windows (num Windows em
+  portugues, MON,TUE,... e recusado); aqui eles sao fixos. Criada pelo comando da secao 8 do
+  deploy/INSTALACAO.md. So ASCII e sem a declaracao XML no topo: o schtasks /XML
+  recusa a declaracao com encoding UTF-8.
+-->
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2026-10-01T07:00:00</StartBoundary>
+      <Repetition>
+        <Interval>PT30M</Interval>
+        <Duration>PT10H1M</Duration>
+      </Repetition>
+      <ScheduleByWeek>
+        <WeeksInterval>1</WeeksInterval>
+        <DaysOfWeek>
+          <Monday />
+          <Tuesday />
+          <Wednesday />
+          <Thursday />
+          <Friday />
+        </DaysOfWeek>
+      </ScheduleByWeek>
+    </CalendarTrigger>
+  </Triggers>
+  <Actions>
+    <Exec>
+      <Command>C:\CentralAlmoxarifado\deploy\tarefa.bat</Command>
+      <Arguments>importar_estoque</Arguments>
+    </Exec>
+  </Actions>
+</Task>

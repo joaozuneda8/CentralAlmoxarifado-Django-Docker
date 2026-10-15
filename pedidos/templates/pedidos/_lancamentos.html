@@ -1,0 +1,203 @@
+{% load interface_extras %}
+{% comment %}
+Aba Lançamento no SCPI de Automações: formulário único ("Simular", "Lançar no SCPI" e o limite),
+andamento da última execução do robô e travas para conferir (as execuções anteriores ficam no
+histórico da visão geral). Enquanto houver execução em andamento, o HTMX recarrega este trecho a
+cada 3 s (a view o escolhe pelo HX-Target `section#lancamentos`). Quando a execução termina, a resposta seguinte já vem sem
+`hx-trigger`: a atualização para e os formulários de resolução, que só aparecem sem execução
+em andamento, nunca ficam numa seção recarregada (perderiam o que o usuário digitou); a confirmação do
+"Não lançar" fica junto deles.
+{% endcomment %}
+<section id="lancamentos" class="pilha-larga"{% if acompanhar_lancamento %} hx-get="{% url 'automacoes:pagina' %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <div class="cartao pilha">
+    {# Um formulário só: o botão clicado diz o modo e o limite vale para ele. A ação em destaque é a que dá para executar agora: "Simular" com o lançamento real bloqueado (LANCAMENTO_REAL), "Lançar no SCPI" com ele liberado. Bloqueado, o "Lançar no SCPI" fica aria-disabled e type="button", como no cartão do painel: continua no Tab e mostra o motivo numa dica, sem enviar nada. #}
+    <form method="post" action="{% url 'automacoes:lancar' %}" class="lancar-acao" data-acao-lancamento>
+      {% csrf_token %}
+      <div class="lancar-botoes">
+        <button type="submit" name="modo" value="simular" class="botao {% if pode_executar and not lancamento_real %}botao-primario{% else %}botao-secundario{% endif %}"{% if not pode_executar %} disabled{% endif %}>{% include "interface/_icone.html" with nome="olho" %}Simular</button>
+        {% if lancamento_real %}
+        <button type="submit" name="modo" value="lancar" class="botao {% if pode_executar %}botao-primario{% else %}botao-secundario{% endif %}"{% if not pode_executar %} disabled{% endif %}>{% include "interface/_icone.html" with nome="robo" %}Lançar no SCPI</button>
+        {% else %}
+        <span class="dica-flutuante">
+          <button type="button" class="botao botao-secundario" aria-disabled="true" aria-describedby="dica-lancamento-real">{% include "interface/_icone.html" with nome="robo" %}Lançar no SCPI{% include "interface/_icone.html" with nome="cadeado" %}</button>
+          <span class="dica-flutuante-texto" role="tooltip" id="dica-lancamento-real">Lançamento real bloqueado até a virada: só a simulação roda.</span>
+        </span>
+        {% endif %}
+      </div>
+      <div class="lancar-limite">
+        <label class="campo-rotulo" for="limite-lancamento">Só as primeiras</label>
+        <input id="limite-lancamento" class="campo-entrada" type="number" name="limite" min="1" max="10000" inputmode="numeric" placeholder="todas"{% if not pode_executar %} disabled{% endif %}>
+        <span class="texto-secundario">requisições</span>
+      </div>
+      {% if lancamento_em_andamento %}<p class="lancar-motivo">Há uma execução em andamento.</p>{% endif %}
+    </form>
+    <p class="campo-dica">A simulação preenche cada requisição no SCPI e não salva: nenhuma linha muda de estado.{% if not lancamento_real %} O lançamento real é liberado pelo LANCAMENTO_REAL no .env.{% endif %}</p>
+    {# A fila do robô logo abaixo dos botões: é o que se confere antes de clicar. Sem nada nela, a frase é também o motivo de os botões estarem desabilitados. #}
+    <div class="fila-robo pilha" id="fila">
+      <p class="fila-total">{% if fila.total %}{{ fila.total }} {{ fila.total|pluralize:"requisição aguardando o robô,requisições aguardando o robô" }}{% else %}Nada aguardando o robô.{% endif %}</p>
+      {% if fila.requisicoes %}
+      <div class="tabela-rolagem">
+        <table class="tabela">
+          <thead>
+            <tr>
+              <th scope="col">Nº</th>
+              <th scope="col">Data</th>
+              <th scope="col">Recebedor</th>
+              <th scope="col">Centro de custo</th>
+              <th scope="col">Materiais</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for req in fila.requisicoes %}
+            <tr>
+              <td><a class="mono" href="{% url 'pedidos:detalhe' req.lote %}">{{ req.lote }}</a></td>
+              <td class="tabela-data">{{ req.data|date:"d/m/Y" }}</td>
+              <td>{{ req.recebedor }}</td>
+              <td>{{ req.centro_custo }}</td>
+              <td class="tabela-data">{{ req.materiais }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if fila.fora %}<p class="texto-secundario texto-pequeno">e mais {{ fila.fora }} {{ fila.fora|pluralize:"requisição,requisições" }}</p>{% endif %}
+      {% endif %}
+    </div>
+    <!-- /fila -->
+  </div>
+
+  {# A última execução numa frase (pedidos/andamento.py), com quem iniciou e a duração; só os contadores diferentes de zero. A falha vem explicada em português, com o texto técnico recolhido. #}
+  {% if execucao %}
+  <div class="cartao pilha" id="andamento">
+    <div class="andamento-topo">
+      <h2 class="cartao-titulo">Andamento</h2>
+      {% if andamento.interrompida %}<span class="selo selo-aviso">Interrompida</span>
+      {% elif execucao.situacao == "FALHA" %}<span class="selo selo-erro">{{ execucao.get_situacao_display }}</span>
+      {% elif execucao.situacao == "ATENCAO" %}<span class="selo selo-aviso">{{ execucao.get_situacao_display }}</span>
+      {% elif execucao.situacao == "SUCESSO" %}<span class="selo selo-ok">{{ execucao.get_situacao_display }}</span>
+      {% else %}<span class="selo selo-info">{{ execucao.get_situacao_display }}</span>{% endif %}
+    </div>
+    <p class="andamento-frase">{{ andamento.frase }}</p>
+    <p class="texto-secundario texto-pequeno">Iniciada por {% if execucao.iniciada_por %}{{ execucao.iniciada_por.get_full_name|default:execucao.iniciada_por.username }}{% else %}linha de comando{% endif %}. Duração: {{ andamento.duracao }}.</p>
+    {% if andamento.contadores %}
+    <ul class="contadores">
+      {% for contador in andamento.contadores %}<li class="selo selo-neutro">{{ contador }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% with falha=andamento.falha %}
+    {% if falha %}
+    <div class="aviso aviso-erro" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<div class="pilha-curta"><p><strong>{{ falha.frase|linebreaksbr }}</strong></p><p>{{ falha.ate_onde }} {{ falha.proximo_passo }}</p></div></div>
+    <div class="acoes">
+      {% if falha.simular_de_novo %}
+      <form method="post" action="{% url 'automacoes:lancar' %}">
+        {% csrf_token %}
+        <button type="submit" name="modo" value="simular" class="botao botao-secundario"{% if lancamento_em_andamento or not fila.total %} disabled{% endif %}>{% include "interface/_icone.html" with nome="olho" %}Simular de novo</button>
+      </form>
+      {% endif %}
+      {% if andamento.precisa_conferir %}<a class="botao botao-texto" href="#travas">Ver as travas</a>{% endif %}
+    </div>
+    {% if falha.tecnico %}
+    <details class="detalhe-tecnico">
+      <summary>Detalhe técnico</summary>
+      <pre class="log-execucao mono" tabindex="0">{{ execucao.erro }}{% if log_recente %}
+
+{{ log_recente }}{% endif %}</pre>
+    </details>
+    {% endif %}
+    {% elif andamento.precisa_conferir %}
+    <p><a href="#travas">Ver as travas</a></p>
+    {% endif %}
+    {% if log_recente and not falha.tecnico %}
+    <details class="detalhe-tecnico"{% if lancamento_em_andamento %} open{% endif %}>
+      <summary>Registro da execução</summary>
+      <pre class="log-execucao mono" tabindex="0">{{ log_recente }}</pre>
+    </details>
+    {% endif %}
+    {% endwith %}
+  </div>
+  {% else %}
+  <p class="texto-secundario" id="andamento">Nenhuma execução ainda.</p>
+  {% endif %}
+  <!-- /andamento -->
+
+  {% if travados %}
+  <div class="cartao pilha" id="travas">
+    <h2 class="cartao-titulo">Travas para conferir</h2>
+    {% for trava in travados %}
+    <article class="cartao cartao-sutil trava">
+      <div class="trava-cabecalho">
+        <h3>Nº <a class="mono" href="{% url 'pedidos:detalhe' trava.lote %}">{{ trava.lote }}</a></h3>
+        {% with primeira=trava.linhas.0 %}
+        <dl class="dados">
+          <div><dt>Data</dt><dd>{{ primeira.data|date:"d/m/Y" }}</dd></div>
+          <div><dt>Recebedor</dt><dd>{{ primeira.recebedor }}</dd></div>
+          <div><dt>Centro de custo</dt><dd>{{ primeira.centro_custo }}</dd></div>
+        </dl>
+        {% endwith %}
+      </div>
+      <div class="tabela-rolagem">
+        <table class="tabela">
+          <thead>
+            <tr>
+              <th scope="col">Material</th>
+              <th scope="col">Quantidade</th>
+              <th scope="col">Situação</th>
+              <th scope="col">Mensagem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in trava.linhas %}
+            <tr>
+              <td><span class="mono">{{ linha.codigo }}</span> <span class="texto-secundario">{{ linha.descricao }}</span></td>
+              <td class="tabela-data">{{ linha.qtd|quantidade }}</td>
+              <td><span class="selo {% if linha.status == 'ERRO' %}selo-erro{% else %}selo-aviso{% endif %}">{{ linha.get_status_display }}</span></td>
+              <td>{{ linha.mensagem|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if lancamento_em_andamento %}
+      <p class="texto-secundario texto-pequeno">A resolução fica disponível quando o lançamento terminar.</p>
+      {% else %}
+      <form method="post" action="{% url 'automacoes:resolver' trava.lote %}" class="resolucao">
+        {% csrf_token %}
+        <div class="resolucao-requisicao">
+          <label class="campo-rotulo" for="requisicao-{{ trava.lote }}">Nº da requisição</label>
+          <div class="resolucao-linha">
+            <input id="requisicao-{{ trava.lote }}" class="campo-entrada mono" type="text" name="requisicao" placeholder="000000/00" maxlength="9" autocomplete="off">
+            <button type="submit" name="acao" value="lancada" class="botao botao-secundario">Informar requisição</button>
+          </div>
+        </div>
+        {% if trava.conferir %}
+        <label class="campo-check"><input type="checkbox" name="conferido" value="1"><span>Conferi no SCPI: a requisição não foi gravada</span></label>
+        {% endif %}
+        <div class="acoes">
+          <button type="submit" name="acao" value="liberar" class="botao botao-secundario">Liberar para relançar</button>
+        </div>
+      </form>
+      {# Tirar do lançamento vai em dois passos, também sem JavaScript: o <summary> só abre o aviso, e o formulário próprio (sem o nº nem o "Conferi") manda a confirmação. #}
+      <details class="confirmar-nao-lancar">
+        <summary class="botao botao-texto botao-perigo">Não lançar…</summary>
+        <div class="confirmar-nao-lancar-painel">
+          <div class="aviso aviso-atencao">{% include "interface/_icone.html" with nome="alerta" %}<p>A requisição de <span class="mono">{{ trava.lote }}</span> não será lançada no SCPI. As linhas ficam marcadas como Não lançar.</p></div>
+          <form method="post" action="{% url 'automacoes:resolver' trava.lote %}" class="acoes">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="nao_lancar">
+            <input type="hidden" name="confirmado" value="1">
+            <button type="submit" class="botao botao-secundario botao-perigo">Confirmar: não lançar</button>
+            <button type="button" class="botao botao-texto" data-desistir hidden>Desistir</button>
+          </form>
+        </div>
+      </details>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="texto-secundario" id="travas">Nenhuma trava para conferir.</p>
+  {% endif %}
+
+  <p><a class="botao botao-texto" href="{% url 'automacoes:pagina' %}?aba=visao-geral&amp;robo=lancamento#historico">Ver histórico{% include "interface/_icone.html" with nome="seta-direita" %}</a></p>
+
+</section>

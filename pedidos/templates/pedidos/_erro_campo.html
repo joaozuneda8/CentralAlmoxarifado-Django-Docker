@@ -1,0 +1,2 @@
+{% comment %}Erros de um campo do formulário público, logo abaixo dele. Recebe `nome` (o id do campo) e `erros` (textos).{% endcomment %}
+{% if erros %}<p id="{{ nome }}-erro" class="campo-erro">{% include "interface/_icone.html" with nome="alerta" %}<span>{% for e in erros %}{{ e }}{% if not forloop.last %} {% endif %}{% endfor %}</span></p>{% endif %}

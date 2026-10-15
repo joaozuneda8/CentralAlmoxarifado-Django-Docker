@@ -1,0 +1,55 @@
+{% extends "interface/base_almoxarifado.html" %}
+{% load static interface_extras %}
+
+{% block title %}Curva ABC — Central Almoxarifado{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'catalogo/css/catalogo.css' %}">{% endblock %}
+{% block heading %}Curva ABC{% endblock %}
+{% block sub %}Saídas do SCPI consolidadas pelo código canônico (de/para).{% endblock %}
+
+{% block page %}
+<div class="pilha-larga">
+  <div class="cartao">
+    <form method="get" class="filtros">
+      <input type="hidden" name="aba" value="{{ aba }}">
+      <div class="campo filtros-campo">
+        <label class="campo-rotulo" for="campo-meses">Janela (meses)</label>
+        <input class="campo-entrada" type="number" min="1" id="campo-meses" name="meses" value="{{ meses }}">
+      </div>
+      <div class="filtros-acoes"><button type="submit" class="botao botao-secundario">Aplicar</button></div>
+    </form>
+    <p>Período: de {{ dados.periodo.inicio|date:"d/m/Y" }} a {{ dados.periodo.fim|date:"d/m/Y" }} ({{ dados.periodo.dias|separador_milhar }} dias).</p>
+    {% if dados.periodo.limitado %}
+    <p class="aviso aviso-info">Os dados anteriores a {{ inicio_confiavel|date:"d/m/Y" }} não entram nos cálculos.</p>
+    {% endif %}
+    {% with r=dados.reconciliacao %}
+    <p class="aviso {% if r.bate %}aviso-ok{% else %}aviso-erro{% endif %}">
+      {% if r.bate %}Reconciliação conferida:{% else %}Reconciliação não bate:{% endif %}
+      {{ r.ocorrencias_antes|separador_milhar }} ocorrências antes e {{ r.ocorrencias_depois|separador_milhar }} depois;
+      valor {{ r.valor_antes|dinheiro }} antes e {{ r.valor_depois|dinheiro }} depois;
+      {{ r.codigos_antes|separador_milhar }} códigos viraram {{ r.canonicos_depois|separador_milhar }} canônicos.
+    </p>
+    {% endwith %}
+  </div>
+
+  <div class="abas" data-abas data-url="{% url 'catalogo:curva' %}">
+    <div class="abas-lista" role="tablist" aria-label="Curva ABC">
+      {% for chave, rotulo in abas %}
+      <button type="button" role="tab" class="aba{% if chave == aba %} aba-ativa{% endif %}" id="aba-{{ chave }}" data-aba="{{ chave }}" aria-controls="painel-{{ chave }}" aria-selected="{% if chave == aba %}true{% else %}false{% endif %}" tabindex="{% if chave == aba %}0{% else %}-1{% endif %}">{{ rotulo }}</button>
+      {% endfor %}
+    </div>
+
+    <section role="tabpanel" id="painel-frequencia" class="aba-painel{% if aba == 'frequencia' %} aba-painel-ativo{% endif %}" aria-labelledby="aba-frequencia">
+      {% include "catalogo/_curva_tabela.html" with linhas=dados.frequencia titulo="Curva por frequência (ocorrências)" %}
+    </section>
+    <section role="tabpanel" id="painel-valor" class="aba-painel{% if aba == 'valor' %} aba-painel-ativo{% endif %}" aria-labelledby="aba-valor">
+      {% include "catalogo/_curva_tabela.html" with linhas=dados.valor titulo="Curva por valor" %}
+    </section>
+    <section role="tabpanel" id="painel-reposicao" class="aba-painel{% if aba == 'reposicao' %} aba-painel-ativo{% endif %}" aria-labelledby="aba-reposicao">
+      {% include "catalogo/_curva_reposicao.html" %}
+    </section>
+    <section role="tabpanel" id="painel-pendentes" class="aba-painel{% if aba == 'pendentes' %} aba-painel-ativo{% endif %}" aria-labelledby="aba-pendentes">
+      {% include "catalogo/_curva_pendentes.html" %}
+    </section>
+  </div>
+</div>
+{% endblock %}

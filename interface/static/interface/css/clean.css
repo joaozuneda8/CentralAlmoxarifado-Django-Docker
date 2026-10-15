@@ -1,0 +1,163 @@
+/*
+ * Clean — fundação visual do Central Almoxarifado (docs/DESIGN.md; skill clean-design).
+ * Tokens, fontes, tipografia, ritmos e utilitários. Só tema claro.
+ */
+
+@font-face { font-family: "Geist"; src: url("../fonts/geist-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist"; src: url("../fonts/geist-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Sans"; src: url("../fonts/dm-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Sans"; src: url("../fonts/dm-sans-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Sans"; src: url("../fonts/dm-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("../fonts/geist-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("../fonts/geist-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+
+:root {
+  --fundo: #ffffff;
+  --superficie: #f7f6f2;
+  --texto: #0f0e0c;
+  --texto-secundario: #6b6760;
+  --texto-suave: #a8a49f;
+  --borda: #e8e6e1;
+  --destaque: #2563eb;
+  --destaque-hover: #1d4ed8;
+  --destaque-texto: #ffffff;
+  --destaque-superficie: #eff4ff;
+  --ok-superficie: #ecf7ee;
+  --ok-texto: #1e6b34;
+  --aviso-superficie: #fdf4e3;
+  --aviso-texto: #8a5a00;
+  --erro-superficie: #fcedec;
+  --erro-texto: #a3261d;
+  --info-superficie: var(--destaque-superficie);
+  --info-texto: var(--destaque-hover);
+  --neutro-superficie: var(--superficie);
+  --neutro-texto: var(--texto-secundario);
+
+  --fonte-titulo: "Geist", "DM Sans", sans-serif;
+  --fonte-texto: "DM Sans", sans-serif;
+  --fonte-mono: "Geist Mono", ui-monospace, monospace;
+
+  --esp-meio: 4px;
+  --esp-1: 8px;
+  --esp-2: 16px;
+  --esp-3: 24px;
+  --esp-4: 32px;
+  --esp-6: 48px;
+  --esp-8: 64px;
+  --esp-12: 96px;
+  --esp-16: 128px;
+
+  --raio-cartao: 12px;
+  --raio-controle: 8px;
+  --raio-pilula: 100px;
+
+  --sombra-cartao: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --sombra-hover: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --sombra-elevada: 0 8px 30px rgba(0, 0, 0, 0.09);
+  --anel-foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--destaque);
+  --transicao: 0.18s ease;
+
+  /* Ritmo: os valores mudam com .ritmo-publico / .ritmo-almox no <body>. */
+  --texto-corpo: 16px;
+  --titulo-1: 32px;
+  --recheio-cartao: var(--esp-3);
+  --entre-blocos: var(--esp-4);
+  --celula-v: 12px;
+  --celula-h: 16px;
+  --altura-controle: 44px;
+}
+
+.ritmo-publico {
+  --texto-corpo: 17px;
+  --titulo-1: clamp(32px, 5vw, 48px);
+  --recheio-cartao: var(--esp-4);
+  --entre-blocos: var(--esp-6);
+}
+
+.ritmo-almox {
+  --texto-corpo: 15px;
+  --titulo-1: 24px;
+  --recheio-cartao: var(--esp-3);
+  --entre-blocos: var(--esp-3);
+  --celula-v: 10px;
+  --celula-h: 12px;
+  --altura-controle: 40px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--texto-corpo);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  color: var(--texto);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+h1 { font-size: var(--titulo-1); font-weight: 700; line-height: 1.1; }
+h2 { font-size: 1.25em; font-weight: 600; }
+h3 { font-size: 1.05em; font-weight: 600; letter-spacing: -0.01em; }
+p, ul, ol, dl, dd { margin: 0; }
+ul, ol { padding-left: 1.2em; }
+
+a { color: var(--destaque); text-decoration: none; transition: color var(--transicao); }
+a:hover { color: var(--destaque-hover); text-decoration: underline; text-underline-offset: 3px; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible { outline: none; box-shadow: var(--anel-foco); border-radius: var(--raio-controle); }
+
+.mono { font-family: var(--fonte-mono); font-size: 0.92em; letter-spacing: 0; }
+.texto-secundario { color: var(--texto-secundario); }
+.texto-suave { color: var(--texto-suave); }
+.texto-pequeno { font-size: 0.875em; }
+
+.rotulo-secao {
+  font-family: var(--fonte-texto);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-suave);
+}
+.rotulo-secao:empty { display: none; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+
+.pilha { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--esp-2); }
+.pilha-larga { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--entre-blocos); }
+.linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+.grade-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--esp-2) var(--esp-3); }
+@media (max-width: 640px) { .grade-2 { grid-template-columns: minmax(0, 1fr); } }
+
+.icone { display: inline-block; flex: none; width: 18px; height: 18px; vertical-align: middle; }
+
+@keyframes subir {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -131,3 +131,23 @@ def test_tarefa_repassa_o_codigo_de_saida(tmp_path):
     assert ok.returncode == 0 and falha.returncode != 0
     log = (tmp_path / "agendador.log").read_text(encoding="utf-8", errors="replace")
     assert "=== " in log and "comando_que_nao_existe" in log
+
+
+def test_guias_nao_citam_mais_o_windows():
+    for nome in ("INSTALACAO.md", "VIRADA.md"):
+        texto = (DEPLOY / nome).read_text(encoding="utf-8")
+        for resto in (r".venv\Scripts", "nssm", "schtasks", ".bat", "C:\\"):
+            assert resto not in texto, (nome, resto)
+
+
+def test_instalacao_cobre_os_dois_servidores_e_o_firewall():
+    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
+    for trecho in (
+        "WSL2",
+        "DOCKER-USER",
+        "PORTA_PUBLICADA",
+        "chown -R 1000:1000",
+        "docker compose run --rm web python manage.py createsuperuser",
+        "bash deploy/atualizar.sh",
+    ):
+        assert trecho in guia, trecho

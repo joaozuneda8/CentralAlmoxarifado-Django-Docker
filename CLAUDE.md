@@ -13,7 +13,9 @@ almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança
   `docs/superpowers/plans/`. Os subprojetos 1 (Fundação), 2 (Catálogo e importadores), 3
   (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) tem o código
   feito (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e falta a execução: instalar no
-  servidor e fazer a migração e a virada, pelo roteiro `deploy/VIRADA.md`. Do 4 ainda falta a
+  servidor e fazer a migração e a virada, pelo roteiro `deploy/VIRADA.md`. A implantação é
+  em Docker Compose (`docs/superpowers/specs/2026-10-15-docker-design.md`), no lugar do
+  NSSM e do Agendador do Windows da spec principal. Do 4 ainda falta a
   simulação contra o SCPI real (João roda `lancar_saidas --dry-run --limite 1`).
 - Referências fora deste repositório: o Apps Script atual (`../CentralAlmoxarifado`,
   com `Regras.gs`, `Catalogo.gs` e os testes em Node), o WMS-Almoxarifado
@@ -47,10 +49,10 @@ ensaio fiel: roda a gravação numa transação e a desfaz, com as travas e as r
 `backup_banco` faz o dump
 comprimido em `BACKUP_DIR` e apaga os de mais de 60 dias (a senha vai num arquivo de opções
 temporário, `--defaults-extra-file`, nunca nos argumentos nem no ambiente); `robos_em_andamento` sai com erro se há
-lançamento ou importação em andamento (o `deploy/atualizar.bat` o usa);
+lançamento ou importação em andamento (o `deploy/atualizar.sh` o usa);
 `importar_depara --arquivo <xlsx> [--dry-run]` carrega os pares de/para da planilha MAPEAMENTO
-DE/PARA CONSOLIDADO (carga única). No servidor os `.bat` chamam o Python do `.venv`, não o
-`uv run`.
+DE/PARA CONSOLIDADO (carga única). No servidor os comandos rodam no container
+(`docker compose exec web python manage.py ...`), não pelo `uv run`.
 
 Os comandos `importar_cadastro`, `importar_estoque`, `importar_saidas_scpi` (`--desde`/`--ate`)
 e `atualizar_catalogo` (os três em sequência, num navegador só; com `--carga-inicial`, o cadastro
@@ -84,7 +86,8 @@ transações precisam se comportar como no servidor.
 - A variável que liga o HTTPS se chama `USAR_HTTPS`, nunca `HTTPS`: o wsgiref do `runserver`
   copia `os.environ` para a requisição, e `HTTPS=1` faria tudo parecer https e quebraria o
   CSRF. Atrás do Apache, o waitress precisa de
-  `--trusted-proxy=127.0.0.1 --trusted-proxy-headers="x-forwarded-proto x-forwarded-for"`
+  `--trusted-proxy=<proxy> --trusted-proxy-headers="x-forwarded-proto x-forwarded-for"`
+  (no compose, `<proxy>` é `*`: o Apache chega por um IP interno do Docker que muda)
   junto com `PROXY_HTTPS=1`: sem o primeiro cabeçalho o redirecionamento para https entra em
   laço; sem o segundo, todo pedido parece vir do Apache e divide um único limite por IP.
 - `contas.Usuario` é o `AUTH_USER_MODEL`: `AbstractUser` com o `username` rotulado
@@ -343,14 +346,25 @@ transações precisam se comportar como no servidor.
   canônico e os antigos; `ParametroReposicao` substitui prazo e cobertura por material), os
   pendentes de mapeamento (código com saída, sem par, oculto ou fora do cadastro) e a
   reconciliação dos totais. As divergências deliberadas da planilha estão na spec.
-- `deploy/` tem os guias e scripts do servidor Windows: `INSTALACAO.md` (André), `VIRADA.md`
-  (roteiro da migração e da virada), `tarefa.bat` (comandos do Agendador, com a saída em
-  `logs\agendador.log`) e `atualizar.bat` (confere `robos_em_andamento` duas vezes e roda tudo
-  num bloco só). O serviço NSSM usa `AppKillProcessTree 0` para o reinício não matar o robô
-  disparado pela página.
+- Implantação em Docker Compose (`compose.yaml`, `Dockerfile`; spec
+  `2026-10-15-docker-design.md`): uma imagem (Python 3.13, `.venv` do uv sem dev, Chromium do
+  Playwright, `mariadb-client`, supercronic, estáticos coletados no build, usuário `almox`
+  UID 1000 que só escreve em `/dados`) para os serviços `web` (waitress com
+  `--url-prefix=${PREFIXO_URL}` e `--trusted-proxy=*`, publicado em `${PORTA_PUBLICADA}`, que
+  só o Apache pode alcançar) e `agendador` (supercronic com `deploy/crontab`, que chama
+  `deploy/tarefa.sh`, saída em `dados/logs/agendador.log`); o `banco` é o MariaDB 11.4, sem
+  porta publicada. O compose força `DB_HOST`, `SCPI_HEADLESS=1`, `MYSQLDUMP=mariadb-dump` e as
+  pastas (`/dados/logs`, `/dados/backups`, `/dados/perfil`) por cima do `.env`; `dados/` do
+  host guarda logs, backups e os `.xlsx` da virada. Os robôs da página são filhos do waitress
+  no container `web` (`disparo.py` abre sessão própria fora do Windows), então recriar o `web`
+  os mata: o `deploy/atualizar.sh` confere `robos_em_andamento` (por `docker compose run
+  --rm`, que funciona com o `web` parado) antes do `git pull` e antes do `up -d`, e tem o corpo
+  numa função porque o bash lê o script aos poucos. `deploy/*.sh`, `deploy/crontab`,
+  `Dockerfile` e `compose.yaml` são LF (`.gitattributes`). Guias em `deploy/INSTALACAO.md`
+  (André; Linux ou WSL2) e `deploy/VIRADA.md`.
 - O log usa `ConcurrentRotatingFileHandler` porque o waitress e os comandos gravam no mesmo
-  arquivo; no Windows o `RotatingFileHandler` não consegue girar um arquivo aberto por outro
-  processo.
+  arquivo (no container também: `web` e `agendador` dividem `dados/logs`); no Windows o
+  `RotatingFileHandler` não consegue girar um arquivo aberto por outro processo.
 
 ## Convenções
 

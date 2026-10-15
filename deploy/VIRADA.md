@@ -3,9 +3,9 @@
 Roteiro para o João (desenvolvedor) e o André (servidor). Cada passo diz quem faz. Marque as
 caixas à medida que terminar; a ordem importa. A spec (seção 8) explica o porquê de cada etapa.
 
-Os comandos são para o `cmd.exe` aberto **como administrador**, no servidor (só a conta do
-serviço e os administradores leem o `.env`). Os endereços usam `servidor` no lugar do nome real,
-como no `INSTALACAO.md`:
+Os comandos são para o terminal do servidor (no Windows Server, o do Ubuntu no WSL2), na pasta
+do sistema (`cd /srv/almoxarifado`), e rodam dentro do container `web` (`docker compose exec
+web ...`). Os endereços usam `servidor` no lugar do nome real, como no `INSTALACAO.md`:
 
 | O quê | Endereço |
 |---|---|
@@ -19,7 +19,7 @@ painel só simulam. Isso evita lançar duas vezes no SCPI as mesmas saídas pend
 
 ## 1. Instalação (André)
 
-- [ ] Instalar o sistema no servidor seguindo `deploy\INSTALACAO.md`, inclusive a conferência da
+- [ ] Instalar o sistema no servidor seguindo `deploy/INSTALACAO.md`, inclusive a conferência da
       seção 11, **com `LANCAMENTO_REAL=0`** no `.env`.
 - [ ] Confirmar que o painel mostra o aviso "Lançamento real bloqueado até a virada" e que, em
       Automações › Lançamento no SCPI, só a simulação está disponível.
@@ -30,9 +30,9 @@ painel só simulam. Isso evita lançar duas vezes no SCPI as mesmas saídas pend
 
 O cadastro de materiais precisa existir antes das planilhas, porque os itens de limpeza apontam
 para ele. Os robôs que abrem o SCPI (cadastro, estoque, saídas) entram com o `SAEP_USER` e a
-`SAEP_PASS` do `.env` do servidor e usam o perfil do navegador em `SCPI_PERFIL_DIR`; o
-Playwright, o Chromium e o `.env` são os da `INSTALACAO.md` (seções 4 e 5). O primeiro acesso do
-servidor ao SCPI é aqui: se o login falhar, veja o `logs\almoxarifado.log` antes de repetir.
+`SAEP_PASS` do `.env` do servidor e usam o perfil do navegador do volume `perfil-navegador`; o
+Chromium vem na imagem e o `.env` é o da `INSTALACAO.md` (seção 4). O primeiro acesso do
+servidor ao SCPI é aqui: se o login falhar, veja o `dados/logs/almoxarifado.log` antes de repetir.
 
 - [ ] Baixar do SCPI o CSV do **cadastro completo** de materiais.
 - [ ] Em `https://servidor/almoxarifado/painel/automacoes/`, aba **Cadastro**: origem "CSV
@@ -40,25 +40,26 @@ servidor ao SCPI é aqui: se o login falhar, veja o `logs\almoxarifado.log` ante
       vez; depois o robô diário só traz os novos.) Conferir o resultado na aba Visão geral.
 - [ ] Carregar o estoque:
 
-      ```bat
-      cd /d C:\CentralAlmoxarifado
-      .venv\Scripts\python.exe manage.py importar_estoque
+      ```bash
+      cd /srv/almoxarifado
+      docker compose exec web python manage.py importar_estoque
       ```
 
 - [ ] Carregar as saídas do SCPI desde **01/01/2026** (os dados anteriores não são confiáveis
       e nunca entram na curva ABC nem na reposição):
 
-      ```bat
-      .venv\Scripts\python.exe manage.py importar_saidas_scpi --desde 01/01/2026
+      ```bash
+      docker compose exec web python manage.py importar_saidas_scpi --desde 01/01/2026
       ```
 
 - [ ] Carregar os pares de/para. **Não desative nem apague a planilha MAPEAMENTO DE/PARA
       CONSOLIDADO** até esta carga ser conferida: ela é a única fonte dos pares. Exportar a
       planilha ("Arquivo › Fazer download › Microsoft Excel (.xlsx)"), salvar como
-      `C:\CentralAlmoxarifado-importacao\mapeamento.xlsx` e simular:
+      `dados/importacao/mapeamento.xlsx` na pasta do sistema (no container,
+      `/dados/importacao/mapeamento.xlsx`) e simular:
 
-      ```bat
-      .venv\Scripts\python.exe manage.py importar_depara --arquivo C:\CentralAlmoxarifado-importacao\mapeamento.xlsx --dry-run
+      ```bash
+      docker compose exec web python manage.py importar_depara --arquivo /dados/importacao/mapeamento.xlsx --dry-run
       ```
 
       Ler os recusados (com aba, linha e motivo) e corrigir na planilha o que for erro. Depois,
@@ -73,15 +74,14 @@ servidor ao SCPI é aqui: se o login falhar, veja o `logs\almoxarifado.log` ante
 ## 3. Primeira importação das planilhas (João)
 
 - [ ] Na planilha do sistema (Google Sheets): "Arquivo › Fazer download › Microsoft Excel
-      (.xlsx)". Salvar num lugar fora do repositório, por exemplo
-      `C:\CentralAlmoxarifado-importacao\planilha.xlsx` (crie a pasta antes com `mkdir
-      C:\CentralAlmoxarifado-importacao`; a planilha tem dados dos pedidos, apague o arquivo
-      quando terminar).
+      (.xlsx)". Salvar como `dados/importacao/planilha.xlsx` na pasta do sistema (fora do git;
+      no container, `/dados/importacao/planilha.xlsx`). A planilha tem dados dos pedidos:
+      apague o arquivo quando terminar (passo 6).
 - [ ] Simular a importação:
 
-      ```bat
-      cd /d C:\CentralAlmoxarifado
-      .venv\Scripts\python.exe manage.py importar_planilhas --arquivo C:\CentralAlmoxarifado-importacao\planilha.xlsx --dry-run
+      ```bash
+      cd /srv/almoxarifado
+      docker compose exec web python manage.py importar_planilhas --arquivo /dados/importacao/planilha.xlsx --dry-run
       ```
 
       A simulação é um ensaio fiel: converte a planilha, lista os problemas dela e grava tudo
@@ -99,8 +99,8 @@ servidor ao SCPI é aqui: se o login falhar, veja o `logs\almoxarifado.log` ante
       encurtado na planilha. Os avisos são lidos e aceitos (o que só se perde como histórico).
 - [ ] Exportar de novo, se corrigiu algo, e importar de verdade:
 
-      ```bat
-      .venv\Scripts\python.exe manage.py importar_planilhas --arquivo C:\CentralAlmoxarifado-importacao\planilha.xlsx
+      ```bash
+      docker compose exec web python manage.py importar_planilhas --arquivo /dados/importacao/planilha.xlsx
       ```
 
       O resumo mostra os totais e o "último número". A importação grava numa transação: ou entra
@@ -126,17 +126,17 @@ painel precisa de conta própria, com a matrícula como usuário.
 
       Pedido de teste feito no Django (troque a lista pelos números que a recusa mostrou):
 
-      ```bat
-      cd /d C:\CentralAlmoxarifado
-      .venv\Scripts\python.exe manage.py shell -c "from pedidos.models import Pedido; Pedido.objects.filter(numero__in=['P-000001']).delete()"
+      ```bash
+      cd /srv/almoxarifado
+      docker compose exec web python manage.py shell -c "from pedidos.models import Pedido; Pedido.objects.filter(numero__in=['P-000001']).delete()"
       ```
 
       Atendimento feito no Django sobre um pedido que veio da planilha (apaga os materiais
       acrescentados pelo almoxarifado e o atendimento, as linhas de saída vão junto, e zera a
       quantidade entregue dos itens):
 
-      ```bat
-      .venv\Scripts\python.exe manage.py shell -c "from pedidos.models import Atendimento, ItemPedido; n=['P-000120']; ItemPedido.objects.filter(pedido__numero__in=n, origem='ALMOXARIFADO').delete(); Atendimento.objects.filter(pedido__numero__in=n).delete(); ItemPedido.objects.filter(pedido__numero__in=n).update(qtd_entregue=None)"
+      ```bash
+      docker compose exec web python manage.py shell -c "from pedidos.models import Atendimento, ItemPedido; n=['P-000120']; ItemPedido.objects.filter(pedido__numero__in=n, origem='ALMOXARIFADO').delete(); Atendimento.objects.filter(pedido__numero__in=n).delete(); ItemPedido.objects.filter(pedido__numero__in=n).update(qtd_entregue=None)"
       ```
 
       (a importação seguinte repõe tudo a partir da planilha; se a linha de saída do atendimento
@@ -149,8 +149,8 @@ painel precisa de conta própria, com a matrícula como usuário.
       cada pedido.
 - [ ] Usar "Simular" em Automações › Lançamento no SCPI e comparar os lotes simulados com o que o robô antigo
       lançou.
-- [ ] O Agendador está rodando (estoque, catálogo, backup) e `logs\agendador.log` não tem erros.
-      O backup diário gera arquivos em `BACKUP_DIR`.
+- [ ] O agendador está rodando (estoque, catálogo, backup) e `dados/logs/agendador.log` não tem
+      erros. O backup diário gera arquivos em `dados/backups`.
 
 ## 6. Virada (João e André, fora do expediente)
 
@@ -194,12 +194,13 @@ ou o robô antigo lança uma saída que o Django lançaria de novo.
       ```
 
 - [ ] **André:** liberar o lançamento real: `LANCAMENTO_REAL=1` no `.env`, preencher
-      `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` (que estavam vazios desde o passo 1) e reiniciar o
-      serviço:
+      `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` (que estavam vazios desde o passo 1) e recriar os
+      containers (o `restart` não relê o `.env`):
 
-      ```bat
-      notepad C:\CentralAlmoxarifado\.env
-      nssm restart CentralAlmoxarifado
+      ```bash
+      cd /srv/almoxarifado
+      nano .env
+      docker compose up -d
       ```
 
 - [ ] **João:** primeiro lançamento real, em Automações › Lançamento no SCPI, com "Só as
@@ -208,7 +209,7 @@ ou o robô antigo lança uma saída que o Django lançaria de novo.
 - [ ] Os funcionários passam a usar `https://servidor/almoxarifado/` (formulários) e a equipe,
       `https://servidor/almoxarifado/painel/`.
 - [ ] **João:** arquivar o repositório do Apps Script: `gh repo archive <dono>/CentralAlmoxarifado`.
-- [ ] **João:** por último, apagar o `.xlsx` exportado (`C:\CentralAlmoxarifado-importacao`):
+- [ ] **João:** por último, apagar os `.xlsx` exportados (`dados/importacao/`):
       só depois de arquivar o repositório e de conferir o primeiro lançamento, porque até lá a
       planilha é o único retrato do que veio do sistema antigo.
 
@@ -218,5 +219,5 @@ ou o robô antigo lança uma saída que o Django lançaria de novo.
   o app `implantacao` pode perder esse comando e seus módulos (`planilha`, `conversao`,
   `migracao`) sem mexer no resto; o backup e `robos_em_andamento` ficam.
 - Mudança de modelo passa a ter **migration nova**, nunca regenerada (o banco agora tem dados
-  reais). Atualizações pelo `deploy\atualizar.bat` (`INSTALACAO.md`, seção 10).
+  reais). Atualizações pelo `deploy/atualizar.sh` (`INSTALACAO.md`, seção 9).
 - O backup diário segue valendo; copie a pasta de backup para outra máquina de vez em quando.

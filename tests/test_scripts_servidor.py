@@ -40,48 +40,37 @@ def test_execucao_interrompida_nao_conta():
 
 
 def test_atualizar_para_no_primeiro_erro_e_segue_a_ordem():
-    texto = (DEPLOY / "atualizar.bat").read_text(encoding="utf-8")
-    linhas = [linha.strip() for linha in texto.splitlines()]
-    comandos = [linha for linha in linhas if linha.startswith(('".venv', "git ", "uv ", "nssm "))]
-    assert comandos and all(linha.endswith(" || goto :falha") for linha in comandos)
+    texto = (DEPLOY / "atualizar.sh").read_text(encoding="utf-8")
+    assert "set -eu" in texto
+    assert "Atualização interrompida: corrija o erro acima e rode de novo." in texto
     ordem = [
-        "robos_em_andamento",
+        "run --rm web python manage.py robos_em_andamento",
         "git pull --ff-only",
-        "uv sync --frozen --no-dev",
-        "migrate --noinput",
-        "collectstatic --noinput",
-        "check --deploy --fail-level WARNING",
-        "nssm restart CentralAlmoxarifado",
+        "docker compose build",
+        "run --rm web python manage.py migrate --noinput",
+        "run --rm web python manage.py check --deploy --fail-level WARNING",
+        "up -d",
     ]
     posicoes = [texto.index(trecho) for trecho in ordem]
     assert posicoes == sorted(posicoes)
-
-
-def test_atualizar_corpo_num_bloco_que_o_cmd_le_inteiro():
-    # O git pull pode trocar o atualizar.bat durante a execução: o cmd precisa já ter lido tudo.
-    texto = (DEPLOY / "atualizar.bat").read_text(encoding="utf-8")
-    linhas = [linha.strip() for linha in texto.splitlines()]
-    abre = linhas.index("(")
-    fecha = linhas.index(")")
-    assert linhas[abre - 1].startswith("rem ")
-    assert linhas[abre - 2].startswith("cd /d ")
-    assert abre < linhas.index("exit /b 0") < fecha < linhas.index(":falha")
-    fora = [
-        i
-        for i, linha in enumerate(linhas)
-        if "manage.py" in linha or linha.startswith(("git ", "nssm "))
+    # Com "run --rm" (e não "exec"), a conferência funciona também com o web parado.
+    assert "compose exec" not in texto
+    verificacoes = [
+        i for i in range(len(texto)) if texto.startswith("manage.py robos_em_andamento", i)
     ]
-    assert fora and all(abre < i < fecha for i in fora)
-    verificacoes = [i for i, linha in enumerate(linhas) if "manage.py robos_em_andamento" in linha]
     assert len(verificacoes) == 2
-    depois_do_check = next(i for i, linha in enumerate(linhas) if "check --deploy" in linha)
-    reinicio = next(i for i, linha in enumerate(linhas) if linha.startswith("nssm restart"))
-    assert depois_do_check < verificacoes[1] < reinicio
+    assert texto.index("check --deploy") < verificacoes[1] < texto.index("up -d")
 
 
-def test_bat_com_fim_de_linha_do_windows():
-    dados = (DEPLOY / "atualizar.bat").read_bytes()
-    assert dados.count(b"\n") == dados.count(b"\r\n") > 0
+def test_atualizar_corpo_numa_funcao_chamada_no_fim():
+    # O git pull pode trocar o script durante a execução: o bash precisa já ter lido tudo.
+    texto = (DEPLOY / "atualizar.sh").read_text(encoding="utf-8")
+    linhas = [linha.strip() for linha in texto.splitlines()]
+    linhas = [linha for linha in linhas if linha and not linha.startswith("#")]
+    assert linhas[-1] in ('atualizar "$@"', "atualizar")
+    abre = next(i for i, linha in enumerate(linhas) if linha.startswith("atualizar()"))
+    comandos = [i for i, linha in enumerate(linhas) if linha.startswith(("docker ", "git "))]
+    assert comandos and all(abre < i < len(linhas) - 1 for i in comandos)
 
 
 def _linhas_crontab():
@@ -104,10 +93,13 @@ def test_crontab_mantem_os_horarios_do_agendador():
     }
 
 
-@pytest.mark.parametrize("nome", ["crontab", "tarefa.sh"])
+@pytest.mark.parametrize(
+    "nome",
+    ["deploy/crontab", "deploy/tarefa.sh", "deploy/atualizar.sh", "Dockerfile", "compose.yaml"],
+)
 def test_arquivos_do_container_com_fim_de_linha_lf(nome):
     # Com CRLF, o bash recusa o script ("set: -\r") e o supercronic lê o comando com \r.
-    dados = (DEPLOY / nome).read_bytes()
+    dados = (RAIZ / nome).read_bytes()
     assert b"\r\n" not in dados and dados.endswith(b"\n")
 
 

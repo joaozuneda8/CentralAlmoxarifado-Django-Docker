@@ -4,6 +4,5 @@ tests/fixtures/scpi/*.csv -text
 # Scripts e crontab do container: LF, senão o bash e o supercronic leem o \r.
 deploy/*.sh text eol=lf
 deploy/crontab text eol=lf
-
-# Scripts do cmd.exe: CRLF, senão rótulos e goto falham.
-deploy/*.bat text eol=crlf
+Dockerfile text eol=lf
+compose.yaml text eol=lf

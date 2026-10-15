@@ -1,10 +1,10 @@
 import io
 import os
+import shutil
 import subprocess
 import sys
 from datetime import timedelta
 from pathlib import Path
-from xml.etree import ElementTree
 
 import pytest
 from django.core.management import CommandError, call_command
@@ -79,50 +79,63 @@ def test_atualizar_corpo_num_bloco_que_o_cmd_le_inteiro():
     assert depois_do_check < verificacoes[1] < reinicio
 
 
-@pytest.mark.parametrize("nome", ["tarefa.bat", "atualizar.bat"])
-def test_bat_com_fim_de_linha_do_windows(nome):
-    dados = (DEPLOY / nome).read_bytes()
+def test_bat_com_fim_de_linha_do_windows():
+    dados = (DEPLOY / "atualizar.bat").read_bytes()
     assert dados.count(b"\n") == dados.count(b"\r\n") > 0
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe")
+def _linhas_crontab():
+    texto = (DEPLOY / "crontab").read_text(encoding="utf-8")
+    return [
+        linha.split(None, 5)
+        for linha in texto.splitlines()
+        if linha.strip() and not linha.startswith("#")
+    ]
+
+
+def test_crontab_mantem_os_horarios_do_agendador():
+    # O estoque de 30 em 30 minutos das 07:00 às 17:00 só nos dias úteis; o resto todo dia.
+    agenda = {tuple(campos[:5]): campos[5] for campos in _linhas_crontab()}
+    assert agenda == {
+        ("*/30", "7-16", "*", "*", "1-5"): "/app/deploy/tarefa.sh importar_estoque",
+        ("0", "17", "*", "*", "1-5"): "/app/deploy/tarefa.sh importar_estoque",
+        ("30", "6", "*", "*", "*"): "/app/deploy/tarefa.sh atualizar_catalogo",
+        ("0", "23", "*", "*", "*"): "/app/deploy/tarefa.sh backup_banco",
+    }
+
+
+@pytest.mark.parametrize("nome", ["crontab", "tarefa.sh"])
+def test_arquivos_do_container_com_fim_de_linha_lf(nome):
+    # Com CRLF, o bash recusa o script ("set: -\r") e o supercronic lê o comando com \r.
+    dados = (DEPLOY / nome).read_bytes()
+    assert b"\r\n" not in dados and dados.endswith(b"\n")
+
+
+def _bash() -> str:
+    """O bash do Git no Windows (o `bash` do PATH lá é o do WSL); fora dele, o do PATH."""
+    if sys.platform == "win32":
+        git = shutil.which("git")
+        if git:
+            for pasta in Path(git).parents:
+                candidato = pasta / "bin" / "bash.exe"
+                if candidato.exists():
+                    return str(candidato)
+        pytest.skip("sem o bash do Git")
+    bash = shutil.which("bash")
+    if not bash:
+        pytest.skip("sem bash")
+    return bash
+
+
 def test_tarefa_repassa_o_codigo_de_saida(tmp_path):
-    ambiente = {**os.environ, "TAREFA_LOG": str(tmp_path / "agendador.log")}
-    ok = subprocess.run(
-        ["cmd", "/c", str(DEPLOY / "tarefa.bat"), "check"], env=ambiente, timeout=120
-    )
-    falha = subprocess.run(
-        ["cmd", "/c", str(DEPLOY / "tarefa.bat"), "comando_que_nao_existe"],
-        env=ambiente,
-        timeout=120,
-    )
+    ambiente = {
+        **os.environ,
+        "TAREFA_LOG": (tmp_path / "agendador.log").as_posix(),
+        "TAREFA_PYTHON": Path(sys.executable).as_posix(),
+    }
+    script = (DEPLOY / "tarefa.sh").as_posix()
+    ok = subprocess.run([_bash(), script, "check"], env=ambiente, timeout=120)
+    falha = subprocess.run([_bash(), script, "comando_que_nao_existe"], env=ambiente, timeout=120)
     assert ok.returncode == 0 and falha.returncode != 0
     log = (tmp_path / "agendador.log").read_text(encoding="utf-8", errors="replace")
     assert "=== " in log and "comando_que_nao_existe" in log
-
-
-def test_tarefa_forca_utf8_antes_do_python():
-    linhas = (DEPLOY / "tarefa.bat").read_text(encoding="utf-8").splitlines()
-    ambiente = next(i for i, linha in enumerate(linhas) if "PYTHONIOENCODING=utf-8" in linha)
-    python = next(i for i, linha in enumerate(linhas) if "python.exe" in linha)
-    assert ambiente < python
-
-
-def test_tarefa_do_estoque_nao_depende_do_idioma_do_windows():
-    # O schtasks /XML recusa a declaração UTF-8, e o /D traduz os dias com o Windows.
-    dados = (DEPLOY / "tarefa-estoque.xml").read_bytes()
-    assert dados.isascii() and b"<?xml" not in dados
-    ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
-    tarefa = ElementTree.fromstring(dados)
-    gatilho = tarefa.find("t:Triggers/t:CalendarTrigger", ns)
-    dias = [d.tag.split("}")[1] for d in gatilho.find("t:ScheduleByWeek/t:DaysOfWeek", ns)]
-    assert dias == ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    assert gatilho.findtext("t:StartBoundary", namespaces=ns).endswith("T07:00:00")
-    assert gatilho.findtext("t:Repetition/t:Interval", namespaces=ns) == "PT30M"
-    assert gatilho.findtext("t:Repetition/t:Duration", namespaces=ns) == "PT10H1M"
-    acao = tarefa.find("t:Actions/t:Exec", ns)
-    assert acao.findtext("t:Command", namespaces=ns) == r"C:\CentralAlmoxarifado\deploy\tarefa.bat"
-    assert acao.findtext("t:Arguments", namespaces=ns) == "importar_estoque"
-    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
-    assert r"/XML C:\CentralAlmoxarifado\deploy\tarefa-estoque.xml" in guia
-    assert "schtasks /Create" in guia and " /D " not in guia

@@ -1,0 +1,81 @@
+# Central Almoxarifado em produção: banco (MariaDB), web (waitress, que também dispara os
+# robôs da página) e agendador (supercronic com deploy/crontab). O HTTPS fica no Apache do
+# servidor, que encaminha para ${PORTA_PUBLICADA}. Guia: deploy/INSTALACAO.md.
+name: almoxarifado
+
+# Comum a web e agendador: a mesma imagem, o .env e os caminhos dentro do container (vencem
+# o .env).
+x-aplicacao: &aplicacao
+  build: .
+  image: central-almoxarifado
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DB_HOST: banco
+    DB_PORT: "3306"
+    SCPI_HEADLESS: "1"
+    MYSQLDUMP: mariadb-dump
+    LOG_DIR: /dados/logs
+    BACKUP_DIR: /dados/backups
+    SCPI_PERFIL_DIR: /dados/perfil
+  # O tini recolhe os processos dos robôs que terminam; o Chromium usa o /dev/shm.
+  init: true
+  shm_size: 1gb
+  depends_on:
+    banco:
+      condition: service_healthy
+
+services:
+  banco:
+    image: mariadb:11.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-almoxarifado}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    volumes:
+      - banco-dados:/var/lib/mysql
+    # Sem porta publicada: só os containers falam com o banco.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    <<: *aplicacao
+    # O Apache chega por um IP interno do Docker que muda: o waitress confia em qualquer
+    # origem, o que só é seguro porque a porta publicada só é alcançável pelo Apache.
+    command:
+      - python
+      - -m
+      - waitress
+      - --listen=0.0.0.0:8010
+      - --threads=8
+      - --url-prefix=${PREFIXO_URL:-}
+      - --trusted-proxy=*
+      - --trusted-proxy-headers=x-forwarded-proto x-forwarded-for
+      - config.wsgi:application
+    ports:
+      - "${PORTA_PUBLICADA:-127.0.0.1:8010}:8010"
+    volumes:
+      - ./dados/logs:/dados/logs
+      - perfil-navegador:/dados/perfil
+      - ./dados/importacao:/dados/importacao:ro
+
+  agendador:
+    <<: *aplicacao
+    command: supercronic /app/deploy/crontab
+    volumes:
+      - ./dados/logs:/dados/logs
+      - perfil-navegador:/dados/perfil
+      - ./dados/backups:/dados/backups
+
+volumes:
+  banco-dados:
+  perfil-navegador:

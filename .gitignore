@@ -10,3 +10,4 @@ media/
 output/
 *.sqlite3
 .DS_Store
+dados/

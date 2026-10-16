@@ -1315,14 +1315,66 @@
     // Reserva: com a aba em segundo plano a animação não roda e o `animationend` não vem.
     else setTimeout(fim, 250);
     var busca = document.getElementById("busca-q");
+    esconderDica();
     if (!busca) return;
     busca.setAttribute("aria-expanded", "false");
+    if (aoToque()) busca.setAttribute("inputmode", "none");
     if (devolverFoco) busca.focus();
   }
 
   function dentroDaBusca(alvo) {
     return !!(alvo && alvo.closest && (alvo.closest("[data-busca-area]") || alvo.closest("dialog")));
   }
+
+  // Celular e tablet: o primeiro toque no campo abre a lista sem o teclado (`inputmode="none"`), que
+  // cobriria os resultados, e uma dica pede o segundo toque, que libera o teclado para digitar e
+  // filtrar. Com a lista fechada o campo volta a ficar sem teclado. Mouse e teclado físico não mudam.
+  var sobDica = null;
+  function aoToque() {
+    return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  }
+  function dicaBusca() {
+    return document.querySelector("[data-busca-dica]");
+  }
+  function esconderDica() {
+    clearTimeout(sobDica);
+    var dica = dicaBusca();
+    if (dica) dica.hidden = true;
+  }
+  function mostrarDica() {
+    var dica = dicaBusca();
+    if (!dica) return;
+    dica.hidden = false;
+    clearTimeout(sobDica);
+    sobDica = setTimeout(esconderDica, 6000);
+  }
+  var liberarNoClique = false;
+  document.addEventListener(
+    "pointerdown",
+    function (e) {
+      var campo = e.target;
+      if (campo.id !== "busca-q" || !aoToque()) return;
+      var p = painel();
+      var aberto = p && p.classList.contains("aberto") && !p.classList.contains("fechando");
+      if (aberto && campo.getAttribute("inputmode") === "none") {
+        // Segundo toque: o teclado só sobe quando o campo ganha o foco de novo, dentro do clique.
+        campo.removeAttribute("inputmode");
+        liberarNoClique = true;
+        esconderDica();
+      } else if (!aberto) {
+        campo.setAttribute("inputmode", "none");
+        abrirPainel();
+        mostrarDica();
+      }
+    },
+    true
+  );
+  document.addEventListener("click", function (e) {
+    if (!liberarNoClique || e.target.id !== "busca-q") return;
+    liberarNoClique = false;
+    e.target.blur();
+    e.target.focus();
+  });
 
   document.addEventListener("focusin", function (e) {
     if (e.target.id === "busca-q") return abrirPainel();
@@ -1332,7 +1384,9 @@
     if (!dentroDaBusca(e.target)) fecharPainel(false);
   });
   document.addEventListener("input", function (e) {
-    if (e.target.id === "busca-q") abrirPainel();
+    if (e.target.id !== "busca-q") return;
+    esconderDica();
+    abrirPainel();
   });
   // "Limpar" volta a "Todos os grupos" pelo mesmo `change` da escolha (HTMX, resumo e resultados).
   document.addEventListener("click", function (e) {

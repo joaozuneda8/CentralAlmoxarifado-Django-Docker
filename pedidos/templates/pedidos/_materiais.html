@@ -52,6 +52,8 @@ pedido" ficam lado a lado; senão, um embaixo do outro.
              aria-expanded="false" aria-controls="resultados"
              hx-get="{{ url_materiais }}" hx-trigger="input changed delay:300ms, search"
              hx-target="#resultados" hx-include="#busca-materiais">
+      {# No toque, o primeiro toque só abre a lista, sem teclado; esta dica (pedidos.js) pede o segundo. #}
+      <span class="busca-dica" data-busca-dica role="status" hidden>Toque de novo no campo para digitar e filtrar por nome.</span>
     </div>
   </div>
 </div>

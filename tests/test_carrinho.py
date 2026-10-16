@@ -328,7 +328,7 @@ def test_gaveta_segue_a_largura_da_area_dos_passos_e_nao_a_da_janela():
     pedidos = open(finders.find("pedidos/css/pedidos.css"), encoding="utf-8").read()
     js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
     assert "@container (min-width: 960px)" in pedidos and "LARGURA_LADO_A_LADO = 960" in js
-    assert "ResizeObserver" in js and "matchMedia" not in js
+    assert "ResizeObserver" in js and 'matchMedia("(max-width' not in js  # só o ponteiro usa matchMedia
 
 
 @pytest.mark.django_db

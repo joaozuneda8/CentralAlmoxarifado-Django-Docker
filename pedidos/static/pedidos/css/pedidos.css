@@ -75,6 +75,17 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .busca-principal .campo-busca .icone { left: 16px; width: 22px; height: 22px; color: var(--destaque); }
 .busca-principal .campo-entrada { min-height: 56px; padding-left: 50px; font-size: 18px; border: 2px solid var(--destaque); }
 .busca-principal .campo-entrada:focus { box-shadow: 0 0 0 4px var(--destaque-superficie); }
+/* Dica do primeiro toque (celular e tablet): o texto aparece sob o campo, sobre o começo da lista,
+   com a seta apontando para ele. Some sozinha, ao digitar ou ao fechar a lista. */
+.busca-dica {
+  position: absolute; left: 0; top: calc(100% + 10px); z-index: 31; pointer-events: none;
+  width: max-content; max-width: min(18rem, calc(100vw - 2 * var(--esp-2)));
+  padding: 8px 12px; border-radius: var(--raio-controle); background: var(--texto); color: var(--fundo);
+  font-size: 12.5px; line-height: 1.45; box-shadow: 0 8px 30px rgba(0, 0, 0, .09);
+  animation: dica-surge var(--transicao) both;
+}
+.busca-dica[hidden] { display: none; }
+.busca-dica::after { content: ""; position: absolute; bottom: 100%; left: 20px; border: 6px solid transparent; border-bottom-color: var(--texto); }
 .busca-painel { margin-top: var(--esp-1); }
 .busca-painel .lista-materiais { max-height: none; }
 .js .busca-painel {

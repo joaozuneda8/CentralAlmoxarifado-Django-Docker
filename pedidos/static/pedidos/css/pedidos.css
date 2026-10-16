@@ -232,6 +232,18 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .entrega-estado > [data-estado="parcial"] > span { white-space: nowrap; }
 /* O ícone vai em linha com o texto. */
 .entrega-estado .icone { width: 14px; height: 14px; margin-right: var(--esp-meio); vertical-align: -3px; stroke-width: 2; }
+/* No celular a linha não comporta o estado nem o "Confirmar" ao lado da caixa (a tabela passava da
+   tela): a caixa fica sozinha em cima e embaixo vêm o estado e o "Confirmar", na largura dela. */
+@media screen and (max-width: 640px) {
+  .entrega { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; width: var(--entrega-caixa); align-items: center; gap: var(--esp-meio) var(--esp-1); }
+  .entrega-estado > [data-estado] { white-space: normal; }
+  .entrega-caixa { grid-column: 1 / -1; grid-row: 1; justify-self: end; }
+  .entrega-estado { order: 0; grid-column: 1; grid-row: 2; justify-self: end; }
+  .entrega-confirmar { grid-column: 2; grid-row: 2; }
+  .entrega[data-confirmado] .entrega-confirmar[hidden] { display: none; }
+  .js .recibo-th-entregue > span { margin-right: 0; }
+  .recibo-itens :is(th, td) { padding-inline: var(--esp-meio); }
+}
 /* Só com JavaScript o estado aparece; ele escolhe qual dos textos mostrar. */
 .js .entrega-estado { display: inline-flex; }
 .entrega[data-estado="total"] [data-estado="total"],

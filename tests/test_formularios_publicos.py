@@ -540,8 +540,8 @@ def test_botao_do_fim_so_aparece_sem_javascript(client):
 
 
 def test_pedidos_js_so_cancela_a_alteracao_aberta_com_hx_post_de_botao():
-    # O próprio <form hx-post> é ancestral de todo clique dentro do pedido: sem excluí-lo, o −, o + e o
-    # "Confirmar" da quantidade aberta a cancelariam (e restaurariam o valor) antes de agirem.
+    # O próprio <form hx-post> é ancestral de todo clique dentro do pedido: sem excluí-lo, o −, o +
+    # e o "Confirmar" da quantidade aberta a cancelariam (e restaurariam o valor) antes de agirem.
     from django.contrib.staticfiles import finders
 
     js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()

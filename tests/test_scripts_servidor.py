@@ -178,3 +178,35 @@ def test_instalacao_wsl_pede_atualizar_virtualizacao_e_senha_da_tarefa():
     ):
         assert trecho in guia, trecho
     assert guia.index("wsl --version") < guia.index("systemd=true")
+
+
+def test_atualizar_avisa_da_variavel_nova_do_exemplo_sem_parar(tmp_path):
+    bash = _bash()
+    (tmp_path / "deploy").mkdir()
+    shutil.copy(DEPLOY / "atualizar.sh", tmp_path / "deploy" / "atualizar.sh")
+    (tmp_path / ".env.example").write_text("A=\nNOVA=1\n# COMENTADA=\nB=x\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("A=1\nB=2\n", encoding="utf-8")
+    (tmp_path / ".env.banco.example").write_text("SENHA=\n", encoding="utf-8")
+    (tmp_path / ".env.banco").write_text("SENHA=1\n", encoding="utf-8")
+    # git e docker viram funções exportadas que não fazem nada: só o aviso é o que se confere.
+    script = str(tmp_path / "deploy" / "atualizar.sh")
+    comando = f'git() {{ :; }}; docker() {{ :; }}; export -f git docker; bash "{script}"'
+    r = subprocess.run(
+        [bash, "-c", comando],
+        env=os.environ,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "NOVA" in r.stderr and "falta no .env:" in r.stderr
+    assert "COMENTADA" not in r.stderr and "SENHA" not in r.stderr
+    (tmp_path / ".env").write_text("A=1\nB=2\nNOVA=3\n", encoding="utf-8")
+    r = subprocess.run(
+        [bash, "-c", comando],
+        env=os.environ,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert "AVISO" not in r.stderr

@@ -136,7 +136,6 @@ desenvolvimento local", no fim do arquivo, o compose ignora):
 | `PORTA_PUBLICADA` | caso B: `127.0.0.1:8010`; caso A: `<ip desta máquina na rede do Apache>:8010` (seção 6) |
 | `DB_NAME`, `DB_USER` | `almoxarifado` e `almox` |
 | `DB_PASSWORD` | uma senha forte para o usuário do banco |
-| `MARIADB_ROOT_PASSWORD` | outra senha forte, do root do banco (restauração, seção 8) |
 | `SAEP_USER`, `SAEP_PASS` | usuário e senha do SCPI usados pelos robôs |
 | `LANCAMENTO_REAL` | `0` até a virada (`deploy/VIRADA.md`): com `0`, só a simulação roda |
 | `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` | deixe **vazios** até a virada (`deploy/VIRADA.md`), senão um pedido de teste avisa o grupo de verdade |
@@ -144,10 +143,22 @@ desenvolvimento local", no fim do arquivo, o compose ignora):
 Cada linha é `NOME=valor`, sem espaços em volta do `=`. O compose trata `$` como variável:
 **senha com `$` vai entre aspas simples** (`DB_PASSWORD='abc$123'`), senão muda em silêncio e o
 banco recusa a conexão. O banco é criado com `DB_NAME`, `DB_USER`, `DB_PASSWORD` e
-`MARIADB_ROOT_PASSWORD` na primeira subida; trocá-los depois no `.env` **não** muda o banco (seria
+`MARIADB_ROOT_PASSWORD` (do `.env.banco`) na primeira subida; trocá-los depois nos arquivos **não** muda o banco (seria
 preciso trocar a senha dentro do MariaDB também).
 
-O `chmod 600` deixa o `.env` legível só por você: ele tem as senhas.
+A senha do root do banco fica num arquivo à parte, que só o container do banco lê (o `.env` vai
+inteiro ao `web`, que fica exposto à internet, e ela não deve estar lá):
+
+```bash
+cp .env.banco.example .env.banco
+chmod 600 .env.banco
+nano .env.banco
+```
+
+Preencha `MARIADB_ROOT_PASSWORD` com outra senha forte, diferente da `DB_PASSWORD` (usada na
+restauração, seção 8). A mesma regra do `$` vale aqui.
+
+O `chmod 600` deixa o `.env` e o `.env.banco` legíveis só por você: eles têm as senhas.
 
 ## 5. Primeira subida
 

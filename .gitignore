@@ -1,4 +1,5 @@
 .env
+.env.banco
 .venv/
 __pycache__/
 *.pyc

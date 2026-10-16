@@ -48,7 +48,7 @@ def test_imagem_tem_chromium_cliente_do_banco_e_supercronic():
 
 def test_imagem_sem_env_nem_dados_locais():
     ignorados = (RAIZ / ".dockerignore").read_text(encoding="utf-8").split()
-    for caminho in (".env", ".venv", ".git", "logs", "dados", ".pw-profile", "staticfiles"):
+    for caminho in (".env*", ".venv", ".git", "logs", "dados", ".pw-profile", "staticfiles"):
         assert caminho in ignorados, caminho
 
 
@@ -118,7 +118,7 @@ def test_agendador_roda_o_crontab():
 def test_env_example_avisa_do_cifrao_nas_senhas():
     exemplo = (RAIZ / ".env.example").read_text(encoding="utf-8")
     assert "PORTA_PUBLICADA=127.0.0.1:8010" in exemplo
-    assert "MARIADB_ROOT_PASSWORD=" in exemplo
+    assert "MARIADB_ROOT_PASSWORD=" not in exemplo
     assert "$" in exemplo and "aspas simples" in exemplo
 
 
@@ -162,3 +162,28 @@ def test_compose_forca_o_chromium_da_imagem():
 def test_backup_manual_pelo_web_tambem_vai_para_o_host():
     # "docker compose exec web python manage.py backup_banco" gravaria dentro do container.
     assert "./dados/backups:/dados/backups" in _trecho("web")
+
+
+def test_senha_do_root_so_no_env_do_banco():
+    # O env_file .env vai inteiro ao web (exposto à internet): a senha do root fica num arquivo
+    # só do banco.
+    assert "env_file: .env.banco" in _trecho("banco")
+    assert "MARIADB_ROOT_PASSWORD" not in COMPOSE
+    assert "env_file: .env.banco" not in _trecho("x-aplicacao")
+    exemplo = (RAIZ / ".env.banco.example").read_text(encoding="utf-8")
+    assert "MARIADB_ROOT_PASSWORD=" in exemplo
+    assert ".env.banco" in (RAIZ / ".gitignore").read_text(encoding="utf-8").split()
+    guia = (RAIZ / "deploy" / "INSTALACAO.md").read_text(encoding="utf-8")
+    assert "cp .env.banco.example .env.banco" in guia
+
+
+def test_comentario_do_init_nao_atribui_os_robos_ao_tini():
+    comum = _trecho("x-aplicacao")
+    assert "init: true" in comum
+    assert "subprocess" in comum and "O tini recolhe os processos dos robôs" not in comum
+
+
+def test_dockerignore_exclui_todo_env_menos_o_exemplo():
+    linhas = (RAIZ / ".dockerignore").read_text(encoding="utf-8").split()
+    assert ".env*" in linhas and "!.env.example" in linhas
+    assert linhas.index(".env*") < linhas.index("!.env.example")

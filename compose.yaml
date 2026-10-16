@@ -21,7 +21,8 @@ x-aplicacao: &aplicacao
     # O env_file passaria o valor vazio do .env por cima do ENV da imagem, e os robôs ficariam
     # sem o Chromium.
     PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
-  # O tini recolhe os processos dos robôs que terminam; o Chromium usa o /dev/shm.
+  # O init (tini) é o PID 1 e recolhe órfãos e zumbis; os robôs são filhos do waitress, que os
+  # recolhe pelo subprocess. O Chromium usa o /dev/shm.
   init: true
   shm_size: 1gb
   depends_on:
@@ -35,11 +36,13 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+    # A senha do root fica num arquivo só do banco: o .env vai inteiro ao web, que fica exposto
+    # à internet.
+    env_file: .env.banco
     environment:
       MARIADB_DATABASE: ${DB_NAME:-almoxarifado}
       MARIADB_USER: ${DB_USER}
       MARIADB_PASSWORD: ${DB_PASSWORD}
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
     volumes:
       - banco-dados:/var/lib/mysql
     # Sem porta publicada: só os containers falam com o banco.

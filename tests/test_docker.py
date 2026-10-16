@@ -120,3 +120,45 @@ def test_env_example_avisa_do_cifrao_nas_senhas():
     assert "PORTA_PUBLICADA=127.0.0.1:8010" in exemplo
     assert "MARIADB_ROOT_PASSWORD=" in exemplo
     assert "$" in exemplo and "aspas simples" in exemplo
+
+
+def _variaveis_env_example() -> set[str]:
+    texto = (RAIZ / ".env.example").read_text(encoding="utf-8")
+    return {
+        linha.split("=", 1)[0]
+        for linha in texto.splitlines()
+        if "=" in linha and not linha.startswith("#")
+    }
+
+
+def _variaveis_env_dockerfile() -> set[str]:
+    """Os nomes definidos por ENV no Dockerfile (inclusive nas linhas de continuação)."""
+    nomes = set()
+    dentro = False
+    for linha in DOCKERFILE.splitlines():
+        if linha.startswith("ENV "):
+            dentro = True
+            linha = linha[4:]
+        if dentro:
+            for parte in linha.replace("\\", " ").split():
+                if "=" in parte:
+                    nomes.add(parte.split("=", 1)[0])
+            dentro = linha.rstrip().endswith("\\")
+    return nomes
+
+
+def test_env_vazio_nao_apaga_o_env_da_imagem():
+    # O env_file passa "NOME=" vazio ao container, por cima do ENV da imagem: toda variável que
+    # a imagem define e o .env.example também traz precisa ser forçada no compose.
+    comum = _trecho("x-aplicacao")
+    for nome in _variaveis_env_dockerfile() & _variaveis_env_example():
+        assert f"{nome}: " in comum, nome
+
+
+def test_compose_forca_o_chromium_da_imagem():
+    assert "PLAYWRIGHT_BROWSERS_PATH: /ms-playwright" in _trecho("x-aplicacao")
+
+
+def test_backup_manual_pelo_web_tambem_vai_para_o_host():
+    # "docker compose exec web python manage.py backup_banco" gravaria dentro do container.
+    assert "./dados/backups:/dados/backups" in _trecho("web")

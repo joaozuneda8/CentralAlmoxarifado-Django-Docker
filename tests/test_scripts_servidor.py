@@ -151,3 +151,11 @@ def test_instalacao_cobre_os_dois_servidores_e_o_firewall():
         "bash deploy/atualizar.sh",
     ):
         assert trecho in guia, trecho
+
+
+def test_firewall_da_vm_nao_derruba_o_ufw():
+    # O iptables-persistent remove o ufw no Ubuntu e grava as cadeias do próprio Docker: a regra
+    # do DOCKER-USER é reaplicada por uma unidade do systemd depois do Docker.
+    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
+    assert "iptables-persistent" not in guia and "netfilter-persistent" not in guia
+    assert "After=docker.service" in guia

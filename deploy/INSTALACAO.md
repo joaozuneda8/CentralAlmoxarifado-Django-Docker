@@ -202,9 +202,32 @@ falsificaria o próprio IP e ainda passaria por fora do HTTPS.
 
   ```bash
   sudo iptables -I DOCKER-USER -p tcp --dport 8010 ! -s <ip do Apache> -j DROP
-  sudo apt install iptables-persistent
-  sudo netfilter-persistent save
   ```
+
+  A regra some quando a máquina reinicia. Para reaplicá-la sempre depois do Docker, crie uma
+  unidade do systemd (troque `<ip do Apache>`):
+
+  ```bash
+  sudo tee /etc/systemd/system/almoxarifado-firewall.service <<'FIM'
+  [Unit]
+  Description=Central Almoxarifado: porta 8010 só para o Apache
+  After=docker.service
+  Requires=docker.service
+
+  [Service]
+  Type=oneshot
+  RemainAfterExit=yes
+  ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -p tcp --dport 8010 ! -s <ip do Apache> -j DROP || iptables -I DOCKER-USER -p tcp --dport 8010 ! -s <ip do Apache> -j DROP'
+
+  [Install]
+  WantedBy=multi-user.target
+  FIM
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now almoxarifado-firewall
+  ```
+
+  Não instale o pacote que salva as regras do iptables: no Ubuntu ele remove o `ufw` (e as regras que você já tinha)
+  e grava também as cadeias do próprio Docker, que voltariam desatualizadas no boot.
 
   Confira de outra máquina da rede, que não seja a do Apache: `curl http://<ip da VM>:8010/`
   não pode responder.

@@ -98,7 +98,7 @@ Volumes:
 | Onde | O quê | Por quê |
 |---|---|---|
 | `./dados/logs` → `/dados/logs` | logs, CSVs enviados, journal do lançamento | o André lê do host |
-| `./dados/backups` → `/dados/backups` (só `agendador`) | dumps diários | copiar para outra máquina |
+| `./dados/backups` → `/dados/backups` | dumps diários (também o manual pelo `web`) | copiar para outra máquina |
 | `./dados/importacao` → `/dados/importacao:ro` (só `web`) | `.xlsx` da virada | `importar_planilhas`, `importar_depara` |
 | volume `perfil-navegador` → `/dados/perfil` | perfis do Chromium | comum a `web` e `agendador` |
 | volume `banco-dados` | dados do MariaDB | |

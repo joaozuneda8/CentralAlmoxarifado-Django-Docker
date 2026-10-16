@@ -18,6 +18,9 @@ x-aplicacao: &aplicacao
     LOG_DIR: /dados/logs
     BACKUP_DIR: /dados/backups
     SCPI_PERFIL_DIR: /dados/perfil
+    # O env_file passaria o valor vazio do .env por cima do ENV da imagem, e os robôs ficariam
+    # sem o Chromium.
+    PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
   # O tini recolhe os processos dos robôs que terminam; o Chromium usa o /dev/shm.
   init: true
   shm_size: 1gb
@@ -66,6 +69,7 @@ services:
     volumes:
       - ./dados/logs:/dados/logs
       - perfil-navegador:/dados/perfil
+      - ./dados/backups:/dados/backups
       - ./dados/importacao:/dados/importacao:ro
 
   agendador:

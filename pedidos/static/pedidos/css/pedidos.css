@@ -627,6 +627,9 @@ html:not(.js) [data-quantidade] { display: none; }
 .js [data-alterar].aberto .carrinho-qtd-texto,
 .js [data-alterar].aberto .carrinho-alterar,
 .js [data-alterar].aberto .carrinho-remover { display: none; }
-.js [data-alterar].aberto .carrinho-qtd-area { display: flex; flex-wrap: nowrap; width: 100%; }
-.js [data-alterar].aberto .carrinho-confirmar { display: inline-flex; flex: 1 1 0; min-width: 0; padding-inline: var(--esp-1); }
+/* Unidade longa (a do limpeza, "EMBALAGEM 500 g"): a linha quebra e o "Confirmar" com o ✕ descem,
+   em vez de passar da largura do pedido. */
+.js [data-alterar].aberto .carrinho-qtd-area { display: flex; flex-wrap: wrap; width: 100%; min-width: 0; }
+.js [data-alterar].aberto .carrinho-qtd-area > .texto-secundario { min-width: 0; overflow-wrap: anywhere; }
+.js [data-alterar].aberto .carrinho-confirmar { display: inline-flex; flex: 1 1 7rem; min-width: 7rem; padding-inline: var(--esp-1); }
 .js [data-alterar].aberto .carrinho-cancelar { display: inline-flex; width: var(--altura-controle); min-height: var(--altura-controle); }

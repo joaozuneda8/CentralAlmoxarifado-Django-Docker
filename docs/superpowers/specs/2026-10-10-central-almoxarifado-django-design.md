@@ -246,6 +246,8 @@ pytest + pytest-django, banco MySQL/MariaDB local (Docker ou instalado), para
 
 ### Servidor (pasta `deploy/`)
 
+Substituída pela implantação em Docker: `2026-10-15-docker-design.md`.
+
 - `INSTALACAO.md` para o André: Python 3.13, `uv`, `playwright install
   chromium`; criar banco e usuário; preencher `.env`; `migrate`,
   `collectstatic`, `createsuperuser`; serviço `waitress` via NSSM; proxy

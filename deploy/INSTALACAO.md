@@ -1,228 +1,192 @@
 # Instalação do Central Almoxarifado no servidor
 
-Guia para o André. O sistema roda neste servidor Windows como um serviço (waitress, por trás do
-Apache) e três tarefas do Agendador. Siga as seções na ordem. Os comandos são para o `cmd.exe`
-aberto **como administrador**, salvo onde disser o contrário. Texto entre `<` e `>` é para você
-trocar (senhas, nomes); nunca guarde senha neste arquivo.
+Guia para o André. O sistema roda em três containers do Docker Compose (`compose.yaml`):
 
-Nas mensagens dos `.bat` os acentos podem aparecer trocados no console. É só aparência, não
-atrapalha.
+| Serviço | O que faz |
+|---|---|
+| `banco` | MariaDB 11.4 com os dados do sistema (volume `banco-dados`, sem porta aberta) |
+| `web` | o site (waitress), que também dispara os robôs do SCPI pelos botões da página |
+| `agendador` | as tarefas de horário fixo (`deploy/crontab`): estoque, catálogo e backup |
 
-## 1. Requisitos
+O HTTPS continua no **Apache que já existe**: ele guarda o certificado e encaminha
+`/almoxarifado` para o container `web`. Siga as seções na ordem. Os comandos são para um terminal
+Linux (no caso do Windows Server, o terminal do Ubuntu no WSL2, seção 2). Texto entre `<` e `>` é
+para você trocar (senhas, nomes, endereços); nunca guarde senha neste arquivo.
 
-- Windows Server com **Git**, **Python 3.13** e **uv**.
-  - Python 3.13 do python.org (a série 3.13; o sistema não aceita outra), instalado **para todos
-    os usuários** (opção "Install for all users", que o põe em `C:\Program Files`) e com o
-    "Add python.exe to PATH" marcado. Python instalado só no seu perfil não serve: a conta do
-    serviço (seção 2) não conseguiria abri-lo.
-  - uv: instalador oficial, ou `winget install astral-sh.uv`.
-  - Git: o instalador oficial.
+## 1. Onde o sistema roda
 
-  Diga ao `uv` para usar sempre esse Python e para **copiar** os arquivos das bibliotecas em vez
-  de ligá-los ao cache do seu usuário. Sem isto, o Python e as bibliotecas do sistema ficariam na
-  sua pasta de usuário, que a conta do serviço não lê. Rode uma vez, como administrador:
+São dois casos possíveis; escolha um antes de começar.
 
-  ```bat
-  setx /M UV_PYTHON_DOWNLOADS never
-  setx /M UV_LINK_MODE copy
-  setx /M UV_PYTHON_PREFERENCE only-system
-  ```
+- **A. Uma VM ou servidor Linux** (Ubuntu 24.04 ou Debian 12, x86-64). É o ambiente natural do
+  Docker. O Apache, em outra máquina, encaminha para o IP desta (seção 6).
+- **B. O Windows Server do Apache, com o Docker dentro do WSL2** (Windows Server 2022 ou mais
+  novo). O Apache encaminha para `127.0.0.1`. Funciona, mas tem mais peças: o WSL2 precisa
+  subir sozinho com o servidor (seção 2).
 
-  - `UV_PYTHON_DOWNLOADS=never`: o `uv` nunca baixa um Python próprio (ele iria para o seu
-    `%APPDATA%`); usa o do python.org.
-  - `UV_PYTHON_PREFERENCE=only-system`: o `uv` só considera Pythons instalados no sistema. Sem
-    esta, um Python que o `uv` já tenha baixado no perfil do administrador ainda seria escolhido
-    para o `.venv`, e a conta do serviço não o leria.
-  - `UV_LINK_MODE=copy`: o `.venv` recebe cópias dos arquivos, que herdam a permissão da pasta do
-    sistema (seção 2), e não ligações ao cache do `uv` no seu `%LOCALAPPDATA%`.
+O **Docker Desktop não serve** para o caso B: não é suportado em Windows Server e exige licença
+paga em órgão ou empresa grande. Use o Docker Engine dentro do WSL2, como abaixo.
 
-  **Feche e abra um novo `cmd.exe` como administrador** (as variáveis só valem em terminais
-  novos) e confira:
+Nos dois casos o Apache tem de ter `mod_proxy`, `mod_proxy_http` e `mod_headers` ligados e estar
+**atendendo em HTTPS, com certificado**: os formulários ficam abertos fora da rede da SAEP e a
+área interna tem login, e o `check --deploy` (seção 5) exige HTTPS.
 
-  ```bat
-  git --version
-  uv --version
-  python --version
-  where python
-  ```
+## 2. Docker
 
-  `python --version` tem de mostrar 3.13.x, e o primeiro caminho de `where python` tem de estar
-  em `C:\Program Files`. Se não estiver, corrija o `PATH` antes de seguir.
-- **NSSM** no `PATH` (`nssm version` precisa responder).
-- O **MySQL/MariaDB do ProducaoLab** e o programa de dump dele: `mysqldump` (MySQL 8) ou
-  `mariadb-dump` (MariaDB). Anote qual é o servidor: ele define qual cliente usar na
-  restauração (seção 9).
-- O **Apache** do servidor, com `mod_proxy`, `mod_proxy_http` e `mod_headers` ligados (seção 7),
-  **atendendo em HTTPS, com certificado**. É pré-requisito: os formulários ficam abertos fora da
-  rede da SAEP e a área interna tem login, e o `atualizar.bat` confere a configuração de
-  produção, que exige HTTPS (sem ele, toda atualização para no `check --deploy`).
+### Caso A (Linux)
 
-## 2. Conta e pasta
+Instale o Docker Engine e o plugin compose pelo repositório oficial do Docker, seguindo
+<https://docs.docker.com/engine/install/ubuntu/> (ou `/debian/`). Confira:
 
-1. Crie uma conta local dedicada, que roda o serviço e as tarefas. Ela não precisa ser
-   administradora:
-
-   ```bat
-   net user svc-almoxarifado <senha> /add /expires:never
-   ```
-
-   Dê a ela os direitos "Fazer logon como serviço" e "Fazer logon como tarefa em lote"
-   (`secpol.msc` > Diretivas Locais > Atribuição de Direitos de Usuário). Sem o segundo, o
-   Agendador recusa as tarefas da seção 8.
-2. Clone o repositório em `C:\CentralAlmoxarifado`. **O caminho não pode ter espaços**: os `.bat`
-   e o Agendador dependem disso.
-
-   ```bat
-   git clone <endereço do repositório> C:\CentralAlmoxarifado
-   ```
-
-3. Crie as pastas de trabalho e dê à conta permissão de escrita. Escolha a pasta de backup
-   (aqui `C:\CentralAlmoxarifado-backups`, fora do repositório) e a do Chromium:
-
-   ```bat
-   mkdir C:\CentralAlmoxarifado\logs
-   mkdir C:\CentralAlmoxarifado\.pw-profile
-   mkdir C:\CentralAlmoxarifado\staticfiles
-   mkdir C:\CentralAlmoxarifado-backups
-   mkdir C:\CentralAlmoxarifado-navegadores
-   icacls C:\CentralAlmoxarifado /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F svc-almoxarifado:(OI)(CI)RX
-   icacls C:\CentralAlmoxarifado-navegadores /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F svc-almoxarifado:(OI)(CI)RX
-   icacls C:\CentralAlmoxarifado-backups /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F svc-almoxarifado:(OI)(CI)M
-   icacls C:\CentralAlmoxarifado\logs /grant:r svc-almoxarifado:(OI)(CI)M
-   icacls C:\CentralAlmoxarifado\.pw-profile /grant:r svc-almoxarifado:(OI)(CI)M
-   ```
-
-   A conta só lê e executa o código, o `.venv` e o Chromium: se alguém conseguir rodar código
-   pelo site, não consegue alterar o sistema. Ela escreve só em `logs\` (logs, CSVs enviados,
-   journal do robô), em `.pw-profile\` (perfil do navegador dos robôs) e na pasta de backup. O
-   `staticfiles\` é preenchido pelo `collectstatic`, que roda como administrador (seção 5 e
-   `atualizar.bat`).
-
-   O `/inheritance:r` corta a permissão que as pastas herdariam de `C:\`: lá, todo usuário
-   autenticado ganha "Modificar" em tudo o que é criado (no Windows Server, criar arquivos), o
-   que anularia o "só leitura" da conta, e qualquer usuário leria o backup do banco. Só ficam os
-   administradores, o SYSTEM e a conta do serviço; os SIDs valem em qualquer idioma do Windows
-   (seção 4). Por isso, depois disso, essas pastas (e os logs) só abrem num `cmd.exe` **como
-   administrador**; sem elevação, o Windows nega o acesso (o Explorer oferece incluir o seu
-   usuário na pasta, o que não é preciso).
-
-   O `/grant:r` substitui a permissão que a conta já tinha em cada pasta, então os comandos podem
-   ser repetidos num servidor já instalado. Não tire as permissões da conta recursivamente
-   (`/remove /T`): o `.env` tem uma permissão própria, dada na seção 4, e o serviço pararia de
-   subir.
-
-   O primeiro `icacls` vale para tudo o que for criado depois dentro de `C:\CentralAlmoxarifado`,
-   inclusive o `.venv` do `uv sync`, porque os arquivos são copiados (`UV_LINK_MODE=copy`, seção
-   1) e herdam a permissão da pasta. Se você já tinha rodado o `uv sync` antes de ajustar as
-   variáveis da seção 1, apague a pasta `.venv` e rode o `uv sync` de novo.
-
-## 3. Banco
-
-Num cliente `mysql` (ou `mariadb`) como root, no servidor de banco. Use uma senha forte e anote
-(vai no `.env`, seção 4). Este é o SQL do README, sem o `GRANT` do `test_almoxarifado`, que só
-serve para os testes:
-
-```sql
-CREATE DATABASE almoxarifado CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'almox'@'localhost' IDENTIFIED BY '<senha forte>';
-CREATE USER 'almox'@'127.0.0.1' IDENTIFIED BY '<senha forte>';
-GRANT ALL PRIVILEGES ON almoxarifado.* TO 'almox'@'localhost', 'almox'@'127.0.0.1';
+```bash
+docker --version
+docker compose version
+git --version
 ```
 
-Se o banco ficar em outra máquina, crie também o usuário para o endereço do servidor do sistema
-(`'almox'@'<ip deste servidor>'`) e use esse banco no `DB_HOST` do `.env`.
+Para rodar o `docker` sem `sudo`, ponha seu usuário no grupo `docker` (`sudo usermod -aG docker
+$USER`, depois saia e entre de novo). Esse grupo equivale a root na máquina: só para quem
+administra o servidor.
+
+### Caso B (Windows Server com WSL2)
+
+1. Se o Windows Server for uma máquina virtual, o host precisa expor a virtualização aninhada à
+   VM (no Hyper-V: `Set-VMProcessor -VMName <nome da VM> -ExposeVirtualizationExtensions $true`,
+   com a VM desligada); sem ela o WSL2 não inicia.
+2. No PowerShell **como administrador**, instale o WSL2 com o Ubuntu e reinicie se pedir:
+
+   ```powershell
+   wsl --install -d Ubuntu-24.04
+   wsl --update
+   wsl --version
+   ```
+
+   O `wsl --version` precisa responder (versão do WSL 2.0 ou mais nova); o systemd do próximo
+   passo exige essa versão.
+
+3. No Ubuntu (menu Iniciar › Ubuntu), ligue o systemd, que mantém o Docker rodando:
+
+   ```bash
+   printf '[boot]\nsystemd=true\n' | sudo tee /etc/wsl.conf
+   ```
+
+   No PowerShell, `wsl --shutdown` e abra o Ubuntu de novo.
+4. Dentro do Ubuntu, instale o Docker Engine como no caso A.
+5. Faça o WSL2 subir com o servidor e continuar de pé sem ninguém conectado. No PowerShell
+   **como administrador**, crie uma tarefa de inicialização que mantém a distribuição aberta
+   (ela pede a senha da sua conta do Windows):
+
+   ```powershell
+   $acao = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d Ubuntu-24.04 --exec sleep infinity"
+   $gatilho = New-ScheduledTaskTrigger -AtStartup
+   $config = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+   Register-ScheduledTask -TaskName "Central Almoxarifado WSL" -Action $acao -Trigger $gatilho -Settings $config -User "$env:USERDOMAIN\$env:USERNAME" -Password (Read-Host "Senha") -Force
+   ```
+
+   Sem isso, o Windows desliga o WSL2 quando ninguém o usa, e o sistema sai do ar.
+
+   A tarefa guarda a senha da conta: **quando a senha dessa conta mudar, a tarefa para de
+   funcionar** e o sistema não sobe mais depois de um reinício. Registre a tarefa de novo (rode o
+   `Register-ScheduledTask` acima com a senha nova) sempre que a senha mudar.
+6. Reinicie o servidor uma vez e confira, no PowerShell, que o sistema subiu sozinho (depois da
+   seção 5): `curl.exe -I http://127.0.0.1:8010/almoxarifado/` responde.
+
+Tudo o que vem depois é no terminal do Ubuntu. Guarde o sistema dentro do Linux (`/srv`), nunca
+em `/mnt/c`: lá os arquivos ficam lentos e perdem as permissões.
+
+## 3. Pasta
+
+```bash
+sudo mkdir -p /srv/almoxarifado
+sudo chown "$USER" /srv/almoxarifado
+git clone <endereço do repositório> /srv/almoxarifado
+cd /srv/almoxarifado
+mkdir -p dados/logs dados/backups dados/importacao
+sudo chown -R 1000:1000 dados/logs dados/backups
+```
+
+- `dados/logs`: logs do sistema, das tarefas e dos robôs, os CSVs enviados pela página e o
+  journal do lançamento.
+- `dados/backups`: os backups diários do banco (seção 8).
+- `dados/importacao`: os `.xlsx` da migração (`deploy/VIRADA.md`); o sistema só os lê.
+
+O `chown -R 1000:1000` dá as pastas ao usuário do container (`almox`, UID 1000), o único que
+grava nelas; sem ele, o sistema não sobe (não consegue abrir o log). O código no container é só
+leitura: se alguém conseguir rodar código pelo site, não consegue alterar o sistema.
 
 ## 4. `.env` de produção
 
-```bat
-copy C:\CentralAlmoxarifado\.env.example C:\CentralAlmoxarifado\.env
-notepad C:\CentralAlmoxarifado\.env
+```bash
+cp .env.example .env
+chmod 600 .env
+nano .env
 ```
 
-Valores de produção, variável por variável (as não citadas ficam como estão):
+Valores de produção, variável por variável (as não citadas ficam como estão; as do bloco "Só no
+desenvolvimento local", no fim do arquivo, o compose ignora):
 
 | Variável | Valor |
 |---|---|
-| `SECRET_KEY` | uma chave gerada, só deste servidor (comando abaixo) |
+| `SECRET_KEY` | uma chave gerada, só deste servidor: `python3 -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `DEBUG` | `0` |
 | `ALLOWED_HOSTS` | o nome pelo qual o site é acessado, sem esquema, ex.: `servidor.saep.local` |
 | `CSRF_TRUSTED_ORIGINS` | o mesmo nome **com** esquema, ex.: `https://servidor.saep.local` |
 | `USAR_HTTPS` | `1` (sempre: o `check --deploy` da seção 5 exige HTTPS) |
-| `PROXY_HTTPS` | `1` (sempre, atrás do Apache; seção 7) |
-| `PREFIXO_URL` | `/almoxarifado` (o mesmo do `--url-prefix` da seção 6); vazio se o site ficar na raiz |
-| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | `almoxarifado`, `almox` e a senha da seção 3 |
-| `DB_HOST`, `DB_PORT` | `127.0.0.1` e `3306`, ou os do banco do ProducaoLab |
+| `PROXY_HTTPS` | `1` (sempre, atrás do Apache; seção 6) |
+| `PREFIXO_URL` | `/almoxarifado`; vazio se o site ficar na raiz |
+| `PORTA_PUBLICADA` | caso B: `127.0.0.1:8010`; caso A: `<ip desta máquina na rede do Apache>:8010` (seção 6) |
+| `DB_NAME`, `DB_USER` | `almoxarifado` e `almox` |
+| `DB_PASSWORD` | uma senha forte para o usuário do banco |
 | `SAEP_USER`, `SAEP_PASS` | usuário e senha do SCPI usados pelos robôs |
-| `SCPI_HEADLESS` | `1` (rodando como serviço não há janela) |
-| `LANCAMENTO_REAL` | `0` até a virada (`deploy\VIRADA.md`): com `0`, só a simulação roda |
-| `PLAYWRIGHT_BROWSERS_PATH` | `C:\CentralAlmoxarifado-navegadores` |
-| `BACKUP_DIR` | `C:\CentralAlmoxarifado-backups` |
-| `MYSQLDUMP` | `mysqldump` (MySQL 8) ou `mariadb-dump` (MariaDB); o caminho completo se não estiver no `PATH` |
-| `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` | bot e chat que recebem o aviso de novo pedido; deixe **vazios** até a virada (`deploy\VIRADA.md`), senão um pedido de teste avisa o grupo de verdade |
+| `LANCAMENTO_REAL` | `0` até a virada (`deploy/VIRADA.md`): com `0`, só a simulação roda |
+| `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` | deixe **vazios** até a virada (`deploy/VIRADA.md`), senão um pedido de teste avisa o grupo de verdade |
 
-Gerar a `SECRET_KEY` (rode depois do `uv sync` da seção 5, ou com qualquer Python):
+Cada linha é `NOME=valor`, sem espaços em volta do `=`. O compose trata `$` como variável:
+**senha com `$` vai entre aspas simples** (`DB_PASSWORD='abc$123'`), senão muda em silêncio e o
+banco recusa a conexão. O banco é criado com `DB_NAME`, `DB_USER`, `DB_PASSWORD` e
+`MARIADB_ROOT_PASSWORD` (do `.env.banco`) na primeira subida; trocá-los depois nos arquivos **não** muda o banco (seria
+preciso trocar a senha dentro do MariaDB também).
 
-```bat
-C:\CentralAlmoxarifado\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(64))"
+A senha do root do banco fica num arquivo à parte, que só o container do banco lê (o `.env` vai
+inteiro ao `web`, que fica exposto à internet, e ela não deve estar lá):
+
+```bash
+cp .env.banco.example .env.banco
+chmod 600 .env.banco
+nano .env.banco
 ```
 
-Cada linha do `.env` é `NOME=valor`, sem aspas e sem espaços em volta do `=`. O arquivo tem
-senhas: só a conta do serviço, os administradores e o SYSTEM devem lê-lo. O `icacls` abaixo usa os
-SIDs (`*S-1-5-32-544` é o grupo Administradores e `*S-1-5-18` é o SYSTEM), que valem em qualquer
-idioma do Windows; o nome "Administrators" não existe num Windows em português.
+Preencha `MARIADB_ROOT_PASSWORD` com outra senha forte, diferente da `DB_PASSWORD` (usada na
+restauração, seção 8). A mesma regra do `$` vale aqui.
 
-```bat
-icacls C:\CentralAlmoxarifado\.env /inheritance:r /grant:r svc-almoxarifado:R *S-1-5-32-544:F *S-1-5-18:F
+O `chmod 600` deixa o `.env` e o `.env.banco` legíveis só por você: eles têm as senhas.
+
+## 5. Primeira subida
+
+```bash
+cd /srv/almoxarifado
+docker compose build
+docker compose run --rm web python manage.py migrate
+docker compose run --rm web python manage.py createsuperuser
+docker compose run --rm web python manage.py check --deploy --fail-level WARNING
+docker compose up -d
+docker compose ps
 ```
 
-## 5. Instalação
-
-```bat
-cd /d C:\CentralAlmoxarifado
-uv sync --frozen --no-dev
-set PLAYWRIGHT_BROWSERS_PATH=C:\CentralAlmoxarifado-navegadores
-.venv\Scripts\python.exe -m playwright install chromium
-.venv\Scripts\python.exe manage.py migrate
-.venv\Scripts\python.exe manage.py collectstatic --noinput
-.venv\Scripts\python.exe manage.py createsuperuser
-.venv\Scripts\python.exe manage.py check --deploy --fail-level WARNING
-```
-
-- O `set PLAYWRIGHT_BROWSERS_PATH` tem de ser o mesmo valor do `.env`: ele diz onde o Chromium
-  fica, e o serviço e as tarefas o leem do `.env`.
-- O `migrate` também cria a pasta `logs\`.
+- O `build` demora alguns minutos na primeira vez (baixa o Python, o Chromium e o MariaDB).
+- O `run --rm` sobe o `banco` se preciso e espera ele ficar pronto.
 - O `createsuperuser` pede a matrícula (é o nome de usuário) e a senha do primeiro acesso.
-- O último comando precisa terminar **sem avisos** (`System check identified no issues`). Se
-  listar algum, corrija o `.env` antes de seguir; um aviso quase sempre é HTTPS, `SECRET_KEY` ou
-  `ALLOWED_HOSTS`.
+- O `check --deploy` precisa terminar **sem avisos** (`System check identified no issues`). Se
+  listar algum, corrija o `.env`; um aviso quase sempre é HTTPS, `SECRET_KEY` ou `ALLOWED_HOSTS`.
+- O `ps` mostra os três serviços `running`, o `banco` como `healthy`. Eles voltam sozinhos
+  depois de um reinício do servidor ou do Docker (`restart: unless-stopped`).
 
-## 6. Serviço (NSSM)
+Depois de mudar o `.env`, rode `docker compose up -d`: ele recria os containers com os valores
+novos (o `docker compose restart` **não** relê o `.env`). Recriar o `web` mata o robô que estiver
+rodando; confira antes com `docker compose run --rm web python manage.py robos_em_andamento`.
 
-```bat
-nssm install CentralAlmoxarifado "C:\CentralAlmoxarifado\.venv\Scripts\python.exe"
-nssm set CentralAlmoxarifado AppDirectory C:\CentralAlmoxarifado
-nssm set CentralAlmoxarifado AppParameters "-m waitress --listen=127.0.0.1:8010 --threads=8 --url-prefix=/almoxarifado --trusted-proxy=127.0.0.1 --trusted-proxy-headers=\"x-forwarded-proto x-forwarded-for\" config.wsgi:application"
-nssm set CentralAlmoxarifado ObjectName .\svc-almoxarifado <senha>
-nssm set CentralAlmoxarifado AppStdout C:\CentralAlmoxarifado\logs\servico.log
-nssm set CentralAlmoxarifado AppStderr C:\CentralAlmoxarifado\logs\servico.log
-nssm set CentralAlmoxarifado AppKillProcessTree 0
-nssm set CentralAlmoxarifado Start SERVICE_AUTO_START
-nssm start CentralAlmoxarifado
-```
+## 6. Apache
 
-- `AppKillProcessTree 0`: parar ou reiniciar o serviço não mata o robô que a página disparou
-  (um processo filho), que termina o lançamento sozinho. Por isso o `atualizar.bat` confere
-  antes se há robô em andamento.
-- O `--url-prefix=/almoxarifado` da linha acima é o padrão (seção 7) e tem de bater com o
-  `PREFIXO_URL` do `.env`. Se o site ficar na raiz, tire o `--url-prefix` e deixe o
-  `PREFIXO_URL` vazio.
-- Para conferir o que ficou gravado: `nssm get CentralAlmoxarifado AppParameters`.
-- Depois de mudar o `.env`, reinicie: `nssm restart CentralAlmoxarifado`.
-
-## 7. Apache
-
-O padrão é o sistema em `/almoxarifado` do servidor, com o prefixo informado ao waitress (seção 6).
-Endereços resultantes:
+O padrão é o sistema em `/almoxarifado` do servidor. Endereços resultantes:
 
 | O quê | Endereço |
 |---|---|
@@ -230,138 +194,147 @@ Endereços resultantes:
 | Área do almoxarifado (login) | `https://servidor/almoxarifado/painel/` |
 | Cadastros (admin) | `https://servidor/almoxarifado/admin/` |
 
-No `httpd.conf` (ou no `VirtualHost` do site), dentro do bloco HTTPS:
+No `httpd.conf` (ou no `VirtualHost` do site), dentro do bloco HTTPS, com `<destino>` igual ao
+`PORTA_PUBLICADA` do `.env` (`127.0.0.1:8010` no caso B, `<ip da VM>:8010` no caso A):
 
 ```apache
 ProxyPreserveHost On
 RequestHeader set X-Forwarded-Proto "https"
-ProxyPass /almoxarifado http://127.0.0.1:8010/almoxarifado
-ProxyPassReverse /almoxarifado http://127.0.0.1:8010/almoxarifado
+ProxyPass /almoxarifado http://<destino>/almoxarifado
+ProxyPassReverse /almoxarifado http://<destino>/almoxarifado
 ```
 
 Depois, teste a configuração e recarregue o Apache (`httpd -t` e `httpd -k restart`, ou o
 serviço do Apache nos Serviços do Windows).
 
-Se um dia o site ganhar um nome próprio na rede, sem o prefixo: tire o `--url-prefix` do serviço,
-deixe o `PREFIXO_URL` vazio e use `ProxyPass / http://127.0.0.1:8010/` (e `ProxyPassReverse /
-http://127.0.0.1:8010/`).
-
-Nos dois casos:
-
 - `ProxyPreserveHost On`: o link "Abrir painel" do aviso no Telegram usa o host da requisição.
 - `RequestHeader set X-Forwarded-Proto "https"` e, no `.env`, `USAR_HTTPS=1` e `PROXY_HTTPS=1`:
-  sempre os três, o Apache é HTTPS (seção 1).
-- O waitress precisa das opções `--trusted-proxy...` da seção 6. Sem
-  `x-forwarded-proto`, o redirecionamento para HTTPS entra em laço; sem `x-forwarded-for`, todo
-  pedido parece vir do Apache e **todos os funcionários dividem o mesmo limite por IP** (três
-  pedidos em 10 minutos para o prédio inteiro).
+  sempre os três. Sem o cabeçalho, o redirecionamento para HTTPS entra em laço.
+- Se o site ficar na raiz, sem o prefixo: `PREFIXO_URL` vazio no `.env` e `ProxyPass /
+  http://<destino>/` (e `ProxyPassReverse / http://<destino>/`).
 
-## 8. Agendador de Tarefas
+**Só o Apache pode alcançar o `PORTA_PUBLICADA`.** O Apache chega ao container por um endereço
+interno do Docker que muda, então o sistema confia no `X-Forwarded-For` de qualquer origem (é
+por ele que conta o limite de pedidos por IP dos formulários). Quem alcançasse a porta direto
+falsificaria o próprio IP e ainda passaria por fora do HTTPS.
 
-Crie as tarefas **só depois do `migrate` da seção 5**: é ele que cria a pasta `logs\`, e o
-`tarefa.bat` grava em `logs\agendador.log`.
+- Caso B: `127.0.0.1:8010` só é alcançável dentro do servidor. Nada a fazer.
+- Caso A: use o IP da VM na rede do Apache (nunca `0.0.0.0`) e libere a porta só para o IP do
+  Apache. **O Docker abre as portas publicadas por cima do `ufw` e do `firewalld`**: a regra
+  tem de ir na cadeia `DOCKER-USER`:
 
-Três tarefas, rodando como a conta do serviço, com "executar estando o usuário conectado ou
-não" (é o que o `/RU ... /RP *` faz; ele pede a senha da conta uma vez por tarefa):
+  ```bash
+  sudo iptables -I DOCKER-USER -p tcp --dport 8010 ! -s <ip do Apache> -j DROP
+  ```
 
-```bat
-schtasks /Create /TN "Central Almoxarifado\Estoque" /XML C:\CentralAlmoxarifado\deploy\tarefa-estoque.xml /RU .\svc-almoxarifado /RP *
-schtasks /Create /TN "Central Almoxarifado\Catalogo" /TR "C:\CentralAlmoxarifado\deploy\tarefa.bat atualizar_catalogo" /SC DAILY /ST 06:30 /RU .\svc-almoxarifado /RP *
-schtasks /Create /TN "Central Almoxarifado\Backup" /TR "C:\CentralAlmoxarifado\deploy\tarefa.bat backup_banco" /SC DAILY /ST 23:00 /RU .\svc-almoxarifado /RP *
-```
+  A regra some quando a máquina reinicia. Para reaplicá-la sempre depois do Docker, crie uma
+  unidade do systemd (troque `<ip do Apache>`):
 
-- Estoque: de segunda a sexta, a cada 30 minutos entre 07:00 e 17:01. O horário está em
-  `deploy\tarefa-estoque.xml` e não no comando porque o `/D` do `schtasks` usa os nomes dos dias
-  no idioma do Windows (`MON,TUE,...` é recusado num Windows em português).
+  ```bash
+  sudo tee /etc/systemd/system/almoxarifado-firewall.service <<'FIM'
+  [Unit]
+  Description=Central Almoxarifado: porta 8010 só para o Apache
+  After=docker.service
+  Requires=docker.service
+
+  [Service]
+  Type=oneshot
+  RemainAfterExit=yes
+  ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -p tcp --dport 8010 ! -s <ip do Apache> -j DROP || iptables -I DOCKER-USER -p tcp --dport 8010 ! -s <ip do Apache> -j DROP'
+
+  [Install]
+  WantedBy=multi-user.target
+  FIM
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now almoxarifado-firewall
+  ```
+
+  Não instale o pacote que salva as regras do iptables: no Ubuntu ele remove o `ufw` (e as regras que você já tinha)
+  e grava também as cadeias do próprio Docker, que voltariam desatualizadas no boot.
+
+  Confira de outra máquina da rede, que não seja a do Apache: `curl http://<ip da VM>:8010/`
+  não pode responder.
+
+## 7. Agendador
+
+O serviço `agendador` roda o `deploy/crontab`, no horário de Brasília:
+
+- Estoque: de segunda a sexta, de 30 em 30 minutos das 07:00 às 17:00.
 - Catálogo: todo dia às 06:30 (cadastro, estoque e saídas do SCPI, em sequência).
 - Backup: todo dia às 23:00.
 
 O resultado das importações aparece em Automações › Visão geral; a saída de cada tarefa, em
-`logs\agendador.log`. Para ver as tarefas: `schtasks /Query /TN "Central Almoxarifado\Estoque"`.
+`dados/logs/agendador.log`. O próprio agendador escreve em `docker compose logs agendador`.
 
-## 9. Backup e restauração
+Para rodar uma tarefa fora de hora (ex.: o backup), com a saída no mesmo log:
 
-- O comando `backup_banco` (a tarefa "Backup") grava em `BACKUP_DIR` um arquivo
+```bash
+docker compose exec agendador /app/deploy/tarefa.sh backup_banco
+```
+
+## 8. Backup e restauração
+
+- O comando `backup_banco` (a tarefa das 23:00) grava em `dados/backups` um arquivo
   `almoxarifado-AAAAMMDD-HHMMSS.sql.gz` por dia e apaga os com mais de **60 dias**.
 - Essa pasta está no mesmo servidor: copie-a de vez em quando para outra máquina.
 
-Para restaurar, descompacte o arquivo escolhido (o primeiro comando abaixo, que usa o Python do
-`.venv`) e carregue o resultado no banco (o segundo):
+Para restaurar, pare o site e o agendador, carregue o arquivo escolhido e suba de novo. O
+`MARIADB_ROOT_PASSWORD` já está dentro do container do banco, então nenhuma senha é digitada:
 
-```bat
-cd /d C:\CentralAlmoxarifado
-.venv\Scripts\python.exe -c "import gzip,shutil,sys; shutil.copyfileobj(gzip.open(sys.argv[1]), open(sys.argv[2], 'wb'))" <arquivo>.sql.gz restaurar.sql
-mysql -u almox -p almoxarifado < restaurar.sql
+```bash
+cd /srv/almoxarifado
+docker compose stop web agendador
+docker compose exec -T banco sh -c 'exec mariadb -u root -p"$MARIADB_ROOT_PASSWORD" -e "DROP DATABASE almoxarifado; CREATE DATABASE almoxarifado CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+gunzip -c dados/backups/<arquivo>.sql.gz | docker compose exec -T banco sh -c 'exec mariadb -u root -p"$MARIADB_ROOT_PASSWORD" almoxarifado'
+docker compose up -d
 ```
 
-(no `cmd.exe`, não no PowerShell: o `<` não funciona lá). **Use o cliente da mesma família do
-servidor**: `mariadb` no lugar de `mysql` se o servidor for MariaDB. O dump do MariaDB começa
-com uma linha (`/*M!999999\- enable the sandbox mode */`) que só o cliente do MariaDB entende; o
-`MYSQLDUMP` do `.env` segue a mesma regra (`mariadb-dump` para MariaDB, `mysqldump` para MySQL
-8). Para restaurar sobre um sistema que já tem dados, esvazie o banco antes (`DROP DATABASE` e
-`CREATE DATABASE` da seção 3) e pare o serviço durante a restauração.
+(o `DROP` só se o banco já tiver dados; o usuário `almox` continua com acesso ao banco recriado,
+porque a permissão é pelo nome.)
 
-**Teste a restauração uma vez depois de instalar**, num banco vazio de teste (por exemplo
-`almoxarifado_restauro`, que você apaga em seguida), para saber que o backup serve antes de
-precisar dele. Rode a criação do banco e a restauração **como root** (`mysql -u root -p
-almoxarifado_restauro < restaurar.sql`): o usuário `almox` só tem direito em `almoxarifado.*` e
-não cria nem carrega outro banco.
+**Teste a restauração uma vez depois de instalar**, num banco de teste, para saber que o backup
+serve antes de precisar dele (o sistema continua no ar):
 
-## 10. Atualização
-
-Rode como administrador:
-
-```bat
-C:\CentralAlmoxarifado\deploy\atualizar.bat
+```bash
+docker compose exec agendador /app/deploy/tarefa.sh backup_banco
+docker compose exec -T banco sh -c 'exec mariadb -u root -p"$MARIADB_ROOT_PASSWORD" -e "CREATE DATABASE almoxarifado_restauro CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+gunzip -c dados/backups/<arquivo mais novo>.sql.gz | docker compose exec -T banco sh -c 'exec mariadb -u root -p"$MARIADB_ROOT_PASSWORD" almoxarifado_restauro'
+docker compose exec -T banco sh -c 'exec mariadb -u root -p"$MARIADB_ROOT_PASSWORD" -e "SELECT COUNT(*) FROM almoxarifado_restauro.pedidos_pedido; DROP DATABASE almoxarifado_restauro"'
 ```
 
-Rode-o **fora das janelas das tarefas agendadas** (estoque a cada 30 minutos em dias úteis,
-catálogo às 06:30, backup às 23:00): ele reinicia o serviço e, se uma tarefa estiver rodando,
-ela e a atualização brigam pelo banco e pelo `.venv`.
+## 9. Atualização
+
+```bash
+cd /srv/almoxarifado
+bash deploy/atualizar.sh
+```
+
+Rode-o **fora dos horários do agendador** (estoque de 30 em 30 minutos em dias úteis, catálogo às
+06:30, backup às 23:00): ele recria os containers, e uma tarefa no meio seria interrompida.
 
 Ele confere se há robô em andamento (e para, sem mexer em nada, se houver), puxa o código novo,
-atualiza as dependências, roda `migrate`, `collectstatic` e `check --deploy`, confere os robôs de
-novo e reinicia o serviço. Para no primeiro erro; corrija o que ele mostrou e rode de novo.
+reconstrói a imagem, roda `migrate` e `check --deploy`, confere os robôs de novo e recria os
+containers. Para no primeiro erro com "Atualização interrompida"; corrija o que ele mostrou e
+rode de novo.
 
-- Se o `uv sync` falhar por **arquivo em uso** (o serviço em execução mantém aberto algum
-  `.pyd` ou DLL), pare o serviço e rode de novo (o `atualizar.bat` o reinicia no fim):
+- Se o `git pull` reclamar de `dubious ownership`, rode uma vez
+  `git config --global --add safe.directory /srv/almoxarifado`.
+- Imagens antigas ocupam disco; de vez em quando, `docker image prune`.
 
-  ```bat
-  nssm stop CentralAlmoxarifado
-  C:\CentralAlmoxarifado\deploy\atualizar.bat
-  ```
-
-- Se o `git pull` reclamar de `dubious ownership` (pasta clonada por outra conta), rode uma vez
-  `git config --global --add safe.directory C:/CentralAlmoxarifado`.
-
-## 11. Conferência depois de instalar
+## 10. Conferência depois de instalar
 
 Marque cada item:
 
+- [ ] `docker compose ps` mostra `banco` (`healthy`), `web` e `agendador` rodando.
 - [ ] O login abre em `https://servidor/almoxarifado/painel/` e entra com o superusuário da seção
       5 (os formulários abrem em `https://servidor/almoxarifado/`, a página já com estilo).
 - [ ] Em Automações › Visão geral, "Atualizar agora" termina sem erro.
 - [ ] Em Automações › Lançamento no SCPI, "Simular" abre o SCPI (sem janela) e termina.
-- [ ] `C:\CentralAlmoxarifado\deploy\tarefa.bat backup_banco` gera o arquivo em `BACKUP_DIR`.
-- [ ] `schtasks /Query /TN "Central Almoxarifado\Estoque"` (e `Catalogo`, `Backup`) mostram as
-      três tarefas.
-- [ ] A conta do serviço consegue rodar o sistema. Abra um terminal **como ela** (pede a senha da
-      conta; troque `<computador>` pelo nome do servidor, o que `echo %COMPUTERNAME%` mostra):
+- [ ] `docker compose exec agendador /app/deploy/tarefa.sh backup_banco` gera o arquivo em
+      `dados/backups`, e o teste de restauração da seção 8 conta os pedidos.
+- [ ] Caso A: de uma máquina que não é a do Apache, `curl http://<ip da VM>:8010/` não responde.
+- [ ] Caso B: depois de reiniciar o servidor, o site volta sozinho (seção 2, passo 5).
+- [ ] Os registros estão em `dados/logs/` (`almoxarifado.log`, `agendador.log` e os dos robôs).
 
-      ```bat
-      runas /user:<computador>\svc-almoxarifado "cmd /k cd /d C:\CentralAlmoxarifado && .venv\Scripts\python.exe manage.py check"
-      ```
-
-      Na janela que abrir, o resultado esperado é `System check identified no issues`. Se aparecer
-      "Acesso negado" ou erro ao abrir o Python, a permissão da seção 2 ou o Python da seção 1
-      não está certo; o serviço e as tarefas falhariam do mesmo jeito.
-
-      Para o `runas` abrir a janela, a conta precisa do direito "Permitir logon local"
-      (`secpol.msc` > Atribuição de Direitos de Usuário), só para este teste; remova depois, se
-      não o tinha. Se o servidor negar esse direito, confira pelo log do serviço: reinicie o
-      serviço e veja se `logs\servico.log` e `logs\almoxarifado.log` não mostram erro de
-      permissão ou de Python.
-- [ ] Os registros estão em `C:\CentralAlmoxarifado\logs\` (`almoxarifado.log`, `servico.log`,
-      `agendador.log`).
-
-Se algo falhar, o primeiro lugar a olhar é `logs\servico.log` e `logs\almoxarifado.log`.
+Se algo falhar, o primeiro lugar a olhar é `docker compose logs web` (ou `agendador`, `banco`) e
+`dados/logs/almoxarifado.log`.

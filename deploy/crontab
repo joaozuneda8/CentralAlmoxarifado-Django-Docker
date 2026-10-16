@@ -1,0 +1,13 @@
+# Tarefas do agendador (serviço "agendador" do compose.yaml, lidas pelo supercronic).
+# Horários no fuso da imagem (TZ=America/Sao_Paulo). A saída de cada tarefa vai para
+# dados/logs/agendador.log (deploy/tarefa.sh).
+
+# Estoque: de segunda a sexta, de 30 em 30 minutos das 07:00 às 17:00.
+*/30 7-16 * * 1-5 /app/deploy/tarefa.sh importar_estoque
+0 17 * * 1-5 /app/deploy/tarefa.sh importar_estoque
+
+# Catálogo (cadastro, estoque e saídas do SCPI, em sequência): todo dia às 06:30.
+30 6 * * * /app/deploy/tarefa.sh atualizar_catalogo
+
+# Backup do banco: todo dia às 23:00.
+0 23 * * * /app/deploy/tarefa.sh backup_banco

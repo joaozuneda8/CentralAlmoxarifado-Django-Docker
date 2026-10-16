@@ -122,9 +122,11 @@ def iniciar_lancamento(
 def _iniciar_comando(argumentos: list[str], arquivo_log: str, titulo: str) -> None:
     """Inicia `manage.py <argumentos>` num processo separado, com a saída em `LOG_DIR`."""
     # No Windows, o processo precisa de grupo próprio e sem console para sobreviver ao fim da
-    # requisição (e ao reinício do waitress).
+    # requisição (e ao reinício do waitress). No Linux (o container), uma sessão própria faz o
+    # mesmo papel: o robô não recebe os sinais do grupo do waitress.
     flags = 0
-    if sys.platform == "win32":
+    windows = sys.platform == "win32"
+    if windows:
         flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
     # Tudo o que o processo escreve (resumos, recusa pela trava, falhas, erro ao subir o
     # Django) vai para este arquivo, que o processo herda; o pai fecha a sua cópia.
@@ -140,4 +142,5 @@ def _iniciar_comando(argumentos: list[str], arquivo_log: str, titulo: str) -> No
             stderr=subprocess.STDOUT,
             close_fds=True,
             creationflags=flags,
+            start_new_session=not windows,
         )

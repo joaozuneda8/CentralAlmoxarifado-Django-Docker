@@ -81,11 +81,13 @@ Pré-requisitos: Python 3.13, [uv](https://docs.astral.sh/uv/) e um MySQL 8 ou M
 
 ## Implantação
 
-O sistema roda num servidor Windows (waitress como serviço do NSSM, atrás do Apache em
-`/almoxarifado`, com tarefas do Agendador para as importações e o backup):
+O sistema roda em Docker Compose (`compose.yaml`), atrás do Apache em `/almoxarifado`: o
+`banco` (MariaDB), o `web` (waitress, que também dispara os robôs da página) e o `agendador`
+(supercronic com `deploy/crontab`: importações e backup). No servidor, os comandos rodam no
+container: `docker compose exec web python manage.py <comando>`.
 
-- [deploy/INSTALACAO.md](deploy/INSTALACAO.md): instalação, `.env` de produção, serviço, Apache,
-  Agendador, backup e atualização (`deploy\atualizar.bat`). Guia para o André.
+- [deploy/INSTALACAO.md](deploy/INSTALACAO.md): instalação (Linux ou WSL2), `.env` de produção,
+  Apache, agendador, backup e atualização (`bash deploy/atualizar.sh`). Guia para o André.
 - [deploy/VIRADA.md](deploy/VIRADA.md): roteiro da migração do Apps Script e da virada.
 
 Três coisas a saber:
@@ -97,4 +99,4 @@ Três coisas a saber:
   exportado das planilhas do Apps Script (migração única, antes da virada). A importação
   substitui os pedidos e recusa com `LANCAMENTO_REAL=1`.
 - `uv run python manage.py backup_banco` grava o dump comprimido em `BACKUP_DIR` e apaga os com
-  mais de 60 dias (roda todo dia pelo Agendador).
+  mais de 60 dias (roda todo dia pelo agendador do compose).

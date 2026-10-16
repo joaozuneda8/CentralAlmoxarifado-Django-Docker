@@ -1,10 +1,10 @@
 import io
 import os
+import shutil
 import subprocess
 import sys
 from datetime import timedelta
 from pathlib import Path
-from xml.etree import ElementTree
 
 import pytest
 from django.core.management import CommandError, call_command
@@ -40,89 +40,173 @@ def test_execucao_interrompida_nao_conta():
 
 
 def test_atualizar_para_no_primeiro_erro_e_segue_a_ordem():
-    texto = (DEPLOY / "atualizar.bat").read_text(encoding="utf-8")
-    linhas = [linha.strip() for linha in texto.splitlines()]
-    comandos = [linha for linha in linhas if linha.startswith(('".venv', "git ", "uv ", "nssm "))]
-    assert comandos and all(linha.endswith(" || goto :falha") for linha in comandos)
+    texto = (DEPLOY / "atualizar.sh").read_text(encoding="utf-8")
+    assert "set -eu" in texto
+    assert "Atualização interrompida: corrija o erro acima e rode de novo." in texto
     ordem = [
-        "robos_em_andamento",
+        "run --rm web python manage.py robos_em_andamento",
         "git pull --ff-only",
-        "uv sync --frozen --no-dev",
-        "migrate --noinput",
-        "collectstatic --noinput",
-        "check --deploy --fail-level WARNING",
-        "nssm restart CentralAlmoxarifado",
+        "docker compose build",
+        "run --rm web python manage.py migrate --noinput",
+        "run --rm web python manage.py check --deploy --fail-level WARNING",
+        "up -d",
     ]
     posicoes = [texto.index(trecho) for trecho in ordem]
     assert posicoes == sorted(posicoes)
-
-
-def test_atualizar_corpo_num_bloco_que_o_cmd_le_inteiro():
-    # O git pull pode trocar o atualizar.bat durante a execução: o cmd precisa já ter lido tudo.
-    texto = (DEPLOY / "atualizar.bat").read_text(encoding="utf-8")
-    linhas = [linha.strip() for linha in texto.splitlines()]
-    abre = linhas.index("(")
-    fecha = linhas.index(")")
-    assert linhas[abre - 1].startswith("rem ")
-    assert linhas[abre - 2].startswith("cd /d ")
-    assert abre < linhas.index("exit /b 0") < fecha < linhas.index(":falha")
-    fora = [
-        i
-        for i, linha in enumerate(linhas)
-        if "manage.py" in linha or linha.startswith(("git ", "nssm "))
+    # Com "run --rm" (e não "exec"), a conferência funciona também com o web parado.
+    assert "compose exec" not in texto
+    verificacoes = [
+        i for i in range(len(texto)) if texto.startswith("manage.py robos_em_andamento", i)
     ]
-    assert fora and all(abre < i < fecha for i in fora)
-    verificacoes = [i for i, linha in enumerate(linhas) if "manage.py robos_em_andamento" in linha]
     assert len(verificacoes) == 2
-    depois_do_check = next(i for i, linha in enumerate(linhas) if "check --deploy" in linha)
-    reinicio = next(i for i, linha in enumerate(linhas) if linha.startswith("nssm restart"))
-    assert depois_do_check < verificacoes[1] < reinicio
+    assert texto.index("check --deploy") < verificacoes[1] < texto.index("up -d")
 
 
-@pytest.mark.parametrize("nome", ["tarefa.bat", "atualizar.bat"])
-def test_bat_com_fim_de_linha_do_windows(nome):
-    dados = (DEPLOY / nome).read_bytes()
-    assert dados.count(b"\n") == dados.count(b"\r\n") > 0
+def test_atualizar_corpo_numa_funcao_chamada_no_fim():
+    # O git pull pode trocar o script durante a execução: o bash precisa já ter lido tudo.
+    texto = (DEPLOY / "atualizar.sh").read_text(encoding="utf-8")
+    linhas = [linha.strip() for linha in texto.splitlines()]
+    linhas = [linha for linha in linhas if linha and not linha.startswith("#")]
+    assert linhas[-1] in ('atualizar "$@"', "atualizar")
+    abre = next(i for i, linha in enumerate(linhas) if linha.startswith("atualizar()"))
+    comandos = [i for i, linha in enumerate(linhas) if linha.startswith(("docker ", "git "))]
+    assert comandos and all(abre < i < len(linhas) - 1 for i in comandos)
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="cmd.exe")
+def _linhas_crontab():
+    texto = (DEPLOY / "crontab").read_text(encoding="utf-8")
+    return [
+        linha.split(None, 5)
+        for linha in texto.splitlines()
+        if linha.strip() and not linha.startswith("#")
+    ]
+
+
+def test_crontab_mantem_os_horarios_do_agendador():
+    # O estoque de 30 em 30 minutos das 07:00 às 17:00 só nos dias úteis; o resto todo dia.
+    agenda = {tuple(campos[:5]): campos[5] for campos in _linhas_crontab()}
+    assert agenda == {
+        ("*/30", "7-16", "*", "*", "1-5"): "/app/deploy/tarefa.sh importar_estoque",
+        ("0", "17", "*", "*", "1-5"): "/app/deploy/tarefa.sh importar_estoque",
+        ("30", "6", "*", "*", "*"): "/app/deploy/tarefa.sh atualizar_catalogo",
+        ("0", "23", "*", "*", "*"): "/app/deploy/tarefa.sh backup_banco",
+    }
+
+
+@pytest.mark.parametrize(
+    "nome",
+    ["deploy/crontab", "deploy/tarefa.sh", "deploy/atualizar.sh", "Dockerfile", "compose.yaml"],
+)
+def test_arquivos_do_container_com_fim_de_linha_lf(nome):
+    # Com CRLF, o bash recusa o script ("set: -\r") e o supercronic lê o comando com \r.
+    dados = (RAIZ / nome).read_bytes()
+    assert b"\r\n" not in dados and dados.endswith(b"\n")
+
+
+def _bash() -> str:
+    """O bash do Git no Windows (o `bash` do PATH lá é o do WSL); fora dele, o do PATH."""
+    if sys.platform == "win32":
+        git = shutil.which("git")
+        if git:
+            for pasta in Path(git).parents:
+                candidato = pasta / "bin" / "bash.exe"
+                if candidato.exists():
+                    return str(candidato)
+        pytest.skip("sem o bash do Git")
+    bash = shutil.which("bash")
+    if not bash:
+        pytest.skip("sem bash")
+    return bash
+
+
 def test_tarefa_repassa_o_codigo_de_saida(tmp_path):
-    ambiente = {**os.environ, "TAREFA_LOG": str(tmp_path / "agendador.log")}
-    ok = subprocess.run(
-        ["cmd", "/c", str(DEPLOY / "tarefa.bat"), "check"], env=ambiente, timeout=120
-    )
-    falha = subprocess.run(
-        ["cmd", "/c", str(DEPLOY / "tarefa.bat"), "comando_que_nao_existe"],
-        env=ambiente,
-        timeout=120,
-    )
+    ambiente = {
+        **os.environ,
+        "TAREFA_LOG": (tmp_path / "agendador.log").as_posix(),
+        "TAREFA_PYTHON": Path(sys.executable).as_posix(),
+    }
+    script = (DEPLOY / "tarefa.sh").as_posix()
+    ok = subprocess.run([_bash(), script, "check"], env=ambiente, timeout=120)
+    falha = subprocess.run([_bash(), script, "comando_que_nao_existe"], env=ambiente, timeout=120)
     assert ok.returncode == 0 and falha.returncode != 0
     log = (tmp_path / "agendador.log").read_text(encoding="utf-8", errors="replace")
     assert "=== " in log and "comando_que_nao_existe" in log
 
 
-def test_tarefa_forca_utf8_antes_do_python():
-    linhas = (DEPLOY / "tarefa.bat").read_text(encoding="utf-8").splitlines()
-    ambiente = next(i for i, linha in enumerate(linhas) if "PYTHONIOENCODING=utf-8" in linha)
-    python = next(i for i, linha in enumerate(linhas) if "python.exe" in linha)
-    assert ambiente < python
+def test_guias_nao_citam_mais_o_windows():
+    for nome in ("INSTALACAO.md", "VIRADA.md"):
+        texto = (DEPLOY / nome).read_text(encoding="utf-8")
+        for resto in (r".venv\Scripts", "nssm", "schtasks", ".bat", "C:\\"):
+            assert resto not in texto, (nome, resto)
 
 
-def test_tarefa_do_estoque_nao_depende_do_idioma_do_windows():
-    # O schtasks /XML recusa a declaração UTF-8, e o /D traduz os dias com o Windows.
-    dados = (DEPLOY / "tarefa-estoque.xml").read_bytes()
-    assert dados.isascii() and b"<?xml" not in dados
-    ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
-    tarefa = ElementTree.fromstring(dados)
-    gatilho = tarefa.find("t:Triggers/t:CalendarTrigger", ns)
-    dias = [d.tag.split("}")[1] for d in gatilho.find("t:ScheduleByWeek/t:DaysOfWeek", ns)]
-    assert dias == ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    assert gatilho.findtext("t:StartBoundary", namespaces=ns).endswith("T07:00:00")
-    assert gatilho.findtext("t:Repetition/t:Interval", namespaces=ns) == "PT30M"
-    assert gatilho.findtext("t:Repetition/t:Duration", namespaces=ns) == "PT10H1M"
-    acao = tarefa.find("t:Actions/t:Exec", ns)
-    assert acao.findtext("t:Command", namespaces=ns) == r"C:\CentralAlmoxarifado\deploy\tarefa.bat"
-    assert acao.findtext("t:Arguments", namespaces=ns) == "importar_estoque"
+def test_instalacao_cobre_os_dois_servidores_e_o_firewall():
     guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
-    assert r"/XML C:\CentralAlmoxarifado\deploy\tarefa-estoque.xml" in guia
-    assert "schtasks /Create" in guia and " /D " not in guia
+    for trecho in (
+        "WSL2",
+        "DOCKER-USER",
+        "PORTA_PUBLICADA",
+        "chown -R 1000:1000",
+        "docker compose run --rm web python manage.py createsuperuser",
+        "bash deploy/atualizar.sh",
+    ):
+        assert trecho in guia, trecho
+
+
+def test_firewall_da_vm_nao_derruba_o_ufw():
+    # O iptables-persistent remove o ufw no Ubuntu e grava as cadeias do próprio Docker: a regra
+    # do DOCKER-USER é reaplicada por uma unidade do systemd depois do Docker.
+    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
+    assert "iptables-persistent" not in guia and "netfilter-persistent" not in guia
+    assert "After=docker.service" in guia
+
+
+def test_virada_cita_a_secao_certa_da_conferencia():
+    instalacao = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
+    virada = (DEPLOY / "VIRADA.md").read_text(encoding="utf-8")
+    assert "## 10. Conferência depois de instalar" in instalacao
+    assert "conferência da\n      seção 10," in virada
+
+
+def test_instalacao_wsl_pede_atualizar_virtualizacao_e_senha_da_tarefa():
+    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
+    for trecho in (
+        "wsl --update",
+        "wsl --version",
+        "virtualização aninhada",
+        "quando a senha dessa conta mudar",
+    ):
+        assert trecho in guia, trecho
+    assert guia.index("wsl --version") < guia.index("systemd=true")
+
+
+def test_atualizar_avisa_da_variavel_nova_do_exemplo_sem_parar(tmp_path):
+    bash = _bash()
+    (tmp_path / "deploy").mkdir()
+    shutil.copy(DEPLOY / "atualizar.sh", tmp_path / "deploy" / "atualizar.sh")
+    (tmp_path / ".env.example").write_text("A=\nNOVA=1\n# COMENTADA=\nB=x\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("A=1\nB=2\n", encoding="utf-8")
+    (tmp_path / ".env.banco.example").write_text("SENHA=\n", encoding="utf-8")
+    (tmp_path / ".env.banco").write_text("SENHA=1\n", encoding="utf-8")
+    # git e docker viram funções exportadas que não fazem nada: só o aviso é o que se confere.
+    script = str(tmp_path / "deploy" / "atualizar.sh")
+    comando = f'git() {{ :; }}; docker() {{ :; }}; export -f git docker; bash "{script}"'
+    r = subprocess.run(
+        [bash, "-c", comando],
+        env=os.environ,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "NOVA" in r.stderr and "falta no .env:" in r.stderr
+    assert "COMENTADA" not in r.stderr and "SENHA" not in r.stderr
+    (tmp_path / ".env").write_text("A=1\nB=2\nNOVA=3\n", encoding="utf-8")
+    r = subprocess.run(
+        [bash, "-c", comando],
+        env=os.environ,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert "AVISO" not in r.stderr

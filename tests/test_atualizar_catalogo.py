@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from datetime import timedelta
 
 import pytest
@@ -59,6 +60,26 @@ def test_disparo_grava_a_saida_do_processo_num_arquivo_de_log(monkeypatch, setti
     assert arquivos[0].name == str(tmp_path / "atualizar_catalogo.log")
     assert arquivos[0].closed  # o processo filho herda o arquivo; o pai fecha a sua cópia
     assert (tmp_path / "atualizar_catalogo.log").exists()
+
+
+def test_disparo_fora_do_windows_abre_sessao_propria(monkeypatch):
+    """No container, o robô fica numa sessão própria: não recebe os sinais do grupo do
+    waitress, o paralelo do DETACHED_PROCESS do Windows."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    chamadas = []
+    monkeypatch.setattr(subprocess, "Popen", lambda args, **kw: chamadas.append(kw))
+    iniciar_atualizacao()
+    assert chamadas[0]["start_new_session"] is True
+    assert chamadas[0]["creationflags"] == 0
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="flags do Windows")
+def test_disparo_no_windows_mantem_o_processo_desligado(monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(subprocess, "Popen", lambda args, **kw: chamadas.append(kw))
+    iniciar_atualizacao()
+    assert chamadas[0]["start_new_session"] is False
+    assert chamadas[0]["creationflags"] & subprocess.DETACHED_PROCESS
 
 
 def test_disparo_recusa_com_importacao_em_andamento(monkeypatch):

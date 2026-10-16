@@ -441,12 +441,15 @@ def test_formulario_tem_o_titulo_publico(client, fluxo, titulo):
     assert "Formulário" not in r[: r.index("<h1>")].split("<body", 1)[-1]
 
 
-def test_formulario_oferece_esquecer_os_dados_lembrados(client):
+def test_formulario_oferece_limpar_nome_e_destino_dentro_do_campo(client):
     r = client.get(reverse("pedidos:formulario", args=["limpeza"])).text
-    botao = r[: r.index("Não é você? Limpar")]
-    botao = botao[botao.rindex("<button") :]
-    assert 'type="button"' in botao and "data-esquecer-solicitante" in botao
-    assert "hidden" in botao  # o pedidos.js mostra quando preencheu algo
+    for campo in ("solicitante", "destino"):
+        i = r.index(f'data-limpar-campo="{campo}"')
+        botao = r[r.rindex("<button", 0, i) : r.index("</button>", i)]
+        assert 'type="button"' in botao and "hidden" in botao  # o pedidos.js mostra com valor
+        # O botão fica dentro do campo (.com-acao), logo depois do input.
+        antes = r[: r.rindex("<button", 0, i)]
+        assert antes.rstrip().endswith(">") and f'id="{campo}"' in antes[antes.rindex("com-acao") :]
 
 
 def test_sucesso_diz_o_que_lembrar_no_aparelho(client, django_capture_on_commit_callbacks):
@@ -470,7 +473,7 @@ def test_pedidos_js_lembra_so_no_aparelho_e_com_cuidado():
 
     js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
     assert '"almoxarifado.solicitante"' in js
-    assert "[data-lembrar-solicitante]" in js and "[data-esquecer-solicitante]" in js
+    assert "[data-lembrar-solicitante]" in js and "[data-limpar-campo]" in js
     # O nome é gravado enquanto se digita, não só depois do envio.
     digitar = js[js.index("// O último nome escrito, mesmo sem enviar o pedido") :]
     digitar = digitar[: digitar.index("\n  });")]

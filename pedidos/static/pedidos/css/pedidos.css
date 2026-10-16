@@ -556,8 +556,12 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 .formulario-pedido .campo-com-erro .campo-entrada:focus { box-shadow: 0 0 0 3px var(--erro-superficie); }
 
 /* "Não é você? Limpar" (nome e destino lembrados), discreto e com área de toque de 44px. */
-.botao-esquecer { justify-self: start; min-height: var(--altura-controle); padding-left: 0; text-decoration: underline; text-underline-offset: 2px; }
-.botao-esquecer[hidden] { display: none; }
+/* "Limpar" dentro do campo (nome e destino): no destino, à esquerda da seta do dropdown. */
+.acao-limpar { right: 10px; }
+.com-acao:has(.acao-limpar:not([hidden])) .campo-entrada { padding-right: 96px; text-overflow: ellipsis; }
+.com-acao:has(.dropdown) .acao-limpar { right: 40px; }
+/* O wrapper do dropdown já reserva os 44px da seta: o campo só cobre o resto até o botão. */
+.com-acao:has(.dropdown):has(.acao-limpar:not([hidden])) .campo-entrada { padding-right: 84px; }
 
 /* "Adicionado" no lugar do "Adicionar" por 2 s. */
 .botao-adicionado { color: var(--ok-texto); background: var(--ok-superficie); border-color: transparent; }

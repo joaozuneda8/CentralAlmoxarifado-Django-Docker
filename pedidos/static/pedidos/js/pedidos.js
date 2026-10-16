@@ -765,8 +765,9 @@
 
   // Nome e destino lembrados neste aparelho (só neste navegador, nunca no servidor). O nome é
   // gravado enquanto se digita; a tela de sucesso (`data-lembrar-*`) grava os dois. O formulário
-  // novo preenche os campos que estiverem vazios (o destino só se ainda estiver na lista) e mostra
-  // "Não é você? Limpar". Sem armazenamento (aba anônima, bloqueado), nada acontece.
+  // novo preenche os campos que estiverem vazios (o destino só se ainda estiver na lista). Cada campo
+  // tem o seu "Limpar" (`data-limpar-campo`), visível enquanto ele tem valor, que apaga o campo e o
+  // que ficou lembrado dele. Sem armazenamento (aba anônima, bloqueado), nada é lembrado.
   var CHAVE_LEMBRADO = "almoxarifado.solicitante";
 
   function lerLembrado() {
@@ -799,28 +800,33 @@
       return;
     }
     var form = document.querySelector("[data-formulario-pedido]");
-    var botao = form && form.querySelector("[data-esquecer-solicitante]");
+    if (!form) return;
+    mostrarLimpar(form);
     // Só no formulário novo: depois de um envio recusado, os campos ficam como a pessoa deixou.
-    if (!botao || form.hasAttribute("data-lembrado-aplicado")) return;
+    if (form.hasAttribute("data-lembrado-aplicado")) return;
     if (form.querySelector("[data-resumo-erros]")) return;
     form.setAttribute("data-lembrado-aplicado", "");
     var dados = lerLembrado();
     if (!dados) return;
     var nome = form.querySelector("#solicitante");
     var destino = form.querySelector("#destino");
-    var preencheu = false;
     if (nome && !nome.value && typeof dados.solicitante === "string" && dados.solicitante) {
       preencher(nome, dados.solicitante);
-      preencheu = true;
     }
     var opcoes = Array.prototype.map.call(document.querySelectorAll("#destinos option"), function (o) {
       return o.value;
     });
     if (destino && !destino.value && opcoes.indexOf(dados.destino) !== -1) {
       preencher(destino, dados.destino);
-      preencheu = true;
     }
-    botao.hidden = !preencheu;
+  }
+
+  // O "Limpar" de cada campo só aparece com o campo preenchido.
+  function mostrarLimpar(form) {
+    Array.prototype.forEach.call(form.querySelectorAll("[data-limpar-campo]"), function (botao) {
+      var campo = form.querySelector("#" + botao.getAttribute("data-limpar-campo"));
+      botao.hidden = !campo || !campo.value;
+    });
   }
 
   document.addEventListener("DOMContentLoaded", aplicarLembrado);
@@ -829,7 +835,9 @@
   // O último nome escrito, mesmo sem enviar o pedido; apagar o campo esquece o nome.
   document.addEventListener("input", function (e) {
     var nome = e.target;
-    if (nome.id !== "solicitante" || !nome.closest("[data-formulario-pedido]")) return;
+    var formulario = nome.closest && nome.closest("[data-formulario-pedido]");
+    if (formulario) mostrarLimpar(formulario);
+    if (nome.id !== "solicitante" || !formulario) return;
     var dados = lerLembrado() || {};
     var valor = nome.value.trim();
     if (valor) dados.solicitante = valor;
@@ -838,18 +846,25 @@
     else esquecerLembrado();
   });
 
+  // Escolher um destino na lista dispara só "change".
+  document.addEventListener("change", function (e) {
+    var form = e.target.closest && e.target.closest("[data-formulario-pedido]");
+    if (form) mostrarLimpar(form);
+  });
+
   document.addEventListener("click", function (e) {
-    var botao = e.target.closest && e.target.closest("[data-esquecer-solicitante]");
+    var botao = e.target.closest && e.target.closest("[data-limpar-campo]");
     if (!botao) return;
     var form = botao.closest("[data-formulario-pedido]");
-    ["#solicitante", "#destino"].forEach(function (seletor) {
-      var campo = form && form.querySelector(seletor);
-      if (campo) preencher(campo, "");
-    });
-    esquecerLembrado();
-    botao.hidden = true;
-    var nome = form && form.querySelector("#solicitante");
-    if (nome) nome.focus();
+    var chave = botao.getAttribute("data-limpar-campo");
+    var campo = form && form.querySelector("#" + chave);
+    if (!campo) return;
+    preencher(campo, "");
+    var dados = lerLembrado() || {};
+    delete dados[chave];
+    if (dados.solicitante || dados.destino) gravarLembrado(dados);
+    else esquecerLembrado();
+    campo.focus();
   });
 
   // "Seu pedido" (_resumo_pedido.html, _carrinho.html). Sem largura para a coluna ao lado dos

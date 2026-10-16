@@ -998,10 +998,12 @@
     if (barra && !primeiraVez) barra.classList.add("carrinho-barra-pulso");
   }
 
-  // Adicionar em dois passos (formulários públicos e saída avulsa, _resultados.html): "Adicionar" abre a
-  // quantidade do material (uma aberta por vez), já com a do pedido se ele estiver lá; "Confirmar"
-  // manda ao servidor como antes, e "Atualizar" (material já no pedido) troca a quantidade da linha
-  // do pedido, sem somar. Esc ou o ✕ fecham. Sem JavaScript, a quantidade fica sempre à vista.
+  // Adicionar em dois passos (formulários públicos e saída avulsa, _resultados.html): tocar na linha do
+  // material abre a quantidade (uma aberta por vez; tocar de novo na linha aberta a fecha), já com a do
+  // pedido se ele estiver lá; "Confirmar" manda ao servidor como antes, e "Atualizar" (material já no
+  // pedido) troca a quantidade da linha do pedido, sem somar. Esc ou o ✕ fecham. Com um aberto, as
+  // outras linhas ficam recuadas (pedidos.css), mas clicáveis. Sem JavaScript, a quantidade fica sempre
+  // à vista.
   var DURACAO_FEITO = 2000;
 
   function nomeDoMaterial(item) {
@@ -1020,26 +1022,34 @@
     return null;
   }
 
-  // Rótulo do "Adicionar" de cada resultado: com o material no pedido, "Alterar (N)", que faz as
-  // vezes do selo "No pedido" (a linha não ganha nada que mude a altura).
+  // Selo "N no pedido" de cada resultado (ao lado da informação do material) e o rótulo do botão que
+  // abre a linha para o leitor de tela: com o material no pedido, "Alterar …, N no pedido".
   function rotularAbrir(item) {
     var abrir = item && item.querySelector("[data-adicionar-abrir]");
-    if (!abrir || abrir.hasAttribute("data-feito")) return;
+    if (!abrir) return;
     var noPedido = campoNoPedido(item);
     var nome = nomeDoMaterial(item);
-    if (noPedido) {
-      abrir.textContent = "Alterar (" + noPedido.defaultValue + ")";
-      abrir.setAttribute("aria-label", "Alterar " + nome + ", " + noPedido.defaultValue + " no pedido");
-    } else {
-      abrir.textContent = "Adicionar";
-      abrir.setAttribute("aria-label", "Adicionar " + nome);
+    var selo = item.querySelector("[data-selo-pedido]");
+    if (selo) {
+      selo.hidden = !noPedido;
+      if (noPedido) selo.querySelector("[data-selo-texto]").textContent = noPedido.defaultValue + " no pedido";
     }
+    abrir.setAttribute(
+      "aria-label",
+      noPedido ? "Alterar " + nome + ", " + noPedido.defaultValue + " no pedido" : "Adicionar " + nome
+    );
+  }
+
+  // O botão que abre a linha fica dentro do material (não da ação, que só existe aberta).
+  function botaoDeAbrir(acao) {
+    var item = acao && acao.closest("li");
+    return item && item.querySelector("[data-adicionar-abrir]");
   }
 
   function fecharQuantidade(acao, devolverFoco) {
     if (!acao || !acao.classList.contains("aberto")) return;
     acao.classList.remove("aberto");
-    var abrir = acao.querySelector("[data-adicionar-abrir]");
+    var abrir = botaoDeAbrir(acao);
     if (!abrir) return;
     abrir.setAttribute("aria-expanded", "false");
     if (devolverFoco) abrir.focus();
@@ -1057,19 +1067,28 @@
     confirmar.setAttribute("aria-label", rotulo + " " + nomeDoMaterial(item));
     acao.toggleAttribute("data-atualizar", !!noPedido);
     acao.classList.add("aberto");
-    acao.querySelector("[data-adicionar-abrir]").setAttribute("aria-expanded", "true");
+    botaoDeAbrir(acao).setAttribute("aria-expanded", "true");
     campo.focus();
     var fim = campo.value.length; // cursor no fim do número, sem selecioná-lo
     campo.setSelectionRange(fim, fim);
   }
 
-  // Retorno de quem confirmou: o "Adicionar" (ou o botão do painel do atendimento) mostra o feito por 2 s
-  // e o leitor de tela ouve o nome do material.
+  // Retorno de quem confirmou: o selo "no pedido" pisca por 2 s (nas linhas em dois passos, sem
+  // botão) ou o botão do painel do atendimento mostra o feito; o leitor de tela ouve o nome do material.
   function mostrarFeito(item, botao, texto) {
     var anuncio = document.querySelector("[data-anuncio-adicionado]");
     var nome = nomeDoMaterial(item);
     if (anuncio && nome) anuncio.textContent = nome + (texto === "Adicionado" ? " adicionado." : ": quantidade atualizada.");
-    if (!botao) return;
+    if (!botao) {
+      var selo = item && item.querySelector("[data-selo-pedido]");
+      if (!selo) return;
+      selo.classList.add("selo-pulso");
+      clearTimeout(selo._voltar);
+      selo._voltar = setTimeout(function () {
+        selo.classList.remove("selo-pulso");
+      }, DURACAO_FEITO);
+      return;
+    }
     if (!botao.hasAttribute("data-feito")) botao.setAttribute("data-original", botao.innerHTML);
     botao.setAttribute("data-feito", "");
     botao.textContent = texto; // sem ícone: cabe na largura fixa do botão (a linha não muda de altura)
@@ -1088,7 +1107,11 @@
     var alvo = e.target;
     if (!alvo || !alvo.closest) return;
     var abrir = alvo.closest("[data-adicionar-abrir]");
-    if (abrir) return abrirQuantidade(abrir.closest("[data-adicionar]"));
+    if (abrir) {
+      var acao = abrir.closest("li").querySelector("[data-adicionar]");
+      // Tocar de novo na linha aberta a fecha.
+      return acao.classList.contains("aberto") ? fecharQuantidade(acao, true) : abrirQuantidade(acao);
+    }
     var cancelar = alvo.closest("[data-adicionar-cancelar]");
     if (cancelar) fecharQuantidade(cancelar.closest("[data-adicionar]"), true);
   });
@@ -1125,7 +1148,7 @@
     if (!acao.isConnected) return;
     if (document.querySelector("#carrinho [data-carrinho-alerta].aviso-erro")) return;
     fecharQuantidade(acao, true);
-    mostrarFeito(acao.closest("li"), acao.querySelector("[data-adicionar-abrir]"), "Atualizado");
+    mostrarFeito(acao.closest("li"), null, "Atualizado");
   });
 
   // "Confirmar": o HTMX 4 dispara o `htmx:after:swap` no botão que fez a requisição (ele fica na
@@ -1139,7 +1162,7 @@
     var acao = botao.closest("[data-adicionar]");
     if (!acao) return mostrarFeito(item, botao, "Adicionado"); // um passo só
     fecharQuantidade(acao, true);
-    mostrarFeito(item, acao.querySelector("[data-adicionar-abrir]"), "Adicionado");
+    mostrarFeito(item, null, "Adicionado");
   }
   document.addEventListener("htmx:after:swap", avisarAdicionado);
 

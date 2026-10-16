@@ -235,8 +235,8 @@ def test_resultados_marcaveis_pelo_codigo(client):
     r = client.get(reverse("pedidos:materiais", args=["ab"]), {"q": "fita"})
     assert '<p class="rotulo-secao">Resultados da busca</p>' in r.text
     assert 'data-codigo="016.005.010"' in r.text
-    # O "no pedido" vai no botão ("Alterar (3)"), sem selo nem linha reservada para ele, também
-    # na saída avulsa.
+    # O "no pedido" vai no selo `data-selo-pedido` (escondido; o pedidos.js o mostra), não num
+    # atributo da linha, também na saída avulsa.
     assert "data-no-pedido" not in r.text
     client.force_login(get_user_model().objects.create_user(username="12345", password="x"))
     avulsa = client.get(reverse("pedidos:avulsa_materiais"), {"q": "item"}).text
@@ -500,15 +500,22 @@ def test_pedidos_js_avisa_o_adicionado():
 
 @pytest.mark.django_db
 def test_resultado_publico_adiciona_em_dois_passos(client):
-    # Com JavaScript, cada resultado mostra só "Adicionar"; ele abre a quantidade, que se
-    # confirma. Sem JavaScript, a quantidade e o botão (que diz "Adicionar") ficam à vista.
+    # Com JavaScript, tocar na linha do material (o botão `material-abrir`, dentro dos dados) abre a
+    # quantidade, que se confirma; o selo "no pedido" fica ao lado da informação. Sem JavaScript, a
+    # quantidade e o botão (que diz "Adicionar") ficam à vista.
     montar_cenario()
     r = client.get(reverse("pedidos:materiais", args=["ab"]), {"q": "fita"}).text
-    acao = r[r.index('<div class="material-acao" data-adicionar>') :]
-    acao = acao[: acao.index("</li>")]
-    abrir = acao[acao.index("<button") : acao.index("</button>")]
+    item = r[r.index('<li class="material"') :]
+    item = item[: item.index("</li>")]
+    dados = item[: item.index('<div class="material-acao"')]
+    abrir = dados[dados.index('<button type="button" class="material-abrir"') :]
+    abrir = abrir[: abrir.index("</button>")]
     assert "data-adicionar-abrir" in abrir and 'aria-expanded="false"' in abrir
     assert 'aria-controls="qtd-area-1"' in abrir and ">Adicionar" in abrir
+    assert "data-selo-pedido" in dados and "hidden" in dados[dados.index("data-selo-pedido") :]
+    assert 'class="material-mais" aria-hidden="true"' in dados
+    acao = item[item.index('<div class="material-acao" data-adicionar>') :]
+    assert "data-adicionar-abrir" not in acao  # o botão não está mais na linha da ação
     area = acao[acao.index('<div class="material-qtd" id="qtd-area-1">') :]
     assert '<div class="quantidade">' in area
     confirmar = area[area.index("data-adicionar-confirmar") :]
@@ -538,7 +545,7 @@ def test_pedidos_js_abre_confirma_e_cancela_a_quantidade():
     ):
         assert gancho in js
     assert '"Confirmar"' in js and '"Atualizar"' in js and '"Escape"' in js
-    assert '"Alterar ("' in js  # quantidade no pedido no próprio botão
+    assert '" no pedido"' in js  # selo "N no pedido" ao lado da informação
 
 
 @pytest.mark.django_db

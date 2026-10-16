@@ -143,15 +143,17 @@ transações precisam se comportar como no servidor.
   ao digitar) e o destino do último pedido registrado (gravado pela tela de sucesso,
   `data-lembrar-*`), preenche só campos vazios e pede confirmação (`beforeunload`) para
   sair com material no pedido. Nos formulários públicos e na saída avulsa, adicionar tem dois passos
-  (`[data-adicionar]` em `_resultados.html`): "Adicionar" abre a quantidade, que se confirma (o
-  `hx-post` de sempre) ou, com o material já no pedido ("Alterar (N)"), "Atualizar" troca a linha
-  do pedido; sem JavaScript a quantidade fica à vista, e o painel do atendimento (`um_passo`)
-  adiciona ou troca direto. Com JavaScript, a ação fica numa linha no pé da célula, em três slots
-  fixos (quantidade, botão, ✕): "Adicionar" e "Confirmar" ocupam o mesmo slot, e com o painel abaixo de
-  340px (container query em `.busca-painel`) o stepper e o ✕ encolhem para a linha caber. A coluna do
-  `.passo-corpo` é `minmax(0, 1fr)`, para a busca não alargar com o conteúdo. Há duas buscas de
-  materiais: a pública (formulários) não mostra código nem grupo; a do almoxarifado (saída avulsa e
-  atendimento) mostra. A quantidade de cada
+  (`[data-adicionar]` em `_resultados.html`): tocar na linha do material (o `material-abrir`, um botão
+  transparente esticado sobre a linha; o "+" só indica que clica) abre a quantidade, que se confirma
+  (o `hx-post` de sempre) ou, com o material já no pedido (selo azul claro "N no pedido" ao lado da
+  informação, `data-selo-pedido`), "Atualizar" troca a linha do pedido; tocar de novo na linha aberta a
+  fecha. Aberta, a linha mostra a quantidade à esquerda e o "Confirmar" no canto inferior direito, com o
+  ✕ vermelho no superior direito; as outras linhas recuam (opacidade 0,6) mas seguem clicáveis. A
+  informação do material quebra por dentro e o selo desce para a linha de baixo quando a unidade é
+  longa (limpeza). Sem JavaScript a quantidade fica à vista, e o painel do atendimento (`um_passo`)
+  adiciona ou troca direto, com botão. A coluna do `.passo-corpo` é `minmax(0, 1fr)`, para a busca não
+  alargar com o conteúdo. Há duas buscas de materiais: a pública (formulários) não mostra código nem
+  grupo; a do almoxarifado (saída avulsa e atendimento) mostra. A quantidade de cada
   linha do pedido segue o mesmo padrão (`[data-alterar]` em `_carrinho.html`): texto com "Alterar",
   e o campo só manda o `alterar` no "Confirmar" (`hx-trigger="confirmar-quantidade"`), também na
   saída avulsa.

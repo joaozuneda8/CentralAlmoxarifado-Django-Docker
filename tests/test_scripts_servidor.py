@@ -159,3 +159,22 @@ def test_firewall_da_vm_nao_derruba_o_ufw():
     guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
     assert "iptables-persistent" not in guia and "netfilter-persistent" not in guia
     assert "After=docker.service" in guia
+
+
+def test_virada_cita_a_secao_certa_da_conferencia():
+    instalacao = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
+    virada = (DEPLOY / "VIRADA.md").read_text(encoding="utf-8")
+    assert "## 10. Conferência depois de instalar" in instalacao
+    assert "conferência da\n      seção 10," in virada
+
+
+def test_instalacao_wsl_pede_atualizar_virtualizacao_e_senha_da_tarefa():
+    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
+    for trecho in (
+        "wsl --update",
+        "wsl --version",
+        "virtualização aninhada",
+        "quando a senha dessa conta mudar",
+    ):
+        assert trecho in guia, trecho
+    assert guia.index("wsl --version") < guia.index("systemd=true")

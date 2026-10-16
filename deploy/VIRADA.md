@@ -20,7 +20,7 @@ painel só simulam. Isso evita lançar duas vezes no SCPI as mesmas saídas pend
 ## 1. Instalação (André)
 
 - [ ] Instalar o sistema no servidor seguindo `deploy/INSTALACAO.md`, inclusive a conferência da
-      seção 11, **com `LANCAMENTO_REAL=0`** no `.env`.
+      seção 10, **com `LANCAMENTO_REAL=0`** no `.env`.
 - [ ] Confirmar que o painel mostra o aviso "Lançamento real bloqueado até a virada" e que, em
       Automações › Lançamento no SCPI, só a simulação está disponível.
 - [ ] Deixar `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` **vazios** no `.env` até a virada: um pedido de

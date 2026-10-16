@@ -49,21 +49,29 @@ administra o servidor.
 
 ### Caso B (Windows Server com WSL2)
 
-1. No PowerShell **como administrador**, instale o WSL2 com o Ubuntu e reinicie se pedir:
+1. Se o Windows Server for uma máquina virtual, o host precisa expor a virtualização aninhada à
+   VM (no Hyper-V: `Set-VMProcessor -VMName <nome da VM> -ExposeVirtualizationExtensions $true`,
+   com a VM desligada); sem ela o WSL2 não inicia.
+2. No PowerShell **como administrador**, instale o WSL2 com o Ubuntu e reinicie se pedir:
 
    ```powershell
    wsl --install -d Ubuntu-24.04
+   wsl --update
+   wsl --version
    ```
 
-2. No Ubuntu (menu Iniciar › Ubuntu), ligue o systemd, que mantém o Docker rodando:
+   O `wsl --version` precisa responder (versão do WSL 2.0 ou mais nova); o systemd do próximo
+   passo exige essa versão.
+
+3. No Ubuntu (menu Iniciar › Ubuntu), ligue o systemd, que mantém o Docker rodando:
 
    ```bash
    printf '[boot]\nsystemd=true\n' | sudo tee /etc/wsl.conf
    ```
 
    No PowerShell, `wsl --shutdown` e abra o Ubuntu de novo.
-3. Dentro do Ubuntu, instale o Docker Engine como no caso A.
-4. Faça o WSL2 subir com o servidor e continuar de pé sem ninguém conectado. No PowerShell
+4. Dentro do Ubuntu, instale o Docker Engine como no caso A.
+5. Faça o WSL2 subir com o servidor e continuar de pé sem ninguém conectado. No PowerShell
    **como administrador**, crie uma tarefa de inicialização que mantém a distribuição aberta
    (ela pede a senha da sua conta do Windows):
 
@@ -71,11 +79,15 @@ administra o servidor.
    $acao = New-ScheduledTaskAction -Execute "wsl.exe" -Argument "-d Ubuntu-24.04 --exec sleep infinity"
    $gatilho = New-ScheduledTaskTrigger -AtStartup
    $config = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
-   Register-ScheduledTask -TaskName "Central Almoxarifado WSL" -Action $acao -Trigger $gatilho -Settings $config -User "$env:USERDOMAIN\$env:USERNAME" -Password (Read-Host "Senha")
+   Register-ScheduledTask -TaskName "Central Almoxarifado WSL" -Action $acao -Trigger $gatilho -Settings $config -User "$env:USERDOMAIN\$env:USERNAME" -Password (Read-Host "Senha") -Force
    ```
 
    Sem isso, o Windows desliga o WSL2 quando ninguém o usa, e o sistema sai do ar.
-5. Reinicie o servidor uma vez e confira, no PowerShell, que o sistema subiu sozinho (depois da
+
+   A tarefa guarda a senha da conta: **quando a senha dessa conta mudar, a tarefa para de
+   funcionar** e o sistema não sobe mais depois de um reinício. Registre a tarefa de novo (rode o
+   `Register-ScheduledTask` acima com a senha nova) sempre que a senha mudar.
+6. Reinicie o servidor uma vez e confira, no PowerShell, que o sistema subiu sozinho (depois da
    seção 5): `curl.exe -I http://127.0.0.1:8010/almoxarifado/` responde.
 
 Tudo o que vem depois é no terminal do Ubuntu. Guarde o sistema dentro do Linux (`/srv`), nunca

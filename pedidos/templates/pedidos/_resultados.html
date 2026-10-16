@@ -1,5 +1,5 @@
 {% load interface_extras %}
-<div class="resultados-cabecalho"><p class="rotulo-secao">Resultados da busca</p><p class="texto-secundario texto-pequeno">{% if not total %}Nenhum material encontrado.{% elif total > resultados|length %}Mostrando {{ resultados|length }} de {{ total|separador_milhar }} — refine a busca ou use os filtros.{% elif total == 1 %}1 material{% else %}{{ total|separador_milhar }} materiais{% endif %}</p></div>
+<div class="resultados-cabecalho"><p class="rotulo-secao">Resultados da busca</p>{% if not total %}<p class="texto-secundario texto-pequeno">Nenhum material encontrado.</p>{% endif %}</div>
 {% if resultados %}
 <ul class="lista-materiais">
   {% for r in resultados %}

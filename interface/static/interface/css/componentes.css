@@ -394,7 +394,8 @@ html:not(.js) .filtros-alternar { display: none; }
 .passo { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--esp-1) var(--esp-3); }
 .passo-numero { font-family: var(--fonte-titulo); font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: var(--texto-suave); }
 .passo-cabecalho { display: grid; gap: var(--esp-meio); align-content: start; }
-.passo-corpo { grid-column: 2; display: grid; gap: var(--esp-2); }
+/* Coluna `minmax(0, 1fr)`: a implícita seria `auto`, que cresce até o mínimo do conteúdo e alarga o passo. */
+.passo-corpo { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--esp-2); }
 @media (max-width: 640px) { .passo { grid-template-columns: minmax(0, 1fr); } .passo-corpo { grid-column: 1; } }
 /* No tablet, na área interna (saída avulsa), o número fica ao lado do título e o corpo usa a
    largura toda do cartão, sem a coluna de 64px só para o número. */

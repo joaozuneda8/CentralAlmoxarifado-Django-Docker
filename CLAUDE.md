@@ -146,7 +146,12 @@ transações precisam se comportar como no servidor.
   (`[data-adicionar]` em `_resultados.html`): "Adicionar" abre a quantidade, que se confirma (o
   `hx-post` de sempre) ou, com o material já no pedido ("Alterar (N)"), "Atualizar" troca a linha
   do pedido; sem JavaScript a quantidade fica à vista, e o painel do atendimento (`um_passo`)
-  adiciona ou troca direto. A quantidade de cada
+  adiciona ou troca direto. Com JavaScript, a ação fica numa linha no pé da célula, em três slots
+  fixos (quantidade, botão, ✕): "Adicionar" e "Confirmar" ocupam o mesmo slot, e com o painel abaixo de
+  340px (container query em `.busca-painel`) o stepper e o ✕ encolhem para a linha caber. A coluna do
+  `.passo-corpo` é `minmax(0, 1fr)`, para a busca não alargar com o conteúdo. Há duas buscas de
+  materiais: a pública (formulários) não mostra código nem grupo; a do almoxarifado (saída avulsa e
+  atendimento) mostra. A quantidade de cada
   linha do pedido segue o mesmo padrão (`[data-alterar]` em `_carrinho.html`): texto com "Alterar",
   e o campo só manda o `alterar` no "Confirmar" (`hx-trigger="confirmar-quantidade"`), também na
   saída avulsa.

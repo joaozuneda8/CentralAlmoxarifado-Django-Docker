@@ -578,25 +578,37 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 /* Sem espaço na linha (tela estreita), o "Adicionar" desce em vez de sair do painel. */
 .lista-materiais .material-acao { flex-wrap: wrap; }
 
-/* Adicionar em dois passos (formulários públicos, pedidos.js): fechado, só o "Adicionar"; aberto, a
-   quantidade com "Confirmar" (ou "Atualizar") e o ✕ ocupam a linha toda. Sem JavaScript, a
-   quantidade fica à vista e o ✕ e o "Adicionar" de abrir não aparecem. */
+/* Adicionar em dois passos (formulários públicos, pedidos.js): o nome ocupa a largura toda e a linha de
+   ação fica no pé da célula, em três slots fixos: quantidade, botão e ✕. Fechado, o "Adicionar" ocupa
+   o slot do botão; aberto, o "Confirmar" (ou "Atualizar") toma o mesmo lugar, com a mesma largura, e a
+   quantidade e o ✕ aparecem nos slots vizinhos: o botão não muda de lugar ao ser tocado. Sem
+   JavaScript, a quantidade fica à vista e o ✕ e o "Adicionar" de abrir não aparecem. */
 .material-qtd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
 .material-abrir, .material-cancelar { display: none; }
 .js [data-adicionar] .material-abrir { display: inline-flex; }
-/* Largura fixa (a do rótulo mais largo, "Adicionado"/"Atualizado"): trocar o rótulo não estreita
-   o nome ao lado nem muda a altura da linha. */
 .material-abrir { flex: none; width: 7.5em; padding-inline: var(--esp-1); white-space: nowrap; }
+.js .material:has([data-adicionar]) { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
+.js [data-adicionar] {
+  --slot-qtd: 146px; --slot-x: 44px;
+  display: grid; grid-template-columns: var(--slot-qtd) minmax(0, 1fr) var(--slot-x); align-items: center; gap: var(--esp-1);
+}
+/* Largura do slot (a do rótulo mais largo, "Adicionado"/"Atualizado"): trocar o rótulo não muda o botão. */
+.js [data-adicionar] .material-abrir { grid-column: 2; width: 100%; min-width: 0; }
 .js [data-adicionar] .material-qtd { display: none; }
-.js [data-adicionar].aberto { flex-basis: 100%; }
 .js [data-adicionar].aberto .material-abrir { display: none; }
-.js [data-adicionar].aberto .material-qtd { display: flex; width: 100%; }
-.js [data-adicionar].aberto .material-cancelar { display: inline-flex; width: var(--altura-controle); min-height: var(--altura-controle); }
-.js [data-adicionar].aberto [data-adicionar-confirmar] { flex: 1 1 0; min-width: 0; padding-inline: var(--esp-1); }
-.js [data-adicionar].aberto .material-qtd { flex-wrap: nowrap; }
-/* Fechado, o "Adicionar" fica ao lado do nome, sem uma linha só para ele. */
-.js .material:has([data-adicionar]:not(.aberto)) { flex-wrap: nowrap; align-items: flex-start; }
-.js .material:has([data-adicionar]:not(.aberto)) .material-dados { flex: 1 1 0; }
+.js [data-adicionar].aberto .material-qtd { display: contents; }
+.js [data-adicionar].aberto .quantidade { grid-column: 1; }
+.js [data-adicionar].aberto [data-adicionar-confirmar] { grid-column: 2; width: 100%; min-width: 0; padding-inline: var(--esp-1); }
+.js [data-adicionar].aberto .material-cancelar { grid-column: 3; display: inline-flex; width: var(--slot-x); min-height: var(--altura-controle); }
+/* Painel estreito (celular em pé, coluna ao lado da barra): o stepper e o ✕ encolhem para a linha
+   caber sem passar da célula (a 320px, 254px úteis); o painel é o contêiner da consulta. */
+.js .busca-painel { container-type: inline-size; }
+@container (max-width: 339px) {
+  .js [data-adicionar] { --slot-qtd: 116px; --slot-x: 36px; gap: 6px; }
+  .js [data-adicionar] .quantidade .botao-icone { width: 34px; }
+  .js [data-adicionar] .quantidade-campo { width: 46px; }
+  .js [data-adicionar] .material-abrir, .js [data-adicionar] [data-adicionar-confirmar] { padding-inline: 4px; }
+}
 /* O − / + só funciona com o pedidos.js: sem JavaScript, fica só o campo da quantidade. */
 html:not(.js) [data-quantidade] { display: none; }
 

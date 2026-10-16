@@ -19,6 +19,10 @@ html:not([data-gaveta]) .pedido-resumo .carrinho-gaveta { padding: 0; background
    no celular, os alvos de toque seguem com 44px.) */
 html:not([data-gaveta]) .pedido-resumo > #carrinho { scrollbar-width: thin; }
 html:not([data-gaveta]) .pedido-resumo .carrinho-cabecalho { position: sticky; top: 0; z-index: 1; padding-bottom: var(--esp-1); background: var(--destaque-superficie); }
+/* Divisores do pedido: o --borda cinza some sobre o fundo azul do cartão; um azul mais marcado separa
+   os materiais (e fecha o último) na coluna ao lado e na gaveta. */
+.carrinho-lista .carrinho-linha { border-top-color: rgba(37, 99, 235, 0.3); }
+.carrinho-lista .carrinho-linha:last-child { border-bottom: 1px solid rgba(37, 99, 235, 0.3); }
 html:not([data-gaveta]) .pedido-resumo .carrinho-linha { padding: 8px 0; gap: var(--esp-meio) var(--esp-1); }
 html:not([data-gaveta]) .pedido-resumo .quantidade .botao-icone { width: 30px; height: 30px; }
 html:not([data-gaveta]) .pedido-resumo .quantidade-campo { width: 44px; min-height: 30px; font-size: 15px; }

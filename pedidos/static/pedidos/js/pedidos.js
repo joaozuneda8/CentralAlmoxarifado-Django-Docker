@@ -1281,17 +1281,16 @@
   function abrirPainel() {
     var p = painel();
     if (!p) return;
-    if (p.classList.contains("fechando")) {
-      // Reaberto no meio da saída: fica aberto, sem repetir a entrada.
-      p.classList.remove("fechando");
-      p.removeEventListener("animationend", p._fimFechamento);
+    // O abrir e fechar animados são os da base dos dropdowns (dropdown.js, `.painel-flutuante`).
+    var estado = window.Dropdown.abrirPainel(p);
+    // Reaberto no meio da saída: fica aberto, sem repetir a entrada.
+    if (estado === "reaberto") {
       var campo = document.getElementById("busca-q");
       if (campo) campo.setAttribute("aria-expanded", "true");
       return;
     }
-    if (p.classList.contains("aberto")) return;
+    if (estado === "ja") return;
     posicionarPainel();
-    p.classList.add("aberto");
     var busca = document.getElementById("busca-q");
     if (busca) busca.setAttribute("aria-expanded", "true");
     trazerAoTopo(document.querySelector(".busca-principal"), caberNaTela);
@@ -1299,22 +1298,7 @@
 
   function fecharPainel(devolverFoco) {
     var p = painel();
-    if (!p || !p.classList.contains("aberto") || p.classList.contains("fechando")) return;
-    var fim = function (e) {
-      if (e && e.target !== p) return; // animação de algo dentro do painel
-      p.removeEventListener("animationend", fim);
-      if (!p.classList.contains("fechando")) return;
-      p.classList.remove("fechando", "aberto");
-      soltarLimite();
-    };
-    // A saída anima (pedidos.css); o painel some de vez quando ela acaba. Sem animação (reduzir
-    // movimento), some na hora.
-    p._fimFechamento = fim;
-    p.addEventListener("animationend", fim);
-    p.classList.add("fechando");
-    if (getComputedStyle(p).animationName === "none") fim();
-    // Reserva: com a aba em segundo plano a animação não roda e o `animationend` não vem.
-    else setTimeout(fim, 250);
+    if (!p || !window.Dropdown.fecharPainel(p, soltarLimite)) return;
     var busca = document.getElementById("busca-q");
     esconderDica();
     if (!busca) return;
@@ -1356,7 +1340,7 @@
       var campo = e.target;
       if (campo.id !== "busca-q" || !aoToque()) return;
       var p = painel();
-      var aberto = p && p.classList.contains("aberto") && !p.classList.contains("fechando");
+      var aberto = p && window.Dropdown.painelAberto(p);
       if (aberto && campo.getAttribute("inputmode") === "none") {
         // Segundo toque: o teclado só sobe quando o campo ganha o foco de novo, dentro do clique.
         campo.removeAttribute("inputmode");

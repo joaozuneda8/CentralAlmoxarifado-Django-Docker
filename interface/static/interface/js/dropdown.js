@@ -1,19 +1,26 @@
 /*
- * Dropdown — o painel de opções dos selects e dos campos com lista (`datalist`), no mesmo
- * estilo do painel de resultados da busca de materiais. Carregado com `defer` no <head>.
+ * Dropdown — a base de todo painel que abre embaixo de um campo, no estilo do painel de
+ * resultados da busca de materiais. Carregado com `defer` no <head>.
  *
  * Melhoria progressiva: o <select> ou <input list> original continua na página e é ele quem
  * guarda o valor, dispara `change` e vai no envio do formulário (HTMX e testes não mudam). O
  * script só o esconde e desenha o gatilho e o painel. Sem JavaScript, valem os nativos.
  *
- * - select.campo-entrada: gatilho (botão) + painel com as opções (grupos viram cabeçalhos);
- *   com mais de LIMITE_BUSCA opções, o painel ganha uma busca.
- * - input.campo-entrada[list]: o próprio campo filtra o painel enquanto se digita; o texto
- *   continua livre (quem valida é o servidor).
+ * A BASE (este arquivo + `.painel-flutuante` e `.dropdown-*` em componentes.css) concentra a casca do
+ * painel, abrir e fechar (animados), a navegação por teclado, o ARIA, a posição e o fechamento por
+ * clique ou foco fora. Os tipos só dizem como montar o controle e quais linhas desenhar:
  *
+ * - select.campo-entrada: seleção simples. Gatilho (botão) + painel com as opções (grupos viram
+ *   cabeçalhos). Não há caixa de busca: digitar pula para a opção que começa com o que se digitou
+ *   (as letras se acumulam por LIMITE_DIGITACAO ms).
+ * - input.campo-entrada[list]: campo com lista. O próprio campo filtra o painel enquanto se digita;
+ *   o texto continua livre (quem valida é o servidor).
  * - select.campo-entrada[data-dropdown-arvore]: cada <optgroup> vira uma pasta (a primeira opção
  *   dele, de valor igual ao rótulo do grupo, é a pasta; as demais, os filhos, ligados por ├─ └─),
- *   fechada até se clicar na seta ou apertar →; escolher a pasta escolhe o grupo inteiro. Sem busca.
+ *   fechada até se clicar na seta ou apertar →; escolher a pasta escolhe o grupo inteiro.
+ *
+ * Fora dos dropdowns, a busca de materiais (pedidos.js) usa a mesma casca (`.painel-flutuante`) e o
+ * mesmo abrir e fechar animado, por `window.Dropdown.abrirPainel` e `fecharPainel`.
  *
  * Teclado: ↓ ↑ Home End Enter Esc, e digitar abre a lista; na árvore, → abre a pasta (ou entra
  * nela) e ← fecha (ou volta à pasta). Papéis ARIA de listbox/combobox, e tree na árvore.
@@ -21,7 +28,7 @@
 (function () {
   "use strict";
 
-  var LIMITE_BUSCA = 8;
+  var LIMITE_DIGITACAO = 800;
   var contador = 0;
   var aberto = null;
 
@@ -34,7 +41,6 @@
   }
   var SETA = icone('<path d="m6 9 6 6 6-6"/>');
   var CHECK = icone('<path d="M20 6 9 17l-5-5"/>');
-  var LUPA = icone('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>');
 
   function norm(texto) {
     return String(texto || "")
@@ -55,6 +61,53 @@
     if (r && !r.id) r.id = campo.id + "-rotulo";
     return r;
   }
+
+  function textoDoRotulo(rotuloEl) {
+    return rotuloEl ? rotuloEl.textContent.replace(/\s*\*\s*$/, "").trim() : "Opções";
+  }
+
+  // ---- abrir e fechar o painel (a casca `.painel-flutuante`) -----------------------------------
+  // Comum a todo painel: o `aberto` o mostra, o `fechando` toca a saída e o `aberto` só sai no fim
+  // dela. Sem animação (reduzir movimento) ou com a aba em segundo plano, fecha na hora.
+
+  function painelAberto(p) {
+    return p.classList.contains("aberto") && !p.classList.contains("fechando");
+  }
+
+  // Devolve "novo" (abriu agora), "reaberto" (estava saindo: fica aberto, sem repetir a entrada) ou
+  // "ja" (já estava aberto).
+  function abrirPainel(p) {
+    if (p.classList.contains("fechando")) {
+      p.classList.remove("fechando");
+      p.removeEventListener("animationend", p._fimFechamento);
+      return "reaberto";
+    }
+    if (p.classList.contains("aberto")) return "ja";
+    p.classList.add("aberto");
+    return "novo";
+  }
+
+  // `aoFechar` roda quando o painel some de vez. Devolve false se não havia o que fechar.
+  function fecharPainel(p, aoFechar) {
+    if (!painelAberto(p)) return false;
+    var fim = function (e) {
+      if (e && e.target !== p) return; // animação de algo dentro do painel
+      p.removeEventListener("animationend", fim);
+      if (!p.classList.contains("fechando")) return;
+      p.classList.remove("fechando", "aberto");
+      if (aoFechar) aoFechar();
+    };
+    p._fimFechamento = fim;
+    p.addEventListener("animationend", fim);
+    p.classList.add("fechando");
+    if (getComputedStyle(p).animationName === "none") fim();
+    else setTimeout(fim, 250); // reserva: em segundo plano a animação não roda
+    return true;
+  }
+
+  window.Dropdown = { abrirPainel: abrirPainel, fecharPainel: fecharPainel, painelAberto: painelAberto };
+
+  // ---- fontes das opções ------------------------------------------------------------------------
 
   function opcoesDoSelect(select) {
     var lista = [];
@@ -93,35 +146,19 @@
     return arvore;
   }
 
-  // ---- painel -----------------------------------------------------------------------------
+  // ---- painel (comum aos tipos) ------------------------------------------------------------------
 
   function montarPainel(d, rotulo) {
     var id = "dropdown-" + ++contador;
     d.id = id;
-    d.painel = criar("div", "dropdown-painel");
-    d.painel.hidden = true;
+    d.painel = criar("div", "painel-flutuante dropdown-painel");
 
     var topo = criar("div", "dropdown-topo");
     topo.appendChild(criar("p", "rotulo-secao", rotulo));
     d.contagem = criar("p", "texto-secundario texto-pequeno");
     topo.appendChild(d.contagem);
-    var cabecalho = criar("div", "dropdown-cabecalho");
+    var cabecalho = criar("div", "painel-flutuante-cabecalho dropdown-cabecalho");
     cabecalho.appendChild(topo);
-
-    if (d.buscavel) {
-      var area = criar("div", "campo-busca");
-      area.innerHTML = LUPA;
-      d.busca = criar("input", "campo-entrada");
-      d.busca.type = "search"; // sem `name`: o HTMX e o formulário não o levam no envio
-      d.busca.autocomplete = "off";
-      d.busca.placeholder = "Buscar…";
-      d.busca.setAttribute("role", "combobox");
-      d.busca.setAttribute("aria-label", "Buscar em " + rotulo);
-      d.busca.setAttribute("aria-controls", id + "-lista");
-      d.busca.setAttribute("aria-expanded", "true");
-      area.appendChild(d.busca);
-      cabecalho.appendChild(area);
-    }
     d.painel.appendChild(cabecalho);
 
     d.lista = criar("ul", "dropdown-lista");
@@ -129,13 +166,13 @@
     d.lista.setAttribute("role", d.arvore ? "tree" : "listbox");
     if (d.arvore) d.lista.classList.add("dropdown-arvore");
     d.lista.setAttribute("aria-label", rotulo);
-    if (!d.busca && d.tipo === "select") d.lista.tabIndex = -1;
+    if (d.tipo === "select") d.lista.tabIndex = -1;
     d.painel.appendChild(d.lista);
     d.raiz.appendChild(d.painel);
 
-    // O foco fica onde está (o campo ou a busca); só a busca precisa receber o clique.
+    // O foco fica onde está (o campo ou a lista): clicar no painel não o tira de lá.
     d.painel.addEventListener("mousedown", function (e) {
-      if (!e.target.closest("input")) e.preventDefault();
+      e.preventDefault();
     });
     d.lista.addEventListener("click", function (e) {
       var seta = e.target.closest("[data-alternar]");
@@ -149,13 +186,20 @@
     });
   }
 
+  // Quem recebe o foco e o `aria-activedescendant`: o próprio campo (campo com lista) ou a lista.
   function teclado(d) {
-    return d.busca || (d.tipo === "combo" ? d.campo : d.lista);
+    return d.tipo === "combo" ? d.campo : d.lista;
   }
 
   function selecionada(d, o) {
     if (d.tipo === "select") return o.valor === d.campo.value;
     return d.campo.value !== "" && norm(o.valor) === norm(d.campo.value);
+  }
+
+  function linhaCheck(li) {
+    var check = criar("span", "dropdown-check");
+    check.innerHTML = CHECK;
+    li.appendChild(check);
   }
 
   function renderizar(d) {
@@ -185,9 +229,7 @@
       li.setAttribute("aria-selected", marcada ? "true" : "false");
       if (marcada && escolhida < 0) escolhida = i;
       li.appendChild(criar("span", "dropdown-texto", o.texto));
-      var check = criar("span", "dropdown-check");
-      check.innerHTML = CHECK;
-      li.appendChild(check);
+      linhaCheck(li);
       d.lista.appendChild(li);
     });
     if (!d.visiveis.length) {
@@ -241,9 +283,7 @@
         li.appendChild(criar("span", "dropdown-qtd dropdown-qtd-vazia"));
       }
       li.appendChild(criar("span", "dropdown-texto", o.texto));
-      var check = criar("span", "dropdown-check");
-      check.innerHTML = CHECK;
-      li.appendChild(check);
+      linhaCheck(li);
       if (n) {
         li.setAttribute("aria-expanded", o.aberto ? "true" : "false");
         var seta = criar("span", "dropdown-alternar");
@@ -311,9 +351,8 @@
         });
       });
     }
-    if (d.busca) d.busca.value = d.termo;
     renderizar(d);
-    d.painel.hidden = false;
+    abrirPainel(d.painel);
     // Coluna perto da borda direita: o painel (mais largo que ela) abre para a esquerda.
     d.painel.style.left = "";
     d.painel.style.right = "";
@@ -324,13 +363,13 @@
     d.raiz.setAttribute("data-aberto", "");
     d.controle.setAttribute("aria-expanded", "true");
     aberto = d;
-    if (d.tipo === "select") (d.busca || d.lista).focus({ preventScroll: true });
+    if (d.tipo === "select") d.lista.focus({ preventScroll: true });
     var li = d.lista.querySelector("[data-ativa]");
     if (li) li.scrollIntoView({ block: "nearest" });
   }
 
   function fechar(d, devolverFoco) {
-    d.painel.hidden = true;
+    fecharPainel(d.painel);
     d.raiz.removeAttribute("data-aberto");
     d.controle.setAttribute("aria-expanded", "false");
     if (aberto === d) aberto = null;
@@ -340,12 +379,8 @@
   function escolher(d, i) {
     var o = d.visiveis[i];
     if (!o) return;
-    if (d.tipo === "select") {
-      d.campo.value = o.valor;
-      atualizarGatilho(d);
-    } else {
-      d.campo.value = o.valor;
-    }
+    d.campo.value = o.valor;
+    if (d.tipo === "select") atualizarGatilho(d);
     d.campo.dispatchEvent(new Event("change", { bubbles: true }));
     fechar(d, d.tipo === "select");
   }
@@ -354,6 +389,22 @@
     var o = d.campo.options[d.campo.selectedIndex];
     d.texto.textContent = o ? o.textContent.trim() : "";
     d.controle.classList.toggle("dropdown-vazio", d.campo.value === "");
+  }
+
+  // Seleção simples sem busca: digitar pula para a primeira opção que começa com o que se digitou.
+  // As letras se acumulam até LIMITE_DIGITACAO ms de pausa; uma letra só, repetida, anda pelas opções.
+  function pularPara(d, tecla) {
+    clearTimeout(d.pausa);
+    d.digitado = (d.digitado || "") + norm(tecla);
+    d.pausa = setTimeout(function () {
+      d.digitado = "";
+    }, LIMITE_DIGITACAO);
+    var n = d.visiveis.length;
+    var inicio = d.digitado.length === 1 ? d.ativo + 1 : 0;
+    for (var k = 0; k < n; k++) {
+      var i = (inicio + k) % n;
+      if (norm(d.visiveis[i].texto).indexOf(d.digitado) === 0) return ativar(d, i, true);
+    }
   }
 
   function aoTeclar(d, e) {
@@ -368,7 +419,8 @@
         abrir(d, "");
       } else if (d.tipo === "select" && imprimivel) {
         e.preventDefault();
-        abrir(d, d.buscavel ? k : "");
+        abrir(d, "");
+        pularPara(d, k);
       }
       return;
     }
@@ -396,7 +448,7 @@
     } else if ((k === "Home" || k === "End") && e.target === d.lista) {
       e.preventDefault();
       ativar(d, k === "Home" ? 0 : d.visiveis.length - 1, true);
-    } else if (k === "Enter" || (k === " " && e.target === d.lista)) {
+    } else if (k === "Enter" || (k === " " && e.target === d.lista && !d.digitado)) {
       if (d.ativo >= 0) {
         e.preventDefault();
         escolher(d, d.ativo);
@@ -412,27 +464,32 @@
       fechar(d, true);
     } else if (k === "Tab") {
       fechar(d, false);
-    } else if (d.tipo === "select" && !d.busca && imprimivel) {
-      // Sem busca, digitar pula para a primeira opção que começa com a letra.
-      var letra = norm(k);
-      for (var i = 0; i < d.visiveis.length; i++) {
-        if (norm(d.visiveis[i].texto).indexOf(letra) === 0) {
-          ativar(d, i, true);
-          break;
-        }
-      }
+    } else if (d.tipo === "select" && imprimivel) {
+      e.preventDefault();
+      pularPara(d, k);
     }
   }
 
-  // ---- select -------------------------------------------------------------------------------
+  // ---- tipos: só montam o controle; o resto é a base ----------------------------------------------
+
+  // Liga ao dropdown o que todo tipo tem: painel, teclado e a trava `data-travado`.
+  function finalizar(d, rotulo) {
+    montarPainel(d, rotulo);
+    d.controle.setAttribute("aria-controls", d.lista.id);
+    d.controle.addEventListener("keydown", function (e) {
+      aoTeclar(d, e);
+    });
+    d.lista.addEventListener("keydown", function (e) {
+      aoTeclar(d, e);
+    });
+    d.campo.setAttribute("data-dropdown-pronto", "");
+  }
 
   function montarSelect(select) {
     var rotuloEl = rotuloDe(select);
-    var rotulo = rotuloEl ? rotuloEl.textContent.replace(/\s*\*\s*$/, "").trim() : "Opções";
     var d = { tipo: "select", campo: select, opcoes: opcoesDoSelect(select) };
     d.arvore = select.hasAttribute("data-dropdown-arvore") ? arvoreDoSelect(select) : null;
     d.abertos = {};
-    d.buscavel = !d.arvore && d.opcoes.length > LIMITE_BUSCA;
 
     d.raiz = criar("div", "dropdown");
     select.parentNode.insertBefore(d.raiz, select);
@@ -454,30 +511,13 @@
     d.controle.appendChild(seta);
     d.raiz.insertBefore(d.controle, select);
 
-    montarPainel(d, rotulo);
-    d.controle.setAttribute("aria-controls", d.lista.id);
+    finalizar(d, textoDoRotulo(rotuloEl));
     atualizarGatilho(d);
 
     d.controle.addEventListener("click", function () {
       if (aberto === d) fechar(d, true);
       else abrir(d, "");
     });
-    d.controle.addEventListener("keydown", function (e) {
-      aoTeclar(d, e);
-    });
-    d.lista.addEventListener("keydown", function (e) {
-      aoTeclar(d, e);
-    });
-    if (d.busca) {
-      d.busca.addEventListener("keydown", function (e) {
-        aoTeclar(d, e);
-      });
-      d.busca.addEventListener("input", function () {
-        d.termo = d.busca.value;
-        renderizar(d);
-        if (d.visiveis.length) ativar(d, 0, true);
-      });
-    }
     // O rótulo (<label for>) e o foco programático chegam ao <select>: passam para o gatilho.
     select.addEventListener("focus", function () {
       d.controle.focus();
@@ -498,20 +538,15 @@
       attributeFilter: ["data-travado"],
     });
     sincronizarTrava();
-    select.setAttribute("data-dropdown-pronto", "");
   }
-
-  // ---- campo com lista (datalist) -----------------------------------------------------------
 
   function montarCombo(input) {
     var datalist = document.getElementById(input.getAttribute("list"));
     if (!datalist) return;
-    var rotuloEl = rotuloDe(input);
-    var rotulo = rotuloEl ? rotuloEl.textContent.replace(/\s*\*\s*$/, "").trim() : "Opções";
     var opcoes = Array.prototype.map.call(datalist.options, function (o) {
       return { valor: o.value, texto: o.value, grupo: "" };
     });
-    var d = { tipo: "combo", campo: input, controle: input, opcoes: opcoes, buscavel: false };
+    var d = { tipo: "combo", campo: input, controle: input, opcoes: opcoes };
 
     input.removeAttribute("list"); // some o dropdown nativo do navegador
     d.raiz = criar("div", "dropdown");
@@ -526,8 +561,7 @@
     seta.innerHTML = SETA;
     d.raiz.appendChild(seta);
 
-    montarPainel(d, rotulo);
-    input.setAttribute("aria-controls", d.lista.id);
+    finalizar(d, textoDoRotulo(rotuloDe(input)));
 
     input.addEventListener("focus", function () {
       if (aberto !== d) abrir(d, "");
@@ -543,13 +577,9 @@
         abrir(d, input.value);
       }
     });
-    input.addEventListener("keydown", function (e) {
-      aoTeclar(d, e);
-    });
-    input.setAttribute("data-dropdown-pronto", "");
   }
 
-  // ---- início e fechamento ------------------------------------------------------------------
+  // ---- início e fechamento ------------------------------------------------------------------------
 
   function iniciar(raiz) {
     if (aberto && !document.contains(aberto.raiz)) aberto = null;

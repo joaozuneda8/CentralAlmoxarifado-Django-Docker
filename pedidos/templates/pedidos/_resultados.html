@@ -1,5 +1,5 @@
 {% load interface_extras %}
-<div class="resultados-cabecalho"><p class="rotulo-secao">Resultados da busca</p>{% if not total %}<p class="texto-secundario texto-pequeno">Nenhum material encontrado.</p>{% endif %}</div>
+<div class="resultados-cabecalho painel-flutuante-cabecalho"><p class="rotulo-secao">Resultados da busca</p>{% if not total %}<p class="texto-secundario texto-pequeno">Nenhum material encontrado.</p>{% endif %}</div>
 {% if resultados %}
 <ul class="lista-materiais">
   {% for r in resultados %}

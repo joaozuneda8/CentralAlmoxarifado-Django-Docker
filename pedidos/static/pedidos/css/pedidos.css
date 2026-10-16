@@ -92,29 +92,18 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .busca-dica::after { content: ""; position: absolute; bottom: 100%; left: 20px; border: 6px solid transparent; border-bottom-color: var(--texto); }
 .busca-painel { margin-top: var(--esp-1); }
 .busca-painel .lista-materiais { max-height: none; }
+/* A casca (borda, sombra, entrada e saída animadas) vem de `.painel-flutuante` (componentes.css),
+   a mesma dos painéis do dropdown.js; aqui só o lugar e o tamanho do painel de resultados. */
 .js .busca-painel {
   position: absolute; left: 0; right: 0; top: var(--busca-base, 100%); z-index: 15;
   max-height: min(60vh, 32rem, var(--busca-limite, 100vh)); overflow-y: auto;
-  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
-  box-shadow: var(--sombra-elevada);
 }
-.js .busca-painel:not(.aberto) { display: none; }
-/* Abre surgindo de perto da busca e fecha pelo mesmo caminho, mais rápido (pedidos.js põe
-   `fechando` e só tira o `aberto` no fim da animação). Sem movimento, abre e fecha direto. */
-.js .busca-painel.aberto { animation: painel-surge 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.js .busca-painel.fechando { animation: painel-some 0.12s ease-in forwards; pointer-events: none; }
-@keyframes painel-surge { from { opacity: 0; transform: translateY(-4px); } }
-@keyframes painel-some { to { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .js .busca-painel.aberto, .js .busca-painel.fechando { animation: none; } }
 /* Na tela estreita (pedidos.js), o painel entra no fluxo logo abaixo da busca em vez de flutuar:
    a página cresce com ele, a busca consegue subir até o topo mesmo perto do fim da página e o
    espaço reservado à barra "Seu pedido" vale também para ele, sem folga inventada no pé. Relativo,
    não estático: os absolutos de dentro (rótulos escondidos) seguem presos a ele e ao seu recorte. */
 .js[data-gaveta] .busca-painel { position: relative; top: auto; z-index: auto; }
-.js .busca-painel .resultados-cabecalho {
-  position: sticky; top: 0; z-index: 1; margin: 0; padding: 10px var(--esp-2);
-  background: var(--fundo); border-bottom: 1px solid var(--borda);
-}
+.js .busca-painel .resultados-cabecalho { position: sticky; top: 0; z-index: 1; margin: 0; }
 .js .busca-painel .lista-materiais { border: 0; border-radius: 0; }
 .carrinho-qtd { white-space: nowrap; font-weight: 500; }
 .numero-pedido { white-space: nowrap; }

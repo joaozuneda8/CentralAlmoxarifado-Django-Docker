@@ -99,7 +99,11 @@ transações precisam se comportar como no servidor.
   `componentes.css` e `layouts.css`, ícones Lucide em `_icone.html`, fontes `.woff2` locais
   (Geist, DM Sans, Geist Mono), HTMX 4.0.0 vendorizado, parciais e template tags. Só tema
   claro; o `shell.js` só cuida do menu móvel. O `dropdown.js` troca todo `select.campo-entrada` e
-  `input.campo-entrada[list]` por um painel no estilo do de resultados da busca de materiais; o
+  `input.campo-entrada[list]` por um painel no estilo do de resultados da busca de materiais, sem
+  caixa de busca (no `select`, digitar pula para a opção que começa com o texto); é a base de todo
+  painel flutuante: a casca (`.painel-flutuante`, em `componentes.css`) e o abrir e fechar animados
+  (`window.Dropdown.abrirPainel`/`fecharPainel`) também servem ao painel de resultados da busca de
+  materiais (`pedidos.js`), e os tipos (select, campo com lista, árvore) só montam o controle; o
   elemento original fica escondido e continua guardando o valor e disparando `change` (script
   que troca o valor de um `select` precisa disparar `change`). O `abas.js` (`[data-abas]`, `?aba=` na URL) dá as abas em pasta: a ativa se funde ao primeiro cartão
   do painel. O `filtros.js` recolhe o painel de

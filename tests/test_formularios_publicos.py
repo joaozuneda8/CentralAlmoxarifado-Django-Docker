@@ -322,7 +322,7 @@ def test_resultados_em_painel_preso_a_busca(client):
     busca = area[: area.index('id="resultados"')]
     assert 'aria-expanded="false" aria-controls="resultados"' in busca
     assert '<div class="campo busca-principal">' in busca
-    assert '<div id="resultados" class="busca-painel" aria-live="polite">' in area
+    assert '<div id="resultados" class="painel-flutuante busca-painel" aria-live="polite">' in area
     assert 'class="lista-materiais"' in area
 
 

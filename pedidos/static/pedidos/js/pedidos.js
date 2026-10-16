@@ -73,7 +73,8 @@
     "click",
     function (e) {
       var botao = e.target.closest && e.target.closest("[hx-post]");
-      if (!botao) return;
+      // O <form hx-post> também casa (é ancestral de todo clique): só vale o botão que dispara outro envio.
+      if (!botao || botao.matches("form")) return;
       document.querySelectorAll("[data-alterar].aberto").forEach(function (linha) {
         cancelarAlteracao(linha, false);
       });

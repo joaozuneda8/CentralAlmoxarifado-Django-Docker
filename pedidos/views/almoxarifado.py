@@ -32,6 +32,7 @@ from pedidos.servicos import (
     confirmar_atendimento,
     erros_de_vinculo,
     marcar_recibos_impressos,
+    recibos_alterados,
     registrar_saida_avulsa,
     tipos_saida,
 )
@@ -382,18 +383,27 @@ def avulsa(request):
 @login_required
 @require_POST
 def marcar_impressos(request):
-    ids = []
+    ids, versoes = [], {}
     for valor in request.POST.getlist("atendimento"):
         try:
-            ids.append(uuid.UUID(valor))
+            atendimento_id = uuid.UUID(valor)
         except ValueError:
             continue
-    n = marcar_recibos_impressos(ids)
+        ids.append(atendimento_id)
+        versao = request.POST.get(f"versao-{valor}", "")
+        if versao.isdigit():
+            versoes[atendimento_id] = int(versao)
+    alterados = recibos_alterados(versoes)
+    n = marcar_recibos_impressos(ids, versoes=versoes)
+    if alterados:
+        messages.warning(
+            request, "O pedido foi alterado depois de abrir esta página; imprima de novo."
+        )
     if n == 1:
         messages.success(request, "1 recibo marcado como impresso.")
     elif n:
         messages.success(request, f"{n} recibos marcados como impressos.")
-    else:
+    elif not alterados:
         messages.info(
             request, "Nenhum recibo novo para marcar: todos já estavam marcados como impressos."
         )

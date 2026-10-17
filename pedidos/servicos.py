@@ -14,6 +14,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from catalogo.catalogos import ItemCatalogo, catalogo_ab, catalogo_avulsa, catalogo_limpeza
@@ -1071,12 +1072,33 @@ def editar_saida_avulsa(
     )
 
 
-def marcar_recibos_impressos(atendimento_ids, agora: datetime | None = None) -> int:
+def marcar_recibos_impressos(
+    atendimento_ids, agora: datetime | None = None, versoes: dict | None = None
+) -> int:
     """Marca como impressos os recibos ainda não marcados: reimprimir não muda a data da
-    primeira impressão."""
-    return Atendimento.objects.filter(
-        id__in=list(atendimento_ids), recibo_impresso_em__isnull=True
-    ).update(recibo_impresso_em=agora or timezone.now())
+    primeira impressão. Com `versoes` ({atendimento: versão do pedido na página}), ignora o
+    pedido editado depois que a página abriu: o que saiu na impressora era a versão anterior."""
+    versoes = versoes or {}
+    ids = list(atendimento_ids)
+    conferem = Q(id__in=[i for i in ids if i not in versoes])
+    for atendimento_id, versao in versoes.items():
+        conferem |= Q(id=atendimento_id, pedido__versao=versao)
+    return (
+        Atendimento.objects.filter(id__in=ids, recibo_impresso_em__isnull=True)
+        .filter(conferem)
+        .update(recibo_impresso_em=agora or timezone.now())
+    )
+
+
+def recibos_alterados(versoes: dict) -> list:
+    """Atendimentos ainda não impressos cujo pedido mudou de versão desde que a página abriu."""
+    return [
+        atendimento_id
+        for atendimento_id, versao in versoes.items()
+        if Atendimento.objects.filter(id=atendimento_id, recibo_impresso_em__isnull=True)
+        .exclude(pedido__versao=versao)
+        .exists()
+    ]
 
 
 ACOES_TRAVA = ("lancada", "liberar", "nao_lancar")

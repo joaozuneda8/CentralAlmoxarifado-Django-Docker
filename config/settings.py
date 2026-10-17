@@ -145,8 +145,8 @@ PEDIDOS_MAX_TEXTO = 200
 SCPI_URL = os.environ.get("SCPI_URL") or "https://transparencia.saep.sp.gov.br:8445/scpi9/"
 SCPI_HEADLESS = ler_bool("SCPI_HEADLESS", False)
 SCPI_PERFIL_DIR = Path(os.environ.get("SCPI_PERFIL_DIR") or BASE_DIR / ".pw-profile")
-# Trava do lançamento real no SCPI. Desligada (o padrão) no período em paralelo com o Apps
-# Script, para os dois não lançarem as mesmas saídas: só a simulação roda. Liga na virada.
+# Libera o lançamento real no SCPI. Com 0 (o padrão), ele fica bloqueado e só a simulação roda.
+# Liga-se no .env do servidor (deploy/VIRADA.md, seção 6), nunca mudando este padrão.
 LANCAMENTO_REAL = ler_bool("LANCAMENTO_REAL", False)
 
 if not DEBUG:

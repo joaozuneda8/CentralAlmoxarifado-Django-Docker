@@ -5,15 +5,36 @@ dependência da plataforma Google. Substitui o Central Almoxarifado em Google
 Apps Script.
 
 Design: [docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md](docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md)
+(spec principal; as decisões posteriores estão nas outras specs de `docs/superpowers/specs/` e
+de `specs/`). Guia de desenvolvimento e arquitetura: [CLAUDE.md](CLAUDE.md). Pendências
+conhecidas: issues do GitHub.
 
 ## O que tem
 
-- **Formulários públicos** (`/`, sem login): pedido de limpeza, copa/cozinha e escritório e
-  pedido de materiais AB (limitado ao estoque do SCPI). Cada pedido novo avisa no Telegram
+- **Formulários públicos** (`/`, sem login): "Limpeza, copa e escritório" e "Ferramentas, peças
+  e materiais" (o pedido AB, limitado ao estoque do SCPI). Cada pedido novo avisa no Telegram
   (`TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` no `.env`).
 - **Área do almoxarifado** (`/painel/`, login por matrícula): painel com filtros,
-  atendimento dos pedidos, saída avulsa, recibo impresso do detalhe do pedido e a página Automações, com as
-  importações e o lançamento no SCPI. Cada saída vira linhas que o robô do SCPI lança depois.
+  atendimento dos pedidos (com troca e acréscimo de materiais), edição do atendimento até o robô
+  lançar o lote, saída avulsa, recibo impresso do detalhe do pedido, a página Automações (as
+  importações do SCPI e o lançamento) e a Curva ABC (curvas por frequência e por valor,
+  reposição e pares de/para). Cada saída vira linhas que o robô do SCPI lança depois.
+- **Cadastros** (`/admin/`): centros de custo, opções, itens de limpeza, pares de/para,
+  parâmetros da curva e as contas de usuário.
+
+| Endereço | O quê |
+|---|---|
+| `/` | escolha do formulário público |
+| `/pedido/limpeza/`, `/pedido/ab/` | os dois formulários públicos |
+| `/painel/entrar/` | login da área do almoxarifado |
+| `/painel/` | painel de pedidos (filtros, atalhos, cartão do lançamento) |
+| `/painel/pedidos/<número>/` | detalhe, com o atendimento (`atender/`) e a edição (`editar/`) |
+| `/painel/saida-avulsa/` | saída avulsa |
+| `/painel/automacoes/` | Automações: visão geral, robôs do SCPI e histórico |
+| `/painel/catalogo/curva/` | Curva ABC |
+| `/admin/` | cadastros (só equipe) |
+
+Atrás do Apache, todos esses endereços ganham o prefixo `/almoxarifado`.
 
 ## Desenvolvimento
 
@@ -45,10 +66,17 @@ Pré-requisitos: Python 3.13, [uv](https://docs.astral.sh/uv/) e um MySQL 8 ou M
 4. Testes e lint:
 
    ```bash
+   uv run python manage.py collectstatic --noinput   # o teste com a configuração de produção lê o manifesto
    uv run pytest
    uv run ruff check .
    uv run ruff format --check .
+   uv run python manage.py makemigrations --check --dry-run
    ```
+
+   Os quatro últimos precisam passar limpos antes do merge. O `collectstatic` só é preciso de
+   novo depois de mexer em estáticos: sem ele, o
+   `test_config.py::test_atras_do_apache_com_waitress_documentado_nao_entra_em_laco` falha com a
+   entrada que falta no manifesto de `staticfiles/`.
 
 5. Importações do SCPI (precisam de `SAEP_USER` e `SAEP_PASS` no `.env` e do Chromium do
    Playwright, instalado uma vez com `uv run playwright install chromium`):
@@ -58,6 +86,7 @@ Pré-requisitos: Python 3.13, [uv](https://docs.astral.sh/uv/) e um MySQL 8 ou M
    uv run python manage.py importar_estoque
    uv run python manage.py importar_saidas_scpi --desde 01/01/2026
    uv run python manage.py atualizar_catalogo      # as três em sequência
+   uv run python manage.py atualizar_catalogo --carga-inicial   # cadastro inteiro e saídas desde 01/01/2026
    ```
 
    Com `--arquivo <csv>`, cada comando lê um CSV já baixado do SCPI em vez de abrir o
@@ -87,16 +116,22 @@ O sistema roda em Docker Compose (`compose.yaml`), atrás do Apache em `/almoxar
 container: `docker compose exec web python manage.py <comando>`.
 
 - [deploy/INSTALACAO.md](deploy/INSTALACAO.md): instalação (Linux ou WSL2), `.env` de produção,
-  Apache, agendador, backup e atualização (`bash deploy/atualizar.sh`). Guia para o André.
-- [deploy/VIRADA.md](deploy/VIRADA.md): roteiro da migração do Apps Script e da virada.
+  Apache, agendador, backup e atualização (`bash deploy/atualizar.sh`), para quem administra o
+  servidor.
+- [deploy/VIRADA.md](deploy/VIRADA.md): roteiro da migração do Apps Script e da virada, com a
+  situação de cada passo. Falta só liberar o lançamento real e conferir o primeiro.
 
-Três coisas a saber:
+Coisas a saber (no servidor, sempre pelo container):
 
-- `LANCAMENTO_REAL` (no `.env`, padrão `0`) libera o lançamento real no SCPI. Fica `0` durante o
-  período em paralelo com o Apps Script, para não lançar duas vezes as mesmas saídas; vira `1` na
-  virada.
-- `uv run python manage.py importar_planilhas --arquivo <xlsx> [--dry-run]` importa o `.xlsx`
-  exportado das planilhas do Apps Script (migração única, antes da virada). A importação
-  substitui os pedidos e recusa com `LANCAMENTO_REAL=1`.
-- `uv run python manage.py backup_banco` grava o dump comprimido em `BACKUP_DIR` e apaga os com
-  mais de 60 dias (roda todo dia pelo agendador do compose).
+- `LANCAMENTO_REAL` (no `.env`, padrão `0`) libera o lançamento real no SCPI; com `0`, só a
+  simulação roda. Ele separou o Django do Apps Script no período em paralelo; o robô antigo já
+  foi desativado, e a liberação é `LANCAMENTO_REAL=1` no `.env` do servidor seguido de
+  `docker compose up -d` (`deploy/VIRADA.md`, seção 6). Até lá, nenhum robô lança no SCPI.
+- `docker compose exec web python manage.py backup_banco` grava o dump comprimido em
+  `BACKUP_DIR` e apaga os com mais de 60 dias (roda todo dia pelo agendador do compose).
+- `docker compose run --rm web python manage.py robos_em_andamento` sai com erro se há robô
+  rodando: recriar o `web` o mataria (o `deploy/atualizar.sh` confere antes).
+- `importar_planilhas --arquivo <xlsx> [--dry-run]` (migração única das planilhas do Apps Script)
+  e `importar_depara --arquivo <xlsx> [--dry-run]` (carga única dos pares de/para) já cumpriram
+  seu papel: o primeiro recusa porque o banco tem pedidos feitos no Django, e o segundo, se há par
+  criado ou alterado no admin depois da carga. Os pares agora são mantidos em Cadastros.

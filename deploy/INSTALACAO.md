@@ -1,6 +1,7 @@
 # Instalação do Central Almoxarifado no servidor
 
-Guia para o André. O sistema roda em três containers do Docker Compose (`compose.yaml`):
+Guia para quem administra o servidor. O sistema roda em três containers do Docker Compose
+(`compose.yaml`):
 
 | Serviço | O que faz |
 |---|---|
@@ -137,8 +138,8 @@ desenvolvimento local", no fim do arquivo, o compose ignora):
 | `DB_NAME`, `DB_USER` | `almoxarifado` e `almox` |
 | `DB_PASSWORD` | uma senha forte para o usuário do banco |
 | `SAEP_USER`, `SAEP_PASS` | usuário e senha do SCPI usados pelos robôs |
-| `LANCAMENTO_REAL` | `0` até a virada (`deploy/VIRADA.md`): com `0`, só a simulação roda |
-| `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` | deixe **vazios** até a virada (`deploy/VIRADA.md`), senão um pedido de teste avisa o grupo de verdade |
+| `LANCAMENTO_REAL` | `0` até a liberação do lançamento real (`deploy/VIRADA.md`, seção 6): com `0`, só a simulação roda |
+| `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` | o bot e o grupo que recebem o aviso de pedido novo; numa instalação de teste, deixe **vazios**, senão um pedido de teste avisa o grupo de verdade |
 
 Cada linha é `NOME=valor`, sem espaços em volta do `=`. O compose trata `$` como variável:
 **senha com `$` vai entre aspas simples** (`DB_PASSWORD='abc$123'`), senão muda em silêncio e o
@@ -278,11 +279,13 @@ docker compose exec agendador /app/deploy/tarefa.sh backup_banco
   `almoxarifado-AAAAMMDD-HHMMSS.sql.gz` por dia e apaga os com mais de **60 dias**.
 - Essa pasta está no mesmo servidor: copie-a de vez em quando para outra máquina.
 
-Para restaurar, pare o site e o agendador, carregue o arquivo escolhido e suba de novo. O
+Para restaurar, pare o site e o agendador, carregue o arquivo escolhido e suba de novo. Parar o
+`web` mata o robô que estiver rodando: confira antes (o comando sai com erro se houver um). O
 `MARIADB_ROOT_PASSWORD` já está dentro do container do banco, então nenhuma senha é digitada:
 
 ```bash
 cd /srv/almoxarifado
+docker compose run --rm web python manage.py robos_em_andamento
 docker compose stop web agendador
 docker compose exec -T banco sh -c 'exec mariadb -u root -p"$MARIADB_ROOT_PASSWORD" -e "DROP DATABASE almoxarifado; CREATE DATABASE almoxarifado CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
 gunzip -c dados/backups/<arquivo>.sql.gz | docker compose exec -T banco sh -c 'exec mariadb -u root -p"$MARIADB_ROOT_PASSWORD" almoxarifado'
@@ -316,6 +319,11 @@ Ele confere se há robô em andamento (e para, sem mexer em nada, se houver), pu
 reconstrói a imagem, roda `migrate` e `check --deploy`, confere os robôs de novo e recria os
 containers. Para no primeiro erro com "Atualização interrompida"; corrija o que ele mostrou e
 rode de novo.
+
+Depois do `git pull`, ele compara o `.env.example` com o `.env` (e o `.env.banco.example` com o
+`.env.banco`) e avisa, sem parar, "AVISO: o .env.example tem variável nova que falta no .env: …".
+Leia o comentário da variável no arquivo de exemplo, acrescente-a ao `.env` com o valor de
+produção e rode `docker compose up -d` (o `restart` não relê o `.env`).
 
 - Se o `git pull` reclamar de `dubious ownership`, rode uma vez
   `git config --global --add safe.directory /srv/almoxarifado`.

@@ -8,16 +8,21 @@ Reescrita em Django do Central Almoxarifado (hoje Google Apps Script + Google Sh
 nenhuma dependência do Google. Fluxo: funcionários fazem pedidos em formulários públicos → o
 almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança no SCPI.
 
-- Spec (fonte de verdade): `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md`.
-  A seção 9 divide o trabalho em 5 subprojetos, cada um com plano próprio em
-  `docs/superpowers/plans/`. Os subprojetos 1 (Fundação), 2 (Catálogo e importadores), 3
-  (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) também: o
-  código (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e a instalação no servidor, que já
-  roda em produção com dados reais (o roteiro foi `deploy/VIRADA.md`). A implantação é
+- Spec principal: `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md`.
+  As decisões posteriores estão nas specs mais novas de `docs/superpowers/specs/` e de `specs/`,
+  que vencem a principal onde a alteram. A seção 9 divide o trabalho em 5 subprojetos, cada um
+  com plano próprio em `docs/superpowers/plans/`. Os subprojetos 1 (Fundação), 2 (Catálogo e
+  importadores), 3 (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e
+  migração) também: o código (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`), a instalação no
+  servidor e a virada (`deploy/VIRADA.md`, que tem a situação de cada passo). A implantação é
   em Docker Compose (`docs/superpowers/specs/2026-10-15-docker-design.md`), no lugar do
-  NSSM e do Agendador do Windows da spec principal. A simulação do 4 contra o SCPI real
-  (`lancar_saidas --dry-run`) já passou; falta só ligar o lançamento real (`LANCAMENTO_REAL`).
-- Referências fora deste repositório: o Apps Script atual (`../CentralAlmoxarifado`,
+  NSSM e do Agendador do Windows da spec principal. O Django é o sistema em uso, em produção com
+  dados reais; o Apps Script está congelado e arquivado, e o robô antigo, desativado. A
+  simulação do 4 contra o SCPI real (`lancar_saidas --dry-run`) já passou; falta liberar o
+  lançamento real e conferir o primeiro (`deploy/VIRADA.md`, seção 6). Até lá, nenhum robô lança
+  no SCPI e as saídas ficam na fila como `PENDENTE`.
+- Pendências conhecidas ficam nas issues do GitHub, não neste arquivo nem nas specs.
+- Referências fora deste repositório: o Apps Script antigo, arquivado (`../CentralAlmoxarifado`,
   com `Regras.gs`, `Catalogo.gs` e os testes em Node), o WMS-Almoxarifado
   (`joaorighetto/WMS-Almoxarifado`), de onde veio a fundação visual, e o extrair-relatorio
   (`joaorighetto/extrair-relatorio`, privado), de onde veio o código do SCPI.
@@ -62,15 +67,22 @@ leem um CSV já baixado. Os testes nunca abrem o navegador.
 
 O pytest usa `config.settings_test` (definido no `pyproject.toml`) e cria o banco
 `test_almoxarifado`. Testes rodam contra MySQL/MariaDB, nunca SQLite: `select_for_update` e
-transações precisam se comportar como no servidor.
+transações precisam se comportar como no servidor. O
+`test_config.py::test_atras_do_apache_com_waitress_documentado_nao_entra_em_laco` abre uma
+página com a configuração de produção (`DEBUG=0`, estáticos com manifesto) num subprocesso e lê
+o manifesto de `staticfiles/`: depois de mexer em estáticos, rode
+`uv run python manage.py collectstatic --noinput` antes da suíte, senão ele falha com a entrada
+que falta no manifesto.
 
 ## Arquitetura
 
 - `config/settings.py` é um módulo único para todos os ambientes, lido do `.env`
   (`python-dotenv`; variável já presente no ambiente vence) via `config/env.py`
   (`ler_bool`, `ler_lista`). Com `DEBUG=0` ligam as proteções de produção e
-  `check --deploy` precisa passar sem avisos (há um teste para isso). `settings_test.py` só
-  ajusta hasher, cookies seguros e storage de estáticos.
+  `check --deploy` precisa passar sem avisos (há um teste para isso). `settings_test.py` ajusta
+  o hasher, os cookies seguros, o storage de estáticos (sem manifesto, com
+  `WHITENOISE_AUTOREFRESH`), uma `SECRET_KEY` padrão, o Telegram vazio, o site na raiz
+  (`PREFIXO_URL`, `FORCE_SCRIPT_NAME`, `STATIC_URL`) e `LANCAMENTO_REAL=True`.
 - A área interna (login, painel, automações, curva ABC e saída avulsa) fica em
   `/painel/`, e o admin em `/admin/`; os formulários públicos ficam na raiz. Os nomes das rotas
   não mudam (as páginas Catálogo e Lançamentos SCPI foram apagadas, com suas rotas, quando viraram
@@ -340,15 +352,19 @@ transações precisam se comportar como no servidor.
   (`IS_USED_LOCK`), toda execução sem fim; sem ela, só a criada há menos de 60 s (o processo
   ainda subindo). As demais sem fim aparecem como interrompidas e liberam o botão. Se o
   disparo não consegue iniciar o processo, a execução já nasce `FALHA`. `consultas.lotes_pendentes` (o total da fila, pela mesma regra) e `lotes_travados`
-  alimentam o cartão do painel e a aba Lançamento no SCPI. O robô é o único lugar fora de `servicos.py` que grava em `pedidos`, e só
-  mexe em `status`, `requisicao_scpi`, `lancado_em` e `mensagem` das `LinhaSaida` (o superusuário
-  também edita esses quatro no admin).
-- `LANCAMENTO_REAL` (`.env`, padrão desligado) bloqueia o lançamento real no SCPI, para o
-  Django e o Apps Script não lançarem em dobro as mesmas saídas pendentes. Em produção ainda está
-  desligado (`=0`); o próximo patch o liga, e aí o Django passa a ser o único a lançar. O comando
-  `lancar_saidas` recusa sem `--dry-run`, a aba Lançamento no SCPI recusa o modo "Lançar" (só
-  "Simular") e o painel avisa que está bloqueado. O `settings_test` o liga, porque os testes do
-  robô lançam no SCPI simulado; os testes do bloqueio o desligam com o fixture `settings`.
+  alimentam o cartão do painel e a aba Lançamento no SCPI. Fora de `servicos.py`, só o robô grava
+  em `pedidos`, e só mexe em `status`, `requisicao_scpi`, `lancado_em` e `mensagem` das
+  `LinhaSaida` (o superusuário também edita esses quatro no admin); a única outra exceção é a
+  migração única das planilhas (`implantacao/migracao.py`), que substitui os pedidos.
+- `LANCAMENTO_REAL` (`.env`) libera o lançamento real no SCPI; com `0` (o padrão), o lançamento
+  real fica bloqueado e só a simulação roda. Ele existiu para o Django e o Apps Script não
+  lançarem em dobro no período em paralelo; o robô antigo já foi desativado, e o bloqueio agora
+  só espera a liberação do lançamento real. Em produção ainda está bloqueado (`=0`); a liberação
+  é `LANCAMENTO_REAL=1` no `.env` do servidor e `docker compose up -d` (`deploy/VIRADA.md`,
+  seção 6), sem mudar o padrão do código. Bloqueado, o comando `lancar_saidas` recusa sem
+  `--dry-run`, a aba Lançamento no SCPI recusa o modo "Lançar" (só "Simular") e o painel avisa
+  que está bloqueado. O `settings_test` o liga, porque os testes do robô lançam no SCPI simulado;
+  os testes do bloqueio o desligam com o fixture `settings`.
 - `implantacao` (sem modelos nem migrations) é a migração única das planilhas do Apps Script e
   pode ser apagada depois da virada, salvo o backup. `planilha.py` (puro) lê o `.xlsx` com as
   colunas achadas pelo nome do cabeçalho; `conversao.py` (sem banco) vira registros não salvos e
@@ -393,14 +409,15 @@ transações precisam se comportar como no servidor.
   só o Apache pode alcançar) e `agendador` (supercronic com `deploy/crontab`, que chama
   `deploy/tarefa.sh`, saída em `dados/logs/agendador.log`); o `banco` é o MariaDB 11.4, sem
   porta publicada. O compose força `DB_HOST`, `SCPI_HEADLESS=1`, `MYSQLDUMP=mariadb-dump` e as
-  pastas (`/dados/logs`, `/dados/backups`, `/dados/perfil`) por cima do `.env`; `dados/` do
-  host guarda logs, backups e os `.xlsx` da virada. Os robôs da página são filhos do waitress
+  pastas (`/dados/logs`, `/dados/backups`, `/dados/perfil` e o `PLAYWRIGHT_BROWSERS_PATH` da
+  imagem) por cima do `.env`; `dados/` do host guarda logs, backups e `dados/importacao`, onde
+  ficaram os `.xlsx` da virada (já apagados). Os robôs da página são filhos do waitress
   no container `web` (`disparo.py` abre sessão própria fora do Windows), então recriar o `web`
   os mata: o `deploy/atualizar.sh` confere `robos_em_andamento` (por `docker compose run
   --rm`, que funciona com o `web` parado) antes do `git pull` e antes do `up -d`, e tem o corpo
   numa função porque o bash lê o script aos poucos. `deploy/*.sh`, `deploy/crontab`,
   `Dockerfile` e `compose.yaml` são LF (`.gitattributes`). Guias em `deploy/INSTALACAO.md`
-  (André; Linux ou WSL2) e `deploy/VIRADA.md`.
+  (para quem administra o servidor; Linux ou WSL2) e `deploy/VIRADA.md`.
 - O log usa `ConcurrentRotatingFileHandler` porque o waitress e os comandos gravam no mesmo
   arquivo (no container também: `web` e `agendador` dividem `dados/logs`); no Windows o
   `RotatingFileHandler` não consegue girar um arquivo aberto por outro processo.

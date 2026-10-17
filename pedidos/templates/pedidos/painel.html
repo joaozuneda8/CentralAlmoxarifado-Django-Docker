@@ -47,7 +47,7 @@
             {% csrf_token %}
             {# Primário só quando dá para lançar: desabilitado, o azul apagado parecia clicável. #}
             <button type="{% if lancamento_real %}submit{% else %}button{% endif %}" class="botao {% if lancamento_pendentes and lancamento_real and not lancamento_em_andamento %}botao-primario{% else %}botao-secundario{% endif %}"{% if not lancamento_real %} aria-disabled="true" aria-describedby="dica-lancamento-real"{% elif lancamento_em_andamento or not lancamento_pendentes %} disabled{% endif %}>{% include "interface/_icone.html" with nome="robo" %}Lançar no SCPI{% if not lancamento_real %}{% include "interface/_icone.html" with nome="cadeado" %}{% endif %}</button>
-            {% if not lancamento_real %}<span class="dica-flutuante-texto" role="tooltip" id="dica-lancamento-real">Lançamento real bloqueado até a virada: só a simulação roda (LANCAMENTO_REAL no .env).</span>{% endif %}
+            {% if not lancamento_real %}<span class="dica-flutuante-texto" role="tooltip" id="dica-lancamento-real">Lançamento real bloqueado: só a simulação roda (LANCAMENTO_REAL=0 no .env).</span>{% endif %}
           </form>
         </div>
       </div>

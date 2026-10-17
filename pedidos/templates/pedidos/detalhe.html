@@ -6,6 +6,12 @@
 {# O número e a origem já estão no recibo logo abaixo. #}
 {% block heading %}{% if pedido.origem == "AVULSA" %}Detalhes da saída{% else %}Detalhes do pedido{% endif %}{% endblock %}
 {% block tools %}
+{% if pedido.atendimento_ou_none %}{% if edicao.permitida %}<a class="botao botao-secundario" href="{% url 'pedidos:editar' pedido.numero %}">{% include "interface/_icone.html" with nome="lapis" %}{% if pedido.origem == "AVULSA" %}Editar saída{% else %}Editar atendimento{% endif %}</a>{% else %}
+{# Fora da janela de edição o botão fica no lugar, desabilitado, com o motivo na dica. #}
+<span class="dica-flutuante dica-flutuante-fim">
+  <button type="button" class="botao botao-secundario" aria-disabled="true" aria-describedby="dica-edicao">{% include "interface/_icone.html" with nome="lapis" %}{% if pedido.origem == "AVULSA" %}Editar saída{% else %}Editar atendimento{% endif %}{% include "interface/_icone.html" with nome="cadeado" %}</button>
+  <span class="dica-flutuante-texto" role="tooltip" id="dica-edicao">{{ edicao.motivo }}</span>
+</span>{% endif %}{% endif %}
 {# Imprime esta página (pedidos.js o mostra); sem JavaScript, imprime-se pelo navegador e a confirmação já fica à vista. #}
 {% if pedido.atendimento_ou_none %}<button type="button" class="botao botao-primario" data-imprimir hidden>{% include "interface/_icone.html" with nome="impressora" %}Imprimir recibo</button>{% endif %}
 {% if pedido.origem == "AVULSA" %}<a class="botao botao-secundario" href="{% url 'pedidos:avulsa' %}">{% include "interface/_icone.html" with nome="mais" %}Registrar outra saída</a>{% endif %}
@@ -18,6 +24,7 @@
     {% if pedido.origem == "AVULSA" and pedido.registrado_por %}Registrado por {{ pedido.registrado_por.get_full_name|default:pedido.registrado_por.username }} ({{ pedido.registrado_por.username }}).
     {% elif a %}Atendido por {{ a.atendido_por.get_full_name|default:a.atendido_por.username }} em {{ a.atendido_em|date:"d/m/Y H:i" }}.{% endif %}
   </p>
+  {% if a %}{% include "pedidos/_edicao_aviso.html" %}{% endif %}
   {% if a and not a.recibo_impresso_em %}
   {# Depois de imprimir, a confirmação de que o recibo saiu na impressora (pedidos.js a mostra). #}
   <form method="post" action="{% url 'pedidos:marcar_impressos' %}" class="confirmacao-impressao nao-imprimir">
@@ -32,6 +39,8 @@
   {% endwith %}
 
   <article class="folha-recibo">{% include "pedidos/_recibo.html" %}</article>
+
+  {% if pedido.atendimento_ou_none %}{% include "pedidos/_alteracoes.html" %}{% endif %}
 
   {% if pedido.situacao_scpi.chave == "atencao" %}
   <p class="nao-imprimir"><a href="{% url 'automacoes:pagina' %}?aba=lancamento#travas">Resolver em Automações</a></p>

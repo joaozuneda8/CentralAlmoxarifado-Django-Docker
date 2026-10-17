@@ -705,3 +705,10 @@ html:not(.js) [data-quantidade] { display: none; }
 .js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)) > .carrinho-acoes { opacity: 0.6; }
 .js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)):hover > .material-dados,
 .js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)):hover > .carrinho-acoes { opacity: 0.9; }
+
+/* Histórico das edições do atendimento (detalhe, só na tela): recolhido, uma entrada por edição
+   salva com quem e quando em cima e as frases do que mudou embaixo. */
+.alteracoes > summary { width: fit-content; cursor: pointer; font-weight: 600; }
+.alteracoes[open] > summary { margin-bottom: var(--esp-2); }
+.alteracoes-lista { display: grid; gap: var(--esp-3); margin: 0; padding: 0; list-style: none; }
+.alteracoes-lista ul { margin: var(--esp-1) 0 0; padding-left: var(--esp-4); }

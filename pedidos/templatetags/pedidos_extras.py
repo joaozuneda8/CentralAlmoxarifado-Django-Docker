@@ -4,7 +4,7 @@ import re
 
 from django import template
 
-from pedidos.regras import LIMPEZA
+from pedidos.regras import LIMPEZA, frase_diferenca
 
 register = template.Library()
 
@@ -39,6 +39,12 @@ def badge_situacao(chave: str) -> str:
 @register.filter
 def badge_scpi(chave: str) -> str:
     return _SCPI.get(chave, "selo-neutro")
+
+
+@register.filter(name="frase_diferenca")
+def frase_diferenca_filtro(diferenca: dict) -> str:
+    """Uma diferença do histórico de alterações em frase (`regras.frase_diferenca`)."""
+    return frase_diferenca(diferenca)
 
 
 @register.filter

@@ -26,7 +26,16 @@ from pedidos.consultas import (
 )
 from pedidos.fluxos import FLUXOS
 from pedidos.models import Atendimento, ExecucaoRobo, ItemPedido, Pedido
-from pedidos.regras import AB, AVULSA, Adicionado, DadosSaida, EnvioSaida, qtd_br
+from pedidos.regras import (
+    AB,
+    AVULSA,
+    ERRO,
+    Adicionado,
+    DadosSaida,
+    EnvioSaida,
+    edicao_permitida,
+    qtd_br,
+)
 from pedidos.servicos import (
     catalogo_de,
     confirmar_atendimento,
@@ -128,8 +137,26 @@ def _formatar_qtd(pedido, q) -> str:
     return str(int(q)) if pedido.origem == AB else qtd_br(q)
 
 
+def _contexto_edicao(pedido) -> dict:
+    """Se o atendimento ainda pode ser editado (botão, avisos) e o histórico das edições."""
+    atendimento = pedido.atendimento_ou_none
+    if atendimento is None:
+        return {"edicao": edicao_permitida(False, [])}
+    linhas = pedido.linhas
+    return {
+        "edicao": edicao_permitida(True, linhas),
+        "lote_com_erro": any(linha.status == ERRO for linha in linhas),
+        "alteracoes": list(pedido.alteracoes.select_related("usuario")),
+    }
+
+
 def _contexto_detalhe(pedido, **extra) -> dict:
-    contexto = {"pedido": pedido, "atendivel": False, "unidades_scpi": unidades_scpi([pedido])}
+    contexto = {
+        "pedido": pedido,
+        "atendivel": False,
+        "unidades_scpi": unidades_scpi([pedido]),
+        **_contexto_edicao(pedido),
+    }
     if pedido.origem != AVULSA and pedido.atendimento_ou_none is None:
         opcoes = opcoes_saida()
         contexto.update(
@@ -196,6 +223,11 @@ def atender(request, numero):
         erros=resposta.erros,
     )
     return render(request, "pedidos/detalhe.html", contexto)
+
+
+@login_required
+def editar(request, numero):
+    raise Http404("Edição ainda não disponível.")
 
 
 def _adicionados_enviados(post) -> list[Adicionado]:

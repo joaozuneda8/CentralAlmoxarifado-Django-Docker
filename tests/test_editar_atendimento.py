@@ -7,12 +7,13 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from django.utils import timezone
 
 from catalogo.models import CentroCusto, Material
 from pedidos.consultas import fila_do_robo
 from pedidos.models import AlteracaoPedido, Atendimento, ItemPedido, LinhaSaida, Pedido
-from pedidos.regras import AB, LIMPEZA, Adicionado, EnvioSaida, diferencas_atendimento
+from pedidos.regras import AB, AVULSA, LIMPEZA, Adicionado, EnvioSaida, diferencas_atendimento
 from pedidos.servicos import (
     confirmar_atendimento,
     editar_atendimento,
@@ -22,6 +23,7 @@ from pedidos.servicos import (
     registrar_saida_avulsa,
 )
 from tests.cenario import (
+    criar_pedido,
     em_paralelo,
     envio_ab,
     envio_limpeza,
@@ -453,3 +455,87 @@ def test_editar_atendimento_recusa_avulsa_e_vice_versa(avulsa, atendido, usuario
     assert not r.ok and r.mensagem == "Pedido não encontrado."
     r = editar_avulsa(atendido, usuario, itens(("023.001.002", "1")))
     assert not r.ok and r.mensagem == "Pedido não encontrado."
+
+
+# ---------------------------------------------------------------------------
+# Detalhe em leitura: botão de editar, avisos e histórico
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def logado(client, usuario):
+    client.force_login(usuario)
+    return usuario
+
+
+def detalhe(client, pedido):
+    return client.get(reverse("pedidos:detalhe", args=[pedido.numero])).text
+
+
+def recibo(html):
+    inicio = html.index('<article class="folha-recibo')
+    return html[inicio : html.index("</article>", inicio)]
+
+
+def test_detalhe_mostra_editar_quando_editavel(client, logado):
+    p = criar_pedido(atendido=True, linhas=[("PENDENTE", "")])
+    html = detalhe(client, p)
+    assert f'href="{reverse("pedidos:editar", args=[p.numero])}"' in html
+    assert "Editar atendimento" in html
+    assert "Pode ser editado até o robô lançar no SCPI." in html
+
+
+def test_detalhe_da_avulsa_diz_editar_saida(client, logado):
+    p = criar_pedido(origem=AVULSA, atendido=True, usuario=logado, linhas=[("PENDENTE", "")])
+    assert "Editar saída" in detalhe(client, p)
+
+
+def test_detalhe_desabilita_editar_quando_lancado(client, logado):
+    p = criar_pedido(atendido=True, linhas=[("LANCADA", "004213/26")])
+    html = detalhe(client, p)
+    assert reverse("pedidos:editar", args=[p.numero]) not in html
+    assert 'aria-disabled="true"' in html
+    assert "Lançado na requisição 004213/26" in html
+
+
+def test_detalhe_suspenso_mostra_motivo(client, logado):
+    p = criar_pedido(atendido=True, linhas=[("VERIFICAR", "")])
+    html = detalhe(client, p)
+    assert reverse("pedidos:editar", args=[p.numero]) not in html
+    assert "Edição suspensa: o robô não confirmou" in html
+
+
+def test_detalhe_sem_atendimento_nao_tem_editar(client, logado):
+    html = detalhe(client, criar_pedido())
+    assert "Editar atendimento" not in html
+    assert "Pode ser editado até o robô" not in html
+
+
+def test_aviso_de_recibo_impresso(client, logado):
+    p = criar_pedido(atendido=True, linhas=[("PENDENTE", "")])
+    Atendimento.objects.update(recibo_impresso_em=timezone.now())
+    assert "Salvar alterações devolve o recibo para impressão." in detalhe(client, p)
+
+
+def test_aviso_de_lote_com_erro(client, logado):
+    p = criar_pedido(atendido=True, linhas=[("ERRO", "")])
+    assert "Corrija e salve: o lote volta para a fila do próximo lançamento." in detalhe(client, p)
+
+
+def test_historico_no_detalhe_e_fora_do_recibo(client, logado):
+    p = criar_pedido(atendido=True, linhas=[("PENDENTE", "")])
+    AlteracaoPedido.objects.create(
+        pedido=p,
+        usuario=logado,
+        versao=1,
+        diferencas=[{"campo": "Recebedor", "antes": "João", "depois": "Ana"}],
+    )
+    html = detalhe(client, p)
+    assert "Alterações depois do atendimento" in html
+    assert "Recebedor: João → Ana" in html
+    assert "Recebedor: João → Ana" not in recibo(html)
+
+
+def test_historico_vazio(client, logado):
+    p = criar_pedido(atendido=True, linhas=[("PENDENTE", "")])
+    assert "Nenhuma alteração registrada." in detalhe(client, p)

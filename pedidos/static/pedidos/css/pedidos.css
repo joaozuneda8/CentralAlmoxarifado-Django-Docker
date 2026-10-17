@@ -601,7 +601,10 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 .selo[hidden] { display: none; }
 .selo .icone { width: 12px; height: 12px; }
 .selo-pulso { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.28); transition: box-shadow var(--transicao); }
-.js .material:has([data-adicionar]) { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
+.js .material:has([data-adicionar]) {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px;
+  transition: background-color var(--transicao);
+}
 .js .material:has([data-adicionar]) .material-dados { position: relative; transition: opacity var(--transicao); }
 /* O canto do "+" e do ✕ só afasta a primeira linha do nome (um flutuante de uma linha de altura): da
    segunda em diante o nome usa a largura toda. Fixo nos dois estados, para abrir não refazer a quebra. */
@@ -616,9 +619,9 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 .js .material-abrir {
   display: block; position: absolute; z-index: 1; inset: -14px calc(-1 * var(--esp-2));
   padding: 0; border: 0; border-radius: 0; background: transparent; color: transparent; font-size: 0; cursor: pointer;
-  transition: background-color var(--transicao);
 }
-.js .material-abrir:hover { background: rgba(15, 14, 12, 0.04); }
+/* O cinza do cursor cobre a célula toda (também a linha da quantidade, quando aberta), não só o botão. */
+.js .material:has([data-adicionar]):hover { background: rgba(15, 14, 12, 0.04); }
 .js .material-abrir:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; }
 .js .material-mais {
   display: inline-flex; position: absolute; top: 0; right: -2px; width: 20px; height: 20px;

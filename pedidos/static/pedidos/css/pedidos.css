@@ -721,3 +721,5 @@ html:not(.js) [data-quantidade] { display: none; }
 .campo-alterado.carrinho-linha { box-shadow: inset 3px 0 0 var(--destaque); }
 .campo-dica-alterado { color: var(--destaque); font-weight: 600; }
 .rodape-saida [data-contagem-alteracoes]:not(:empty) { margin-right: auto; align-self: center; }
+.nao-gravadas [data-copiar-resumo] { justify-self: start; }
+.rodape-saida [data-contagem-alteracoes]:empty { display: none; }

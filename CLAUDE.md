@@ -11,9 +11,9 @@ almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança
 - Spec (fonte de verdade): `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md`.
   A seção 9 divide o trabalho em 5 subprojetos, cada um com plano próprio em
   `docs/superpowers/plans/`. Os subprojetos 1 (Fundação), 2 (Catálogo e importadores), 3
-  (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) tem o código
-  feito (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e falta a execução: instalar no
-  servidor e fazer a migração e a virada, pelo roteiro `deploy/VIRADA.md`. A implantação é
+  (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) também: o
+  código (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e a instalação no servidor, que já
+  roda em produção com dados reais (o roteiro foi `deploy/VIRADA.md`). A implantação é
   em Docker Compose (`docs/superpowers/specs/2026-10-15-docker-design.md`), no lugar do
   NSSM e do Agendador do Windows da spec principal. Do 4 ainda falta a
   simulação contra o SCPI real (João roda `lancar_saidas --dry-run --limite 1`).
@@ -192,6 +192,25 @@ transações precisam se comportar como no servidor.
   de "Adicionado pelo almoxarifado" e nunca mostra quem acrescentou. Três travas contra linha de
   saída com quantidade ≤ 0: `servicos._gravar_linhas`, `scpi/requisicoes.py` (lote vira `ERRO`) e
   a `CheckConstraint` `qtd > 0` da `LinhaSaida`.
+- Edição do atendimento (spec `2026-10-17-edicao-pedido-design.md`): até o robô lançar o lote, o
+  "Editar atendimento" ("Editar saída" na avulsa) do detalhe abre `pedidos:editar`
+  (`/painel/pedidos/<n>/editar/`), o formulário do atendimento (ou o da saída avulsa) preenchido
+  com o que está gravado (`editando`). Edita só o que o atendimento grava (dados da saída,
+  quantidades entregues, trocas e acréscimos); o que veio do funcionário (cabeçalho, materiais e
+  quantidades pedidas) nunca muda. `regras.edicao_permitida` (puro) diz pelas linhas do lote se
+  edita (`PENDENTE`, `NAO_LANCAR`, `ERRO` sem número), se está suspensa (`EM_LANCAMENTO`,
+  `VERIFICAR`) ou bloqueada (lançada ou com número). `servicos.editar_atendimento` e
+  `editar_saida_avulsa` travam o pedido e as linhas, conferem a `Pedido.versao` (concorrência
+  otimista: outra pessoa salvou antes é recusa `versao`; o reenvio igual é sucesso), recusam o lote
+  que entrou em lançamento (`lancamento`), validam como o atendimento, gravam a `AlteracaoPedido`
+  (diferenças de `regras.diferencas_atendimento`, só na tela, nunca no recibo), devolvem o recibo a
+  "não impresso" e **apagam e recriam as `LinhaSaida`**: com IDs novos, o robô que leu o lote antes
+  da edição o pula no `_travar`; nunca atualize as linhas no lugar. `ERRO` volta a `PENDENTE`. O
+  "Saiu na impressora" leva a versão (`versao-<atendimento>`) e não marca a versão nova. No modo de
+  edição o `pedidos.js` abre as quantidades confirmadas, destaca o campo alterado, conta as
+  alterações e pede confirmação para sair; com o robô rodando, a faixa (`_edicao_faixa.html`,
+  `div#edicao-faixa` pelo `HX-Target`) se recarrega a cada 5 s e, se o lote travar, tira o
+  "Salvar".
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,
   `CentroCusto` e `Opcao` são mantidos à mão no admin. A placa do `CentroCusto` é normalizada
@@ -398,7 +417,5 @@ transações precisam se comportar como no servidor.
   por screenshot. Onde discordarem, valem o DESIGN.md e o que já está no código. Não refazer o
   questionário inicial da `clean-design` (o projeto já o respondeu) nem gerar ou gravar um
   design system novo das skills sem pedido.
-- Enquanto não houver dados reais (até a importação das planilhas no servidor, no passo 3 de
-  `deploy/VIRADA.md`), mudança de modelo regenera a migration existente do app e o banco local é
-  recriado (`migrate <app> zero` + `migrate`). Não crie migrations de conversão de dados.
-  Depois dessa importação, mudança de modelo ganha **migration nova**, nunca regenerada.
+- O servidor está em produção com dados reais: mudança de modelo ganha **migration nova**,
+  nunca regenerada (nem `migrate <app> zero`).

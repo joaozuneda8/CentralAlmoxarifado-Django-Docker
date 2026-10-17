@@ -788,9 +788,13 @@ def _gravar_edicao(
     LinhaSaida.objects.filter(atendimento=atendimento).delete()
     _gravar_linhas(atendimento, pares, pedido.numero)
     quando = timezone.localtime().strftime("%d/%m/%Y %H:%M")
-    LinhaSaida.objects.filter(atendimento=atendimento).update(
-        mensagem=f"Refeita na edição de {quando} por {usuario.username}."
-    )
+    novas = LinhaSaida.objects.filter(atendimento=atendimento)
+    novas.update(mensagem=f"Refeita na edição de {quando} por {usuario.username}.")
+    # Material marcado sozinho para não lançar (no admin) continua fora do robô. O lote inteiro
+    # marcado vira a caixa "Não lançar" do formulário, e aí vale o que veio dela.
+    sem_lancar = {linha.codigo for linha in linhas_antigas if linha.status == NAO_LANCAR}
+    if len(sem_lancar) < len({linha.codigo for linha in linhas_antigas}):
+        novas.filter(codigo__in=sem_lancar).update(status=NAO_LANCAR)
 
 
 def editar_atendimento(

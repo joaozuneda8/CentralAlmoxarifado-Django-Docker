@@ -793,3 +793,14 @@ def test_faixa_encerra_quando_o_lote_trava(client, logado, atendido):
     r = client.get(url_editar(atendido), headers=FAIXA)
     assert r.status_code == 200 and "data-edicao-encerrada" in r.text
     assert "Edição suspensa" in r.text
+
+
+def test_linha_marcada_sozinha_para_nao_lancar_continua_assim(atendido, usuario):
+    # Linha marcada "não lançar" no admin, no meio de linhas pendentes: a recriação não a
+    # devolve ao robô.
+    LinhaSaida.objects.filter(codigo="008.001.002").update(status="NAO_LANCAR")
+    assert editar(atendido, usuario, dados=saida(recebedor="Ana")).ok
+    assert dict(LinhaSaida.objects.values_list("codigo", "status")) == {
+        "023.001.002": "PENDENTE",
+        "008.001.002": "NAO_LANCAR",
+    }

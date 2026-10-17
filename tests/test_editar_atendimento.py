@@ -804,3 +804,20 @@ def test_linha_marcada_sozinha_para_nao_lancar_continua_assim(atendido, usuario)
         "023.001.002": "PENDENTE",
         "008.001.002": "NAO_LANCAR",
     }
+
+
+def test_edicao_mantem_o_tipo_gravado_do_atendimento(client, logado, atendido):
+    # Atendimento importado das planilhas pode ter outro tipo que não o BALCÃO do formulário.
+    Atendimento.objects.update(tipo_saida="ENTREGA")
+    assert 'value="ENTREGA" selected' in client.get(url_editar(atendido)).text
+    client.post(url_editar(atendido), post_edicao(atendido, recebedor="Ana"))
+    assert Atendimento.objects.get().tipo_saida == "ENTREGA"
+    assert AlteracaoPedido.objects.get().diferencas == [
+        {"campo": "Recebedor", "antes": "João", "depois": "Ana"}
+    ]
+
+
+def test_lote_marcado_em_automacoes_nao_vira_diferenca(atendido, usuario):
+    LinhaSaida.objects.update(status="NAO_LANCAR")
+    r = editar(atendido, usuario, nao_lancar=True)
+    assert r.ok and r.mensagem == "Nada mudou; nada foi gravado."

@@ -543,8 +543,14 @@ def estado_gravado(pedido: Pedido) -> EstadoAtendimento:
     todos = list(pedido.itens.all())
     por_id = {i.id: i for i in todos}
     avulsa = pedido.origem == AVULSA
+    cabecalho = cabecalho_atendimento(pedido.atendimento)
+    # "Não lançar" marcado em Automações muda as linhas, não o atendimento: o formulário de
+    # edição já abre marcado, então não é diferença.
+    status = set(pedido.atendimento.linhas.values_list("status", flat=True))
+    if status == {NAO_LANCAR}:
+        cabecalho = (*cabecalho[:6], "1")
     return EstadoAtendimento(
-        cabecalho=cabecalho_atendimento(pedido.atendimento),
+        cabecalho=cabecalho,
         entregues={
             i.codigo: i.qtd_entregue
             for i in todos

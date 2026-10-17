@@ -277,7 +277,8 @@ def _contexto_edicao_atendimento(pedido, **extra) -> dict:
             for i in pedido.itens.all()
             if i.origem == ItemPedido.Origem.ALMOXARIFADO
         ],
-        "tipo_fixo": TIPO_ATENDIMENTO if TIPO_ATENDIMENTO in opcoes["tipos"] else "",
+        # O tipo fica o gravado (o importado das planilhas pode não ser BALCÃO).
+        "tipo_fixo": atendimento.tipo_saida if TIPO_ATENDIMENTO in opcoes["tipos"] else "",
         **opcoes,
     }
     contexto.update(extra)
@@ -357,6 +358,8 @@ def editar(request, numero):
         return redirect("pedidos:detalhe", numero=numero)
     recibo_estava_impresso = bool(atendimento and atendimento.recibo_impresso_em)
     dados, nao_lancar = _dados_do_atendimento(request.POST)
+    if atendimento is not None and TIPO_ATENDIMENTO in tipos_saida():
+        dados = replace(dados, tipo=atendimento.tipo_saida)
     qtds = {i.codigo: request.POST.get(f"entregue-{i.codigo}", "") for i in pedido.itens.all()}
     adicionados = _adicionados_enviados(request.POST)
     qtds.update({a.codigo: request.POST.get(f"entregue-{a.codigo}", "") for a in adicionados})

@@ -120,7 +120,7 @@ Nunca mostra quem registrou nem quem atendeu.
   </div>
   {% endwith %}{% endwith %}
 
-  {% if a %}
+  {% if a and not editando %}
   <div class="recibo-saida">
     <h2 class="recibo-subtitulo">Saída registrada</h2>
     <dl class="dados">

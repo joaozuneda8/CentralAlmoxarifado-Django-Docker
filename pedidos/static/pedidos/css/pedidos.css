@@ -712,3 +712,12 @@ html:not(.js) [data-quantidade] { display: none; }
 .alteracoes[open] > summary { margin-bottom: var(--esp-2); }
 .alteracoes-lista { display: grid; gap: var(--esp-3); margin: 0; padding: 0; list-style: none; }
 .alteracoes-lista ul { margin: var(--esp-1) 0 0; padding-left: var(--esp-4); }
+
+/* Modo de edição: o campo diferente do gravado ganha a borda do destaque e o texto "alterado"
+   (pedidos.js), nunca só a cor. */
+.campo-alterado .campo-entrada,
+.campo-alterado .dropdown-gatilho,
+.campo-alterado.entrega .entrega-caixa { border-color: var(--destaque); box-shadow: 0 0 0 1px var(--destaque); }
+.campo-alterado.carrinho-linha { box-shadow: inset 3px 0 0 var(--destaque); }
+.campo-dica-alterado { color: var(--destaque); font-weight: 600; }
+.rodape-saida [data-contagem-alteracoes]:not(:empty) { margin-right: auto; align-self: center; }

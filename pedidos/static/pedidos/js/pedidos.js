@@ -1463,4 +1463,150 @@
     var resumo = detalhes.querySelector("summary");
     if (resumo) resumo.focus();
   });
+
+  // Modo de edição do atendimento e da saída avulsa (`form[data-editando]`). As quantidades gravadas
+  // abrem confirmadas; cada campo diferente do que estava gravado ganha o destaque "alterado" e o
+  // rodapé conta as alterações (por campo da saída e por material). Sair da página com alteração
+  // pede confirmação, e o "Descartar" também. O resumo de um salvar recusado se copia com um botão.
+  function formEdicao() {
+    return document.querySelector("form[data-editando]");
+  }
+
+  // Campos do formulário (também os de fora dele, ligados por `form=`), agrupados por unidade de
+  // alteração: um campo da saída, ou um material (quantidade, troca, presença no carrinho).
+  function unidadesDaEdicao(form) {
+    var unidades = {};
+    var codigos = [];
+    var qtds = [];
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (!campo.name || campo.disabled || campo.type === "submit" || campo.type === "button") return;
+      var nome = campo.name;
+      if (nome === "csrfmiddlewaretoken" || nome === "versao") return;
+      if (campo.type === "checkbox") {
+        unidades[nome] = campo.checked ? "1" : "";
+      } else if (nome === "item_codigo") {
+        codigos.push(campo.value);
+      } else if (nome === "item_qtd") {
+        qtds.push(campo.value);
+      } else if (nome === "adicionado") {
+        unidades["material:" + campo.value] = (unidades["material:" + campo.value] || "") + "|+";
+      } else if (nome.indexOf("entregue-") === 0) {
+        var codigo = nome.slice("entregue-".length);
+        unidades["material:" + codigo] = (unidades["material:" + codigo] || "") + "|" + campo.value;
+      } else if (nome.indexOf("no-lugar-de-") === 0) {
+        var acrescentado = nome.slice("no-lugar-de-".length);
+        unidades["material:" + acrescentado] = (unidades["material:" + acrescentado] || "") + "|>" + campo.value;
+      } else if (nome.indexOf("qtd-") !== 0) {
+        unidades[nome] = campo.value;
+      }
+    });
+    codigos.forEach(function (codigo, i) {
+      unidades["material:" + codigo] = qtds[i] || "";
+    });
+    return unidades;
+  }
+
+  var unidadesIniciais = null;
+  var descartando = false;
+
+  function contarAlteracoes(form) {
+    var atuais = unidadesDaEdicao(form);
+    var chaves = {};
+    Object.keys(unidadesIniciais).concat(Object.keys(atuais)).forEach(function (k) { chaves[k] = true; });
+    return Object.keys(chaves).filter(function (k) { return unidadesIniciais[k] !== atuais[k]; }).length;
+  }
+
+  // O destaque fica no invólucro do campo (`.campo`, `.entrega`, linha do carrinho), com o texto
+  // "alterado" para não depender só da cor.
+  function destacarCampo(campo) {
+    var caixa = campo.closest(".campo, .entrega, .carrinho-linha");
+    if (!caixa) return;
+    var inicial = campo.getAttribute("data-valor-inicial");
+    var atual = campo.type === "checkbox" ? (campo.checked ? "1" : "") : campo.value;
+    var mudou = inicial === null ? true : inicial !== atual;
+    caixa.classList.toggle("campo-alterado", mudou);
+    var nota = caixa.querySelector(":scope > .campo-dica-alterado");
+    if (mudou && !nota) {
+      nota = document.createElement("span");
+      nota.className = "campo-dica campo-dica-alterado";
+      nota.textContent = "alterado";
+      caixa.appendChild(nota);
+    } else if (!mudou && nota) {
+      nota.remove();
+    }
+  }
+
+  function atualizarEdicao() {
+    var form = formEdicao();
+    if (!form || !unidadesIniciais) return;
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (!campo.name || campo.type === "hidden" || campo.type === "submit" || campo.type === "button") return;
+      if (campo.name === "csrfmiddlewaretoken" || campo.name.indexOf("qtd-") === 0) return;
+      destacarCampo(campo);
+    });
+    var n = contarAlteracoes(form);
+    var contagem = document.querySelector("[data-contagem-alteracoes]");
+    if (contagem) contagem.textContent = n === 0 ? "" : n === 1 ? "1 alteração" : n + " alterações";
+  }
+
+  function iniciarEdicao() {
+    var copiar = document.querySelector("[data-copiar-resumo]");
+    if (copiar && navigator.clipboard) copiar.hidden = false;
+    var form = formEdicao();
+    if (!form) return;
+    // Quantidades gravadas já valem: abrem confirmadas (as trocadas o `iniciarTrocas` confirmou).
+    document.querySelectorAll(".entrega[data-pode-confirmar]:not([data-confirmado])").forEach(function (bloco) {
+      var estado = bloco.getAttribute("data-estado");
+      if (estado === "invalido" || estado === "acima") return;
+      if (estado === "zero" && bloco.closest("tr[data-adicionado]")) return;
+      confirmarEntrega(bloco);
+    });
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (!campo.name) return;
+      campo.setAttribute("data-valor-inicial", campo.type === "checkbox" ? (campo.checked ? "1" : "") : campo.value);
+    });
+    unidadesIniciais = unidadesDaEdicao(form);
+    atualizarEdicao();
+  }
+  document.addEventListener("DOMContentLoaded", iniciarEdicao);
+  document.addEventListener("input", atualizarEdicao);
+  document.addEventListener("change", atualizarEdicao);
+  document.addEventListener("htmx:after:swap", function () { setTimeout(atualizarEdicao, 0); });
+  // Troca, acréscimo e o − e o + mudam os campos por código, sem `input`.
+  document.addEventListener("click", function () { setTimeout(atualizarEdicao, 0); });
+
+  document.addEventListener("submit", function (e) {
+    if (e.target.matches && e.target.matches("form[data-editando]")) descartando = true;
+  });
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest && e.target.closest("[data-descartar-edicao], .link-voltar");
+    var form = formEdicao();
+    if (!link || !form || !unidadesIniciais || contarAlteracoes(form) === 0) return;
+    if (!window.confirm("Descartar as alterações?")) {
+      e.preventDefault();
+      return;
+    }
+    descartando = true;
+  });
+  window.addEventListener("beforeunload", function (e) {
+    var form = formEdicao();
+    if (descartando || !form || !unidadesIniciais || contarAlteracoes(form) === 0) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
+  document.addEventListener("click", function (e) {
+    var botao = e.target.closest && e.target.closest("[data-copiar-resumo]");
+    if (!botao) return;
+    var lista = document.querySelector("[data-resumo-alteracoes]");
+    var texto = Array.prototype.map.call(lista.querySelectorAll("li"), function (li) {
+      return "- " + li.textContent.trim();
+    }).join("\n");
+    navigator.clipboard.writeText(texto).then(function () {
+      var rotulo = botao.querySelector("span");
+      var antes = rotulo.textContent;
+      rotulo.textContent = "Copiado";
+      setTimeout(function () { rotulo.textContent = antes; }, 2000);
+    });
+  });
 })();

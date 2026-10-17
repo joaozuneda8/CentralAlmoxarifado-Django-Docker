@@ -749,3 +749,8 @@ def test_carrinho_da_edicao_continua_salvando(client, logado, avulsa):
         },
     ).text
     assert "Salvar alterações" in html and "Registrar saída" not in html
+
+
+def test_modo_de_edicao_nao_repete_a_saida_gravada(client, logado, atendido):
+    assert "Saída registrada" in detalhe(client, atendido)
+    assert "Saída registrada" not in client.get(url_editar(atendido)).text

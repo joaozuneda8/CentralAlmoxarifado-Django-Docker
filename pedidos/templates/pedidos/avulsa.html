@@ -1,6 +1,6 @@
 {% extends "interface/base_almoxarifado.html" %}
 {% load static %}
-{% block title %}Saída avulsa — Central Almoxarifado{% endblock %}
+{% block title %}{% if editando %}{{ pedido.numero }}{% else %}Saída avulsa{% endif %} — Central Almoxarifado{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'pedidos/css/pedidos.css' %}">{% endblock %}
 {% block extra_head %}<script src="{% static 'pedidos/js/pedidos.js' %}" defer></script>{% endblock %}
 {% block rotulo %}Origem: avulsa{% endblock %}

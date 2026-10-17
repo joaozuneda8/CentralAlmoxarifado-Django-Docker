@@ -12,7 +12,14 @@ from django.utils import timezone
 
 from catalogo.models import CentroCusto, Material
 from pedidos.consultas import fila_do_robo
-from pedidos.models import AlteracaoPedido, Atendimento, ItemPedido, LinhaSaida, Pedido
+from pedidos.models import (
+    AlteracaoPedido,
+    Atendimento,
+    ExecucaoRobo,
+    ItemPedido,
+    LinhaSaida,
+    Pedido,
+)
 from pedidos.regras import AB, AVULSA, LIMPEZA, Adicionado, EnvioSaida, diferencas_atendimento
 from pedidos.servicos import (
     confirmar_atendimento,
@@ -754,3 +761,35 @@ def test_carrinho_da_edicao_continua_salvando(client, logado, avulsa):
 def test_modo_de_edicao_nao_repete_a_saida_gravada(client, logado, atendido):
     assert "Saída registrada" in detalhe(client, atendido)
     assert "Saída registrada" not in client.get(url_editar(atendido)).text
+
+
+# ---------------------------------------------------------------------------
+# Faixa do modo de edição acompanhando o robô
+# ---------------------------------------------------------------------------
+
+FAIXA = {"HX-Request": "true", "HX-Target": "div#edicao-faixa"}
+
+
+def test_faixa_sem_robo_nao_consulta(client, logado, atendido):
+    html = client.get(url_editar(atendido)).text
+    assert 'id="edicao-faixa"' in html and "every 5s" not in html
+
+
+def test_faixa_consulta_com_robo_rodando(client, logado, atendido, trava_ocupada):
+    ExecucaoRobo.objects.create()
+    html = client.get(url_editar(atendido)).text
+    assert 'hx-trigger="every 5s"' in html
+    assert "Um lançamento está em andamento; se chegar a este pedido" in html
+
+
+def test_faixa_parcial_pelo_hx_target(client, logado, atendido):
+    r = client.get(url_editar(atendido), headers=FAIXA)
+    assert r.status_code == 200 and "<html" not in r.text
+    assert 'id="edicao-faixa"' in r.text and "Editando" in r.text
+
+
+def test_faixa_encerra_quando_o_lote_trava(client, logado, atendido):
+    LinhaSaida.objects.update(status="EM_LANCAMENTO")
+    r = client.get(url_editar(atendido), headers=FAIXA)
+    assert r.status_code == 200 and "data-edicao-encerrada" in r.text
+    assert "Edição suspensa" in r.text

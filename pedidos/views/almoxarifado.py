@@ -258,6 +258,7 @@ def _contexto_edicao_atendimento(pedido, **extra) -> dict:
     contexto = {
         "atendivel": True,
         "editando": True,
+        "acompanhar_robo": _acompanhar_robo(),
         "versao": pedido.versao,
         "campos": {
             "data": atendimento.data_efetiva.isoformat(),
@@ -305,12 +306,40 @@ def _avisar_salvo(request, resposta, recibo_estava_impresso: bool) -> None:
         )
 
 
+FAIXA_DA_EDICAO = "div#edicao-faixa"
+
+
+def _acompanhar_robo() -> bool:
+    """Com o robô lançando, a faixa do modo de edição se recarrega para avisar se o lote travou."""
+    return ExecucaoRobo.em_andamento().exists()
+
+
+def _faixa(request, pedido, edicao):
+    """Só a faixa do modo de edição, pedida pela recarga periódica (`HX-Target`)."""
+    contexto = {
+        "pedido": pedido,
+        "edicao": edicao,
+        "edicao_encerrada": not edicao.permitida,
+        "acompanhar_robo": edicao.permitida and _acompanhar_robo(),
+        "lote_com_erro": any(linha.status == ERRO for linha in pedido.linhas),
+    }
+    resposta = render(request, "pedidos/_edicao_faixa.html", contexto)
+    patch_vary_headers(resposta, ["HX-Request", "HX-Target"])
+    return resposta
+
+
 @login_required
 def editar(request, numero):
     """Modo de edição do atendimento (ou da saída avulsa) até o robô lançar o lote no SCPI."""
     pedido = _pedido(numero)
     atendimento = pedido.atendimento_ou_none
     edicao = edicao_permitida(atendimento is not None, pedido.linhas)
+    if (
+        request.method != "POST"
+        and request.headers.get("HX-Request")
+        and request.headers.get("HX-Target") == FAIXA_DA_EDICAO
+    ):
+        return _faixa(request, pedido, edicao)
     if request.method != "POST":
         if not edicao.permitida:
             if edicao.motivo:
@@ -376,6 +405,7 @@ def _editar_avulsa(request, pedido):
         "fluxo": fluxo,
         "indisponivel": catalogo is None,
         "editando": True,
+        "acompanhar_robo": _acompanhar_robo(),
         "pedido": pedido,
         "versao": pedido.versao,
         "lote_com_erro": any(linha.status == ERRO for linha in linhas),

@@ -1572,6 +1572,16 @@
   document.addEventListener("input", atualizarEdicao);
   document.addEventListener("change", atualizarEdicao);
   document.addEventListener("htmx:after:swap", function () { setTimeout(atualizarEdicao, 0); });
+  // A faixa voltou encerrada (o lote entrou em lançamento): nada mais se salva nesta página.
+  document.addEventListener("htmx:after:swap", function () {
+    var form = formEdicao();
+    if (!form || !document.querySelector("[data-edicao-encerrada]")) return;
+    document.querySelectorAll('button[type="submit"], [data-carrinho-enviar]').forEach(function (botao) {
+      if (botao.form !== form && !botao.hasAttribute("data-carrinho-enviar")) return;
+      botao.disabled = true;
+    });
+    descartando = true;
+  });
   // Troca, acréscimo e o − e o + mudam os campos por código, sem `input`.
   document.addEventListener("click", function () { setTimeout(atualizarEdicao, 0); });
 

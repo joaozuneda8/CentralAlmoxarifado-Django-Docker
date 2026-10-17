@@ -15,8 +15,8 @@ almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança
   código (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e a instalação no servidor, que já
   roda em produção com dados reais (o roteiro foi `deploy/VIRADA.md`). A implantação é
   em Docker Compose (`docs/superpowers/specs/2026-10-15-docker-design.md`), no lugar do
-  NSSM e do Agendador do Windows da spec principal. Do 4 ainda falta a
-  simulação contra o SCPI real (João roda `lancar_saidas --dry-run --limite 1`).
+  NSSM e do Agendador do Windows da spec principal. A simulação do 4 contra o SCPI real
+  (`lancar_saidas --dry-run`) já passou; falta só ligar o lançamento real (`LANCAMENTO_REAL`).
 - Referências fora deste repositório: o Apps Script atual (`../CentralAlmoxarifado`,
   com `Regras.gs`, `Catalogo.gs` e os testes em Node), o WMS-Almoxarifado
   (`joaorighetto/WMS-Almoxarifado`), de onde veio a fundação visual, e o extrair-relatorio
@@ -343,8 +343,9 @@ transações precisam se comportar como no servidor.
   alimentam o cartão do painel e a aba Lançamento no SCPI. O robô é o único lugar fora de `servicos.py` que grava em `pedidos`, e só
   mexe em `status`, `requisicao_scpi`, `lancado_em` e `mensagem` das `LinhaSaida` (o superusuário
   também edita esses quatro no admin).
-- `LANCAMENTO_REAL` (`.env`, padrão desligado) bloqueia o lançamento real no SCPI até a virada,
-  para o Django e o Apps Script não lançarem em dobro as mesmas saídas pendentes: o comando
+- `LANCAMENTO_REAL` (`.env`, padrão desligado) bloqueia o lançamento real no SCPI, para o
+  Django e o Apps Script não lançarem em dobro as mesmas saídas pendentes. Em produção ainda está
+  desligado (`=0`); o próximo patch o liga, e aí o Django passa a ser o único a lançar. O comando
   `lancar_saidas` recusa sem `--dry-run`, a aba Lançamento no SCPI recusa o modo "Lançar" (só
   "Simular") e o painel avisa que está bloqueado. O `settings_test` o liga, porque os testes do
   robô lançam no SCPI simulado; os testes do bloqueio o desligam com o fixture `settings`.

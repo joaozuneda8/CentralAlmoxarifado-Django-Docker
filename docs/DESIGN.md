@@ -81,10 +81,10 @@ Use estes nomes, e nenhum outro para essas funções.
 | Materiais | `lista-materiais`, `material`, `material-bloqueado`, `material-dados`, `material-acao`, `quantidade`, `quantidade-campo`, `botao-adicionado` ("Adicionado" por 2 s); adicionar em dois passos (formulários públicos e saída avulsa; o painel do atendimento adiciona direto): `material-abrir` (botão transparente sobre a linha), `material-mais` ("+"), `material-no-pedido` (selo `selo selo-info`, com `selo-pulso` por 2 s ao confirmar), `material-qtd`, `material-cancelar`, estado `aberto` no `[data-adicionar]`; com um aberto, as outras linhas recuam |
 | Pedido (formulários de carrinho) | `pedido-layout` (container query), `pedido-grade` (passos + coluna do pedido lado a lado a partir de 960px de largura), `pedido-passos`, `pedido-lado`, `pedido-resumo` (cartão fixo ao rolar, com o botão de envio em `pedido-enviar`), `acoes-final` (o envio do fim do formulário, só quando o pedido está na gaveta); `pagina-larga` no `<body>` alarga o formulário público para 1080px a partir de 1024px |
 | Busca de materiais | `busca-area`, `busca-principal` (campo em destaque: 56px, borda azul de 2px), `busca-painel` (`#resultados`, painel no fluxo da página, logo abaixo da busca, em qualquer tela: o cartão do passo cresce com ele, a página rola para a busca subir e a altura é a do cabeçalho e de 5 linhas) |
-| Painel flutuante (base) | `painel-flutuante` (casca; estados `aberto` e `fechando`), `painel-flutuante-cabecalho` |
-| Dropdown | `dropdown` (envolve o campo), `dropdown-gatilho`, `dropdown-valor`, `dropdown-seta`, `dropdown-combo`, `dropdown-painel`, `dropdown-cabecalho`, `dropdown-topo`, `dropdown-lista`, `dropdown-grupo`, `dropdown-opcao`, `dropdown-texto`, `dropdown-check`, `dropdown-sem-opcoes`; montados pelo `dropdown.js` |
-| Resultados | `resultados-cabecalho` (rótulo "Resultados da busca"); `material-info` (linha de baixo do material); com o material no pedido, o botão diz "Alterar (N)" (`pedidos.js`) |
-| Carrinho | `carrinho`, `carrinho-barra` (fixa), `carrinho-gaveta` (`<dialog>` sempre que o pedido cairia embaixo da busca, isto é, passo com menos de 760px: `data-gaveta` no `<html>`; bloco azul ao lado da busca nos demais casos), `carrinho-lista`, `carrinho-linha`, `carrinho-linha-erro`; nos formulários públicos e na saída avulsa (com os textos da saída), `carrinho-barra-contagem`, `carrinho-barra-vazia`, `carrinho-acoes-gaveta` (enviar e adicionar mais) e a quantidade em dois passos (`carrinho-qtd-texto`, `carrinho-alterar`, `carrinho-qtd-area`, `carrinho-confirmar`, `carrinho-cancelar`, `carrinho-remover`; estado `aberto` no `[data-alterar]`) |
+| Painel flutuante (base) | `painel-flutuante` (casca; estados `aberto` e `fechando`) |
+| Dropdown | `dropdown` (envolve o campo), `dropdown-gatilho`, `dropdown-valor`, `dropdown-seta`, `dropdown-combo`, `dropdown-painel`, `dropdown-lista`, `dropdown-grupo`, `dropdown-opcao`, `dropdown-texto`, `dropdown-check`, `dropdown-sem-opcoes`; montados pelo `dropdown.js` |
+| Resultados | `resultados-vazio` ("Nenhum material encontrado."; o painel não tem legenda); `material-info` (linha de baixo do material); com o material no pedido, o botão diz "Alterar (N)" (`pedidos.js`) |
+| Carrinho | `carrinho`, `carrinho-barra` (fixa), `carrinho-gaveta` (`<dialog>` sempre que o pedido cairia embaixo da busca, isto é, passo com menos de 760px: `data-gaveta` no `<html>`; bloco azul ao lado da busca nos demais casos), `carrinho-lista`, `carrinho-linha`, `carrinho-linha-erro`; nos formulários públicos e na saída avulsa (com os textos da saída), `carrinho-barra-contagem`, `carrinho-barra-vazia`, `carrinho-acoes-gaveta` (enviar e adicionar mais) e a quantidade em dois passos (`carrinho-qtd-texto`, `carrinho-qtd-area`, `carrinho-confirmar`, `carrinho-cancelar`, `carrinho-remover`; a linha toda é o `material-abrir`, com o lápis `material-mais`, como no resultado da busca; estado `aberto` no `[data-alterar]`) |
 | Envio recusado (formulário público) | `resumo-erros` (+ `resumo-erros-titulo`, focável, com link para o campo), `campo-com-erro` + `campo-erro` com ícone embaixo do campo; `botao-esquecer` ("Não é você? Limpar"); `sucesso-itens` (lista da tela de sucesso) |
 | Recibo e atendimento | `recibo-grupo` (linha de grupo da tabela de materiais: "Pedido pelo solicitante" e o selo `selo-info` "Adicionado pelo almoxarifado", só com material acrescentado; no atendimento, a dos acrescentados some enquanto o grupo está vazio), `recibo-nota` (nota pequena embaixo do nome: "Trocado por …", "No lugar de …"), `atendimento-painel` (+ `atendimento-painel-titulo`; painel de busca da troca e do acréscimo, um `<form>` com os resultados de sempre; na troca, o `pedidos.js` o põe numa `atendimento-painel-linha` logo abaixo do material, preso à esquerda da rolagem) |
 | Vazio | `vazio`, `vazio-titulo` |
@@ -98,14 +98,16 @@ Use estes nomes, e nenhum outro para essas funções.
 
 Todo `select.campo-entrada` e todo `input.campo-entrada[list]` ganha, pelo `interface/js/dropdown.js`,
 um painel no mesmo estilo do painel de resultados da busca de materiais: cartão com borda e sombra,
-cabeçalho com o rótulo do campo e a contagem, linhas de 14px com divisória, opção marcada em azul
+sem legenda (nem rótulo nem contagem: o rótulo do campo vai no `aria-label` da lista), linhas de 14px
+com divisória, opção marcada em azul
 com o ícone `check` (nunca só a cor). O painel nunca tem caixa de busca: no `select`, digitar pula
 para a opção que começa com o que se digitou (as letras se acumulam por 0,8 s).
 
-A base é uma só: `.painel-flutuante` (casca, cabeçalho `.painel-flutuante-cabecalho`, entrada e saída
+A base é uma só: `.painel-flutuante` (casca, entrada e saída
 animadas, em `componentes.css`) e o `dropdown.js` (abrir e fechar, teclado, ARIA, posição, fechar por
 fora). Os tipos só montam o controle: seleção simples (`select`), campo com lista (`input[list]`, texto
-livre) e árvore (`select[data-dropdown-arvore]`). A busca de materiais (`#resultados`, `.busca-painel`)
+livre), select digitável (`select[data-dropdown-digitavel]`: campo de texto que filtra a lista, mas só vale uma
+opção dela; placa e centro de custo) e árvore (`select[data-dropdown-arvore]`). A busca de materiais (`#resultados`, `.busca-painel`)
 usa a mesma casca e o mesmo abrir e fechar por `window.Dropdown.abrirPainel` e `fecharPainel`: painel
 novo é `.painel-flutuante` + o que for só dele. O elemento original continua na página, escondido, e guarda o valor e dispara `change`: HTMX,
 formulários e testes não mudam, e sem JavaScript valem os controles nativos. Quem troca o valor de

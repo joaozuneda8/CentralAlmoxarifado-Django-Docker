@@ -103,7 +103,7 @@ transações precisam se comportar como no servidor.
   caixa de busca (no `select`, digitar pula para a opção que começa com o texto); é a base de todo
   painel flutuante: a casca (`.painel-flutuante`, em `componentes.css`) e o abrir e fechar animados
   (`window.Dropdown.abrirPainel`/`fecharPainel`) também servem ao painel de resultados da busca de
-  materiais (`pedidos.js`), e os tipos (select, campo com lista, árvore) só montam o controle; o
+  materiais (`pedidos.js`), e os tipos (select, campo com lista, select digitável, árvore) só montam o controle; o
   elemento original fica escondido e continua guardando o valor e disparando `change` (script
   que troca o valor de um `select` precisa disparar `change`). O `abas.js` (`[data-abas]`, `?aba=` na URL) dá as abas em pasta: a ativa se funde ao primeiro cartão
   do painel. O `filtros.js` recolhe o painel de
@@ -158,10 +158,13 @@ transações precisam se comportar como no servidor.
   do cabeçalho e de 5 linhas (`alturaDoPainel`, `LINHAS_VISIVEIS`, `--busca-limite`), a mesma no
   computador, no tablet e no celular, medida de novo quando os resultados ou a largura mudam; o resto
   rola dentro do painel. Há duas buscas de materiais: a pública (formulários) não mostra código nem
-  grupo; a do almoxarifado (saída avulsa e atendimento) mostra. A quantidade de cada
-  linha do pedido segue o mesmo padrão (`[data-alterar]` em `_carrinho.html`): texto com "Alterar",
-  e o campo só manda o `alterar` no "Confirmar" (`hx-trigger="confirmar-quantidade"`), também na
-  saída avulsa.
+  grupo; a do almoxarifado (saída avulsa e atendimento) mostra. A linha do pedido
+  (`_carrinho.html`) tem o mesmo desenho do resultado da busca, na coluna do desktop, no tablet e na
+  gaveta do celular: a linha inteira abre a quantidade (`material-abrir`, `data-alterar-abrir`; o lápis
+  só indica que clica), com a quantidade e o "Remover" embaixo; aberta, o − / + fica à esquerda, o
+  "Confirmar" à direita (no lugar do "Remover") e o ✕ vermelho em cima, com a barra azul à esquerda e as
+  outras linhas recuadas, mas clicáveis. O campo só manda o `alterar` no "Confirmar"
+  (`hx-trigger="confirmar-quantidade"`), também na saída avulsa.
 - Área do almoxarifado (`views/almoxarifado.py`): painel com filtros em SQL
   (`consultas.py`, que repete `regras.situacao_*` como `Exists`; um teste confere que
   concordam), detalhe com o atendimento, saída avulsa e recibos (`_recibo.html`, que nunca

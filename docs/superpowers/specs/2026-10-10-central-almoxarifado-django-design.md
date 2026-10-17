@@ -1,6 +1,11 @@
 # Central Almoxarifado em Django — design
 
-Data: 2026-10-10 · Situação: aguardando revisão
+Data: 2026-10-10 · Situação: implementada. Revista em 2026-10-17 com o que mudou depois: a
+implantação em Docker (`2026-10-15-docker-design.md`), a página Automações
+(`specs/004-pagina-automacoes`), o material acrescentado pelo almoxarifado
+(`2026-10-14-material-adicionado-pelo-almoxarifado-design.md`), a edição do atendimento
+(`2026-10-17-edicao-pedido-design.md`) e o de/para com a curva ABC
+(`specs/001-depara-curva-abc`). Onde uma dessas specs detalha um ponto, ela vale.
 
 ## 1. Objetivo
 
@@ -16,11 +21,11 @@ ao SCPI pelo robô e nenhuma etapa passa pelo Google.
 
 | Tema | Decisão |
 |---|---|
-| Hospedagem | Projeto Django **separado**, no mesmo servidor Windows do ProducaoLab (rede SAEP). Instalação e operação do servidor passam pelo André. |
+| Hospedagem | Projeto Django **separado**, em Docker Compose no servidor da SAEP, atrás do Apache que já existe (`2026-10-15-docker-design.md`; o desenho original era o servidor Windows do ProducaoLab). Instalação e operação do servidor passam por quem o administra (desde 2026-10-17, o João; antes, o André). |
 | PWA | Não. Aplicativo web comum, no navegador. |
 | Escopo funcional | O do Central Almoxarifado atual (pedido → atendimento → saída → SCPI). **Sem** o fluxo de autorização por chefe de setor do WMS-SAEP-v2. |
 | Interface | Design system Clean (`.claude/skills/clean-design/`, spec `2026-10-10-interface-clean-design.md`): só tema claro, fontes locais, destaque azul `#2563EB`. |
-| Robôs SCPI | Viram comandos `manage.py` do próprio projeto e rodam no servidor; o lançamento é disparado por botão no painel. |
+| Robôs SCPI | Viram comandos `manage.py` do próprio projeto e rodam no servidor; o lançamento e as importações são disparados por botão na página Automações ou pelo agendador. |
 | Curva ABC | Deixa de ser planilha: é o ranking de materiais por número de saídas do SCPI, calculado no banco e consolidado pelo de/para de códigos (antigo → canônico); a planilha MAPEAMENTO DE/PARA CONSOLIDADO também vira o cadastro de pares, as curvas por frequência e por valor e a reposição (`specs/001-depara-curva-abc`). |
 | Login | Formulários dos funcionários **abertos, em qualquer rede**; área do almoxarifado com login do Django por matrícula. |
 
@@ -37,34 +42,44 @@ ao SCPI pelo robô e nenhuma etapa passa pelo Google.
 ### Stack
 
 - Python 3.13, Django 6.x (mesma linha do WMS-Almoxarifado), `uv` para dependências.
-- Banco: o servidor MySQL 8 / MariaDB já instalado no servidor do ProducaoLab,
-  com **banco e usuário próprios** (`mysqlclient`).
+- Banco: MariaDB 11.4 num container do compose, com **banco e usuário próprios**
+  (`mysqlclient`); no desenvolvimento, MySQL 8 ou MariaDB local. (O desenho original usava o
+  banco já instalado no servidor do ProducaoLab.)
 - Interface: templates do Django, HTMX 4.0.0 vendorizado, CSS próprio com tokens,
   sem npm, bundler ou CDN.
 - Playwright + Chromium para os robôs do SCPI.
-- Servidor de aplicação: `waitress`, registrado como serviço do Windows (NSSM).
-  Opcionalmente atrás do Apache do servidor em `/almoxarifado`.
+- Servidor de aplicação: `waitress` no container `web`, atrás do Apache do servidor em
+  `/almoxarifado`; as tarefas de horário fixo rodam no container `agendador` (supercronic).
+  (O desenho original era o waitress como serviço do Windows, pelo NSSM.)
 
 ### Repositório
 
-O projeto Django fica num **repositório novo**, `CentralAlmoxarifado-Django`.
-O repositório `CentralAlmoxarifado` (Apps Script) continua como está até a
-virada e depois é arquivado (seção 8); dele vêm, como referência, `Regras.gs`,
-os testes em Node e as telas atuais.
+O projeto Django fica num **repositório novo**, `CentralAlmoxarifado-Django-Docker`.
+O repositório `CentralAlmoxarifado` (Apps Script) ficou como estava até a
+virada e foi arquivado (seção 8); dele vieram, como referência, `Regras.gs`,
+os testes em Node e as telas antigas.
 
 ```
 config/            settings (lidos do .env), urls, wsgi
-interface/         tokens.css, base.css, components.css, shell.js, htmx,
-                   parciais (_mensagens, _paginacao, _th_ordenavel) e os dois layouts
-pedidos/           regras.py, models, views e templates: formulários, painel,
-                   atendimento, saída avulsa, recibos, travas do SCPI
-catalogo/          Material, ItemLimpeza, CentroCusto, Opcao, SaidaSCPI, Importacao;
-                   montagem dos catálogos dos formulários e saúde do catálogo
-scpi/              código vindo do extrair-relatorio: browser.py, normalizadores,
-                   lançador (Playwright); management/commands:
+contas/            usuário (matrícula) e login
+interface/         clean.css, componentes.css, layouts.css, shell.js, dropdown.js,
+                   abas.js, filtros.js, htmx, ícones, parciais (_mensagens, _paginacao,
+                   _menu) e os dois layouts
+pedidos/           regras.py, servicos.py, models, views e templates: formulários,
+                   painel, atendimento e edição, saída avulsa, recibos, travas do SCPI
+catalogo/          Material, ItemLimpeza, CentroCusto, Opcao, SaidaSCPI, Importacao,
+                   ParDePara, ConfiguracaoCurva, ParametroReposicao; catálogos dos
+                   formulários, saúde do catálogo e curva ABC
+automacoes/        página Automações (importações, lançamento e histórico), sem modelos
+scpi/              código vindo do extrair-relatorio: browser.py, relatorios.py,
+                   normalizadores, leitura, gravação, lançador (Playwright);
+                   management/commands:
                      importar_cadastro · importar_estoque · importar_saidas_scpi
-                     lancar_saidas · importar_planilhas (migração única)
-deploy/            INSTALACAO.md, .bat do agendador, atualizar.bat, backup
+                     atualizar_catalogo · lancar_saidas
+implantacao/       sem modelos; management/commands:
+                     importar_planilhas e importar_depara (cargas únicas)
+                     backup_banco · robos_em_andamento
+deploy/            INSTALACAO.md, VIRADA.md, atualizar.sh, tarefa.sh, crontab (Docker)
 tests/             pytest + pytest-django
 ```
 
@@ -82,7 +97,9 @@ Dois layouts sobre o design system Clean (`.claude/skills/clean-design/`, spec
 (Geist, DM Sans e Geist Mono) e destaque azul `#2563EB`:
 
 - **Almoxarifado** (login obrigatório): shell com barra lateral branca — Painel,
-  Saída avulsa, Recibos, Catálogo, Lançamentos SCPI — em ritmo compacto.
+  Saída avulsa, Automações, Curva ABC e Cadastros (só equipe) — em ritmo compacto. (O
+  desenho original tinha Recibos, Catálogo e Lançamentos SCPI: o recibo passou ao detalhe
+  do pedido, e as outras duas viraram a página Automações.)
 - **Formulários públicos** (sem login): mesmo vocabulário, sem barra lateral, em ritmo
   arejado e priorizando o celular; busca de material e montagem do pedido com HTMX.
 
@@ -102,7 +119,8 @@ tabelas com rolagem lateral no celular. O `THIRD-PARTY-NOTICES.md` cita as fonte
 | `CentroCusto` | `descricao`, `codigo`, `placa` | admin; substitui `Centros de Custo` (o robô lê daqui) |
 | `Opcao` | `lista` (TIPO_SAIDA, GRUPO_OCULTO_AB, CATEGORIA_LIMPEZA, FUNCIONARIO), `valor`, `ordem`, `ativo` | admin; substitui a aba `Listas` |
 | `SaidaSCPI` | `id_requi`, `cadpro`, `item`, `data`, `qtd`, `valor`; único (`id_requi`, `cadpro`, `item`), com `item` a ordem da linha entre as do mesmo material na requisição | `importar_saidas_scpi`; equivale à aba `Saídas` da planilha de mapeamento (a `MOV_NORM` é a consolidação pelo de/para, calculada em `catalogo.consultas_curva`) |
-| `Importacao` | `tipo`, `inicio`, `fim`, `situacao`, `linhas`, `avisos`, `erro` | registro de cada importação; alimenta a saúde do catálogo |
+| `Importacao` | `tipo` (CADASTRO, ESTOQUE, SAIDAS, DEPARA), `inicio`, `fim`, `situacao`, `linhas`, `avisos`, `erro`, `periodo_de`, `periodo_ate` | registro de cada importação; alimenta a saúde do catálogo e o histórico de Automações |
+| `ParDePara`, `ConfiguracaoCurva`, `ParametroReposicao` | ver `specs/001-depara-curva-abc/data-model.md` | de/para de códigos e parâmetros da curva ABC e da reposição (novos) |
 
 `duplicado` marca código que veio repetido no cadastro do SCPI; esses
 materiais ficam bloqueados nos formulários, como hoje.
@@ -111,12 +129,13 @@ materiais ficam bloqueados nos formulários, como hoje.
 
 | Modelo | Campos | Substitui |
 |---|---|---|
-| `Pedido` | `id` (UUID do envio), `numero` (`P-000123` / `AV-000123`, único), `origem` (LIMPEZA, AB, AVULSA), `criado_em`, `solicitante`, `destino`, `obs`, `registrado_por` (FK usuário, só AVULSA) | aba `Pedidos` (cabeçalho) |
-| `ItemPedido` | `pedido`, retrato do material no aceite (`codigo`, `material`, `unidade`, `categoria`, `grupo`, `subgrupo`, `estoque_no_pedido`), `qtd_pedida`, `qtd_entregue` | aba `Itens` |
-| `Atendimento` | `pedido` (1:1), `id` (UUID), `data_efetiva`, `recebedor`, `centro_custo`, `tipo_saida`, `placa`, `obs`, `atendido_em`, `atendido_por`, `recibo_impresso_em` | colunas de atendimento de `Pedidos` |
+| `Pedido` | `id` (UUID do envio), `numero` (`P-000123` / `AV-000123`, único), `origem` (LIMPEZA, AB, AVULSA), `criado_em`, `solicitante`, `destino`, `obs`, `registrado_por` (FK usuário, só AVULSA), `ip` (limites por IP), `versao` (edição do atendimento) | aba `Pedidos` (cabeçalho) |
+| `ItemPedido` | `pedido`, retrato do material no aceite (`codigo`, `material`, `unidade`, `categoria`, `grupo`, `subgrupo`, `estoque_no_pedido`), `qtd_pedida`, `qtd_entregue`, `origem` (PEDIDO, ALMOXARIFADO), `no_lugar_de` e `adicionado_por` (material trocado ou acrescentado no atendimento) | aba `Itens` |
+| `Atendimento` | `pedido` (1:1), `id` (UUID), `data_efetiva`, `recebedor`, `centro_custo`, `tipo_saida`, `placa`, `obs`, `nao_lancar`, `atendido_em`, `atendido_por`, `recibo_impresso_em` | colunas de atendimento de `Pedidos` |
+| `AlteracaoPedido` | `pedido`, `usuario`, `em`, `versao`, `diferencas`, `scpi_antes` | histórico da edição do atendimento (novo) |
 | `LinhaSaida` | `atendimento`, `seq`, `data`, `qtd`, `codigo`, `descricao`, `recebedor`, `centro_custo`, `tipo_saida`, `placa`, `obs`, `lote` (= número do pedido), `status`, `requisicao_scpi`, `lancado_em`, `mensagem` | aba `Saídas` (contrato com o robô) |
-| `ExecucaoRobo` | `tipo` (LANCAMENTO, IMPORTACAO), `iniciada_por`, `inicio`, `fim`, `situacao`, `resumo`, `log` | o terminal onde o robô roda hoje |
-| `Sequencia` | `prefixo`, `ultimo` | numeração; travada com `select_for_update` |
+| `ExecucaoRobo` | `simulacao`, `iniciada_por`, `inicio`, `fim`, `situacao`, `resumo`, `log`, `erro`; só o lançamento (as importações ficam na `Importacao`) | o terminal onde o robô rodava |
+| `Sequencia` | `nome`, `ultimo` | numeração; travada com `select_for_update` |
 
 `LinhaSaida.status`: `PENDENTE`, `EM_LANCAMENTO`, `LANCADA`, `ERRO`,
 `VERIFICAR`, `NAO_LANCAR`. O "não lançar" deixa de ser texto na observação
@@ -185,17 +204,19 @@ uma a uma e com os mesmos textos de erro:
    confirma; outro atendimento para o mesmo pedido é recusado.
 4. **Saída avulsa.** `Pedido` AVULSA, `Atendimento` e `LinhaSaida` numa
    transação; `registrado_por` = usuário logado. Após gravar, oferece o recibo.
-5. **Recibos.** Página de impressão de um ou vários atendimentos (lote dos
-   pendentes); `recibo_impresso_em` é gravado só na primeira impressão.
-   O recibo impresso não mostra quem registrou.
-6. **Lançar no SCPI.** Botão no painel cria `ExecucaoRobo` e inicia
+5. **Recibos.** O "Imprimir recibo" do detalhe do pedido imprime a própria página e
+   depois pergunta se saiu na impressora; a confirmação grava `recibo_impresso_em` (e
+   confere a versão do pedido, que a edição muda). O atalho do painel filtra os não
+   impressos. O recibo impresso não mostra quem registrou. (A página de impressão em
+   lote do desenho original foi removida.)
+6. **Lançar no SCPI.** Botão na página Automações (aba Lançamento no SCPI; o
+   painel tem um atalho) cria `ExecucaoRobo` e inicia
    `manage.py lancar_saidas --execucao <id>` em processo separado. Botão
-   bloqueado enquanto houver execução em andamento (verificado no banco, além
-   da trava de arquivo do robô). O robô agrupa as linhas `PENDENTE` por
+   bloqueado enquanto houver execução em andamento (trava `GET_LOCK` no banco). O robô agrupa as linhas `PENDENTE` por
    `lote`; para cada grupo grava `EM_LANCAMENTO` e confirma a transação
    **antes** de abrir o formulário no SCPI; depois grava `LANCADA` +
    `requisicao_scpi` + `lancado_em`, ou `ERRO` + mensagem, ou `VERIFICAR`
-   quando o resultado é incerto. O painel atualiza o andamento por HTMX a
+   quando o resultado é incerto. A aba atualiza o andamento por HTMX a
    cada poucos segundos. Uma opção "simulação" executa com `--dry-run`.
 7. **Resolver travas.** Para linha em `VERIFICAR` (ou `EM_LANCAMENTO` órfã):
    informar o nº da requisição (→ `LANCADA`), liberar para relançar
@@ -203,12 +224,12 @@ uma a uma e com os mesmos textos de erro:
    e liberada. O sistema nunca destrava sozinho. Casos raros: admin do Django.
 8. **Importações.** Agendadas e também disparáveis por botão "Atualizar agora":
    - `importar_cadastro`: insere/atualiza `Material`, marca `oculto` e `duplicado`;
-     material que some do cadastro é marcado oculto (não apagado, pois há
-     histórico de pedidos).
+     na recarga completa, material que some do cadastro é marcado oculto (não
+     apagado, pois há histórico de pedidos). O robô diário só traz os novos.
    - `importar_estoque`: substitui todos os saldos; código ausente = 0.
      CSV vazio aborta sem alterar nada.
    - `importar_saidas_scpi`: busca apenas o intervalo novo (estado guardado
-     em `Importacao`), sem duplicar (`id_requi`, `cadpro`).
+     em `Importacao`), sem duplicar (`id_requi`, `cadpro`, `item`).
    Cada execução grava `Importacao`.
 
 ## 6. Erros
@@ -221,9 +242,9 @@ uma a uma e com os mesmos textos de erro:
 - **Importação com falha:** dados anteriores intactos; erro exibido na saúde
   do catálogo. Saldo com mais de 24 h sem atualização gera aviso.
 - **Robô interrompido:** linhas `EM_LANCAMENTO` ficam travadas até conferência
-  humana (fluxo 7); `ExecucaoRobo` sem fim há mais de 1 h aparece como
-  "interrompida" e libera o botão.
-- **Logs:** arquivo com rotação em `logs/` (fora do git).
+  humana (fluxo 7); `ExecucaoRobo` sem fim, sem a trava do robô ocupada e criada
+  há mais de 60 s aparece como "interrompida" e libera o botão.
+- **Logs:** arquivo com rotação em `logs/` (fora do git); no servidor, em `dados/logs/`.
 
 ## 7. Testes
 
@@ -268,10 +289,14 @@ Substituída pela implantação em Docker: `2026-10-15-docker-design.md`.
    Lista_Limpeza. Nenhuma credencial Google entra no projeto. Mantém os números
    P-/AV- (a `Sequencia` continua do maior), requisições e status das linhas
    (o texto "FORA DE ESTOQUE"/"NÃO LANÇAR" na observação vira `NAO_LANCAR`).
-2. Carga inicial: `importar_cadastro`, `importar_estoque` e histórico completo
-   de `importar_saidas_scpi`.
+2. Carga inicial: `importar_cadastro`, `importar_estoque` e `importar_saidas_scpi`
+   desde 01/01/2026 (`curva.INICIO_DADOS_CONFIAVEIS`: os dados anteriores não são
+   confiáveis).
 
 ### Virada
+
+Situação: feita, salvo a liberação do lançamento real (`deploy/VIRADA.md`, que tem a
+ordem seguida e a situação de cada passo).
 
 1. Período em paralelo com o lançamento em `--dry-run`, conferindo pedidos,
    atendimentos e lotes contra o Apps Script.

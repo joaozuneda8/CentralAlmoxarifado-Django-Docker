@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-15
 
-**Status**: Draft
+**Status**: Implementada
 
 **Input**: User description: "quero unir as paginas catalogo e lancamentos scpi em uma só pagina de
 gerenciamento de automacoes"

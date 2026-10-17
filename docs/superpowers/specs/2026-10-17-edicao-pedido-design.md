@@ -1,6 +1,6 @@
 # Edição do atendimento até o lançamento no SCPI
 
-Data: 2026-10-17. Acrescenta à área do almoxarifado a edição de um pedido já atendido (ou de uma
+Data: 2026-10-17 · Situação: implementada. Acrescenta à área do almoxarifado a edição de um pedido já atendido (ou de uma
 saída avulsa) enquanto as linhas de saída ainda não foram lançadas no SCPI. Os esboços de baixa
 fidelidade estão em `docs/superpowers/esbocos/2026-10-17-edicao-pedido/` (ver a seção 9 para o
 que mudou depois deles).

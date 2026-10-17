@@ -1,5 +1,9 @@
 # Subprojeto 5 — Implantação e migração: plano de implementação
 
+> **Situação:** executado. As caixas abaixo não foram marcadas durante a execução; o que vale
+> hoje está no código e no `CLAUDE.md`. A instalação no servidor Windows (NSSM, Agendador, `.bat`)
+> foi trocada pelo Docker Compose (`2026-10-15-docker.md`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** O sistema sobe no servidor Windows do ProducaoLab, recebe os dados das planilhas do

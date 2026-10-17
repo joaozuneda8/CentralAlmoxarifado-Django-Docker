@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-14
 
-**Status**: Draft
+**Status**: Implementada
 
 **Input**: User description: "pode fazer tudo" — aplicar as 10 propostas da auditoria de fluxo e
 usabilidade da página Painel › Lançamentos SCPI (ação principal, opções de execução, fila de

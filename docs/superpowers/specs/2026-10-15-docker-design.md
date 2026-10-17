@@ -1,6 +1,6 @@
 # Implantação em Docker
 
-Data: 2026-10-15. Substitui a implantação no Windows (serviço NSSM, Agendador de Tarefas,
+Data: 2026-10-15 · Situação: implementada e em produção. Substitui a implantação no Windows (serviço NSSM, Agendador de Tarefas,
 `.bat`) descrita na seção 8 da spec principal
 (`2026-10-10-central-almoxarifado-django-design.md`). O código da aplicação, a migração das
 planilhas e a virada (`deploy/VIRADA.md`) continuam como estão; muda o que roda o sistema.
@@ -75,9 +75,11 @@ navegador ──HTTPS──> Apache (certificado, /almoxarifado)
 Três serviços, todos `restart: unless-stopped`, e `env_file: .env` nos dois da aplicação.
 
 - `banco`: `mariadb:11.4`, com `--character-set-server=utf8mb4
-  --collation-server=utf8mb4_unicode_ci`. Banco, usuário e senhas vêm do `.env`
-  (`MARIADB_DATABASE`=`DB_NAME`, `MARIADB_USER`=`DB_USER`, `MARIADB_PASSWORD`=`DB_PASSWORD`,
-  `MARIADB_ROOT_PASSWORD` próprio). Volume nomeado `banco-dados`. **Nenhuma porta publicada.**
+  --collation-server=utf8mb4_unicode_ci`. Banco, usuário e senha vêm do `.env`
+  (`MARIADB_DATABASE`=`DB_NAME`, `MARIADB_USER`=`DB_USER`, `MARIADB_PASSWORD`=`DB_PASSWORD`);
+  a senha do root (`MARIADB_ROOT_PASSWORD`) vem do `.env.banco`, que só o `banco` lê: o `.env`
+  vai inteiro ao `web`, exposto à internet. Volume nomeado `banco-dados`. **Nenhuma porta
+  publicada.**
   Healthcheck com o `healthcheck.sh --connect --innodb_initialized` da imagem oficial.
 - `web`: o waitress
   `--listen=0.0.0.0:8010 --threads=8 --url-prefix=${PREFIXO_URL} --trusted-proxy=*
@@ -91,13 +93,14 @@ Três serviços, todos `restart: unless-stopped`, e `env_file: .env` nos dois da
 
 O compose força, por cima do `.env`: `DB_HOST=banco`, `DB_PORT=3306`, `SCPI_HEADLESS=1`,
 `MYSQLDUMP=mariadb-dump`, `LOG_DIR=/dados/logs`, `BACKUP_DIR=/dados/backups`,
-`SCPI_PERFIL_DIR=/dados/perfil`.
+`SCPI_PERFIL_DIR=/dados/perfil` e `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright` (o valor vazio do
+`.env` apagaria o `ENV` da imagem, e os robôs ficariam sem o Chromium).
 
 Volumes:
 
 | Onde | O quê | Por quê |
 |---|---|---|
-| `./dados/logs` → `/dados/logs` | logs, CSVs enviados, journal do lançamento | o André lê do host |
+| `./dados/logs` → `/dados/logs` | logs, CSVs enviados, journal do lançamento | quem administra o servidor lê do host |
 | `./dados/backups` → `/dados/backups` | dumps diários (também o manual pelo `web`) | copiar para outra máquina |
 | `./dados/importacao` → `/dados/importacao:ro` (só `web`) | `.xlsx` da virada | `importar_planilhas`, `importar_depara` |
 | volume `perfil-navegador` → `/dados/perfil` | perfis do Chromium | comum a `web` e `agendador` |
@@ -144,11 +147,11 @@ Cada linha chama `/app/deploy/tarefa.sh <comando>`, que acrescenta ao
   paralelo do `CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS`: o robô não recebe o Ctrl+C nem o
   SIGHUP do grupo do waitress. Parar ou recriar o container `web` ainda mata os robôs dele; por
   isso o `atualizar.sh` confere `robos_em_andamento` antes.
-- `.env.example`: entram `PORTA_PUBLICADA` e `MARIADB_ROOT_PASSWORD`; saem as variáveis que o
-  compose define (`DB_HOST`, `DB_PORT`, `SCPI_HEADLESS`, `SCPI_PERFIL_DIR`,
-  `PLAYWRIGHT_BROWSERS_PATH`, `LOG_DIR`, `BACKUP_DIR`, `MYSQLDUMP`), com uma nota de que o
-  desenvolvimento local ainda pode defini-las. O `settings.py` não muda: todas já são lidas do
-  ambiente.
+- `.env.example`: entra `PORTA_PUBLICADA`, e o `MARIADB_ROOT_PASSWORD` fica num
+  `.env.banco.example` à parte. As variáveis que o compose define (`DB_HOST`, `DB_PORT`,
+  `SCPI_HEADLESS`, `SCPI_PERFIL_DIR`, `PLAYWRIGHT_BROWSERS_PATH`, `LOG_DIR`, `BACKUP_DIR`,
+  `MYSQLDUMP`) vão para um bloco "Só no desenvolvimento local", no fim do arquivo, que o
+  compose ignora. O `settings.py` não muda: todas já são lidas do ambiente.
 
 ## 3. Operação
 
@@ -158,7 +161,8 @@ Bash, `set -eu`, rodado da raiz do repositório no host (Linux ou WSL2). O corpo
 chamada na última linha (o bash lê o script aos poucos e o `git pull` pode trocá-lo no meio):
 
 1. `docker compose run --rm web python manage.py robos_em_andamento` (com `run`, e não `exec`, funciona também com o `web` parado)
-2. `git pull --ff-only`
+2. `git pull --ff-only`, seguido do aviso (sem parar) das variáveis dos arquivos de exemplo
+   que faltam no `.env` e no `.env.banco`
 3. `docker compose build`
 4. `docker compose run --rm web python manage.py migrate --noinput`
 5. `docker compose run --rm web python manage.py check --deploy --fail-level WARNING`
@@ -173,7 +177,8 @@ novo." O `collectstatic` saiu da lista porque roda no build.
 - `deploy/INSTALACAO.md`, reescrito: requisitos (Docker Engine e o plugin compose; em Linux
   pelo repositório oficial; em Windows Server 2022+ pelo WSL2 com systemd, com o aviso de que o
   Docker Desktop não é suportado em Windows Server e exige licença paga em empresa grande);
-  WSL2 subindo com o servidor (tarefa de inicialização que roda `wsl -d <distro> --exec true`);
+  WSL2 subindo com o servidor (tarefa de inicialização que roda
+  `wsl -d <distro> --exec sleep infinity`, que mantém a distribuição aberta);
   clonar o repositório; `.env`; `docker compose up -d`; `migrate`; `createsuperuser`;
   `check --deploy`; Apache (`ProxyPass` para `127.0.0.1:8010` ou para o IP da VM); backup e
   restauração (`gunzip -c <arquivo> | docker compose exec -T banco mariadb -u root -p...`);
@@ -209,6 +214,9 @@ Em `tests/test_scripts_servidor.py` (os de `robos_em_andamento` ficam):
 A suíte inteira, o `ruff` e o `makemigrations --check` continuam passando localmente.
 
 ### Conferência manual (precisa de Docker)
+
+Situação: feita no servidor, pela conferência da seção 10 do `deploy/INSTALACAO.md`; o
+sistema roda em produção desde então.
 
 Esta máquina de desenvolvimento não tem Docker; a imagem só é construída onde houver. Quem
 tiver Docker confere, antes da instalação no servidor:

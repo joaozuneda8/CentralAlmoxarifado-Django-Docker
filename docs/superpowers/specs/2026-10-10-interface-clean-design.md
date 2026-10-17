@@ -1,6 +1,9 @@
 # Interface no estilo Clean — design
 
-Data: 2026-10-10 · Situação: aguardando revisão
+Data: 2026-10-10 · Situação: implementada; histórica. O que vale hoje é o `docs/DESIGN.md` e
+o código: o menu, as páginas e os limites de largura mudaram depois (por exemplo, a barra
+lateral vira cabeçalho até 1286px, não abaixo de 900px, e as páginas Recibos, Catálogo e
+Lançamentos SCPI deram lugar ao recibo no detalhe e à página Automações).
 
 ## 1. Objetivo
 

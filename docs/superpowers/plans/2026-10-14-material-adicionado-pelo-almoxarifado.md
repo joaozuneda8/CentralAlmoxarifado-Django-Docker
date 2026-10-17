@@ -1,5 +1,8 @@
 # Material adicionado pelo almoxarifado — plano de implementação
 
+> **Situação:** executado. As caixas abaixo não foram marcadas durante a execução; o que vale
+> hoje está no código e no `CLAUDE.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** No atendimento, o almoxarifado troca um material pedido por outro ou acrescenta um material, e o pedido guarda separados o que o solicitante pediu e o que o almoxarifado acrescentou.

@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-12
 
-**Status**: Draft
+**Status**: Implementada
 
 **Input**: User description: "De/para de códigos (antigo → canônico) e curva ABC consolidada, substituindo a planilha MAPEAMENTO DE/PARA CONSOLIDADO"
 

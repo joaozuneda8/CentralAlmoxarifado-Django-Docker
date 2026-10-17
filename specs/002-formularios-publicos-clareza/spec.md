@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-13
 
-**Status**: Draft
+**Status**: Implementada
 
 **Input**: User description: "quero aplicar tudo" — aplicar as 11 propostas da revisão de
 usabilidade dos formulários públicos de pedido de materiais (início, formulário de limpeza,

@@ -1,10 +1,11 @@
 # Design do Central Almoxarifado — Clean
 
 A interface segue o design system **Clean**: editorial, com espaço em branco de sobra,
-tipografia precisa e nada de enfeite. A autoridade visual é a skill
-`.claude/skills/clean-design/`; onde ela e o projeto divergem, valem as decisões da spec
-`docs/superpowers/specs/2026-10-10-interface-clean-design.md` (só tema claro, dois ritmos,
-nada de seções de landing page nem *scroll reveal*).
+tipografia precisa e nada de enfeite. A base visual é a skill
+`.claude/skills/clean-design/`; onde ela e o projeto divergem, valem este arquivo e o que já
+está no código, como diz o `CLAUDE.md`. As decisões de origem (só tema claro, dois ritmos,
+nada de seções de landing page nem *scroll reveal*) estão na spec, hoje histórica,
+`docs/superpowers/specs/2026-10-10-interface-clean-design.md`.
 
 ## Arquivos
 
@@ -83,9 +84,9 @@ Use estes nomes, e nenhum outro para essas funções.
 | Busca de materiais | `busca-area`, `busca-principal` (campo em destaque: 56px, borda azul de 2px), `busca-painel` (`#resultados`, painel no fluxo da página, logo abaixo da busca, em qualquer tela: o cartão do passo cresce com ele, a página rola para a busca subir e a altura é a do cabeçalho e de 5 linhas) |
 | Painel flutuante (base) | `painel-flutuante` (casca; estados `aberto` e `fechando`) |
 | Dropdown | `dropdown` (envolve o campo), `dropdown-gatilho`, `dropdown-valor`, `dropdown-seta`, `dropdown-combo`, `dropdown-painel`, `dropdown-lista`, `dropdown-grupo`, `dropdown-opcao`, `dropdown-texto`, `dropdown-check`, `dropdown-sem-opcoes`; montados pelo `dropdown.js` |
-| Resultados | `resultados-vazio` ("Nenhum material encontrado."; o painel não tem legenda); `material-info` (linha de baixo do material); com o material no pedido, o botão diz "Alterar (N)" (`pedidos.js`) |
-| Carrinho | `carrinho`, `carrinho-barra` (fixa), `carrinho-gaveta` (`<dialog>` sempre que o pedido cairia embaixo da busca, isto é, passo com menos de 760px: `data-gaveta` no `<html>`; bloco azul ao lado da busca nos demais casos), `carrinho-lista`, `carrinho-linha`, `carrinho-linha-erro`; nos formulários públicos e na saída avulsa (com os textos da saída), `carrinho-barra-contagem`, `carrinho-barra-vazia`, `carrinho-acoes-gaveta` (enviar e adicionar mais) e a quantidade em dois passos (`carrinho-qtd-texto`, `carrinho-qtd-area`, `carrinho-confirmar`, `carrinho-cancelar`, `carrinho-remover`; a linha toda é o `material-abrir`, com o lápis `material-mais`, como no resultado da busca; estado `aberto` no `[data-alterar]`) |
-| Envio recusado (formulário público) | `resumo-erros` (+ `resumo-erros-titulo`, focável, com link para o campo), `campo-com-erro` + `campo-erro` com ícone embaixo do campo; `botao-esquecer` ("Não é você? Limpar"); `sucesso-itens` (lista da tela de sucesso) |
+| Resultados | `resultados-vazio` ("Nenhum material encontrado."; o painel não tem legenda); `material-info` (linha de baixo do material); com o material no pedido, o selo "N no pedido" (`material-no-pedido`) aparece ao lado da informação, e o botão que abre a linha diz ao leitor de tela "Alterar …, N no pedido" (`pedidos.js`) |
+| Carrinho | `carrinho`, `carrinho-barra` (fixa), `carrinho-gaveta` (`<dialog>` sempre que não cabe a coluna do pedido ao lado dos passos, isto é, área dos passos, `.pedido-layout`, com menos de 960px, o mesmo limite do `pedido-grade`: `data-gaveta` no `<html>`, posto pelo `<head>` abaixo de 768px de tela e acompanhado pelo `pedidos.js`; bloco azul ao lado da busca nos demais casos), `carrinho-lista`, `carrinho-linha`, `carrinho-linha-erro`; nos formulários públicos e na saída avulsa (com os textos da saída), `carrinho-barra-contagem`, `carrinho-barra-vazia`, `carrinho-acoes-gaveta` (enviar e adicionar mais) e a quantidade em dois passos (`carrinho-qtd-texto`, `carrinho-qtd-area`, `carrinho-confirmar`, `carrinho-cancelar`, `carrinho-remover`; a linha toda é o `material-abrir`, com o lápis `material-mais`, como no resultado da busca; estado `aberto` no `[data-alterar]`) |
+| Envio recusado (formulário público) | `resumo-erros` (+ `resumo-erros-titulo`, focável, com link para o campo), `campo-com-erro` + `campo-erro` com ícone embaixo do campo; `acao-limpar` (o "Limpar" dentro dos campos Nome e Destino: `botao-suave acao-campo` num `com-acao`, visível enquanto o campo tem valor; apaga o campo e o que ficou lembrado dele); `sucesso-itens` (lista da tela de sucesso) |
 | Recibo e atendimento | `recibo-grupo` (linha de grupo da tabela de materiais: "Pedido pelo solicitante" e o selo `selo-info` "Adicionado pelo almoxarifado", só com material acrescentado; no atendimento, a dos acrescentados some enquanto o grupo está vazio), `recibo-nota` (nota pequena embaixo do nome: "Trocado por …", "No lugar de …"), `atendimento-painel` (+ `atendimento-painel-titulo`; painel de busca da troca e do acréscimo, um `<form>` com os resultados de sempre; na troca, o `pedidos.js` o põe numa `atendimento-painel-linha` logo abaixo do material, preso à esquerda da rolagem) |
 | Vazio | `vazio`, `vazio-titulo` |
 | Dados | `dados` (`<dl>` em grade de rótulo e valor) |
@@ -119,8 +120,9 @@ o Django admin e `<input type="date">`.
 `{% include "interface/_icone.html" with nome="busca" %}` desenha um SVG inline no estilo
 Lucide (traço 1.5, `currentColor`, `aria-hidden`). O conjunto é fechado: `caixa`, `busca`,
 `mais`, `menos`, `lixeira`, `impressora`, `sair`, `seta-direita`, `seta-esquerda`, `alerta`,
-`check`, `menu`, `fechar`, `painel`, `recibo`, `catalogo`, `cadastros`, `saida`, `enviar`,
-`olho`, `robo`, `grafico`, `trocar`. Nome
+`check`, `check-duplo`, `caixa-check`, `menu`, `fechar`, `painel`, `recibo`, `catalogo`,
+`cadastros`, `saida`, `enviar`, `olho`, `robo`, `usuario`, `cadeado`, `info`, `grafico`,
+`filtro`, `seta-baixo`, `atualizar`, `trocar`, `lapis`. Nome
 desconhecido não desenha nada. Ícone novo entra no `_icone.html`, com os traços do Lucide.
 Nunca emoji na interface.
 
@@ -143,12 +145,14 @@ Nunca emoji na interface.
   com `noSwap` fica no `base.html`.
 - Bloco de cabeçalho vazio (`rotulo`, `sub`) não deixa buraco: o `<p>` do layout fica sem
   espaço dentro e some pelo `:empty`.
-- Os resultados da busca de materiais abrem num painel preso ao campo (ao focar, digitar ou
-  trocar o filtro) e fecham com Esc ou ao sair da área; sem JavaScript ficam na página. Os
+- Os resultados da busca de materiais abrem num painel logo abaixo do campo, no fluxo da
+  página (ao focar, digitar ou trocar o filtro) e fecham com Esc ou ao sair da área; sem JavaScript ficam na página. Os
   formulários públicos buscam só pelo nome; a saída avulsa também pelo código.
-- Abaixo de 768px, "Seu pedido" vira uma barra fixa no rodapé que abre uma gaveta (`<dialog>`);
-  sem JavaScript, ou no desktop, o pedido aparece na página. O material já escolhido ganha o selo
-  "No pedido" nos resultados, para as duas listas não se confundirem.
+- Sem largura para a coluna do pedido ao lado dos passos (área dos passos com menos de 960px:
+  celular, tablet ou tela com a barra lateral), "Seu pedido" vira uma barra fixa no rodapé que
+  abre uma gaveta (`<dialog>`); sem JavaScript, ou com espaço, o pedido aparece na página. O
+  material já escolhido ganha o selo "N no pedido" nos resultados, para as duas listas não se
+  confundirem.
 - Até 1286px de largura a barra lateral vira cabeçalho com o botão `menu`/`fechar`
   (`aria-expanded`, Esc fecha). Sem JavaScript, a navegação fica aberta.
 
@@ -162,9 +166,9 @@ cinza com texto preto.
 ## Tela nova
 
 1. Carregue a skill `clean-design` e leia este arquivo.
-2. Estenda `interface/base_publico.html` (blocos `rotulo`, `heading`, `sub`, `page`,
-   `rodape`) ou `interface/base_almoxarifado.html` (`rotulo`, `heading`, `sub`, `tools`,
-   `page`).
+2. Estenda `interface/base_publico.html` (blocos `voltar`, `rotulo`, `heading`, `sub`, `page`,
+   `rodape`) ou `interface/base_almoxarifado.html` (`voltar`, `rotulo`, `heading`, `sub`,
+   `tools`, `page`; o `voltar` traz "Voltar ao painel" por padrão).
 3. Monte a página só com o vocabulário acima. CSS próprio da app fica no CSS da app, carregado
    pelo bloco `extra_css`.
 4. Destino novo do menu entra em `ITENS_MENU` (`interface/navegacao.py`) com um ícone do

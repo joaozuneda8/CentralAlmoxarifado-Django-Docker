@@ -999,7 +999,7 @@
 
   function atualizarPedido() {
     var carrinho = document.querySelector("[data-carrinho]");
-    // "Alterar (N)" nos resultados que já estão no pedido.
+    // Selo "N no pedido" (e o rótulo do leitor de tela) nos resultados que já estão no pedido.
     document.querySelectorAll("#resultados [data-codigo]").forEach(rotularAbrir);
     if (!carrinho || carrinho.hasAttribute("data-visto")) return;
     // Trecho novo do carrinho: reabre a gaveta, abre para um alerta e pulsa a barra.

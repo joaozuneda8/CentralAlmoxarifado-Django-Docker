@@ -1,6 +1,6 @@
 # Material adicionado pelo almoxarifado no atendimento — design
 
-Data: 2026-10-14 · Situação: aguardando revisão
+Data: 2026-10-14 · Situação: implementada
 
 ## 1. Objetivo
 
@@ -71,6 +71,10 @@ Nova `CheckConstraint`: `qtd > 0`. É a terceira trava contra linha zerada ou ne
 3. o banco recusa a gravação (nova), inclusive pelo admin.
 
 ### 2.3 Migrations
+
+> **Histórico.** A regeneração abaixo valeu só antes da importação das planilhas no
+> servidor. Hoje o servidor está em produção: toda mudança de modelo ganha migration nova,
+> nunca regenerada (`CLAUDE.md`, Convenções).
 
 Ainda não houve a importação das planilhas no servidor (passo 3 de `deploy/VIRADA.md`): a migration
 de `pedidos` é **regenerada** e o banco local recriado, como manda o CLAUDE.md. A `implantacao`

@@ -508,6 +508,8 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 .tabela-pedidos .col-numero a:focus-visible::after { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: var(--raio-controle); }
 .tabela-pedidos .col-pessoa { min-width: 11rem; }
 .tabela-pedidos .col-destino { min-width: 13rem; }
+/* Situação e SCPI numa coluna só: o selo do SCPI embaixo do da situação. */
+.situacao-selos { display: flex; flex-direction: column; align-items: flex-start; gap: var(--esp-meio); }
 /* Estreita (celular, ou tela pequena com a barra lateral): cada pedido vira um cartão. */
 @container (max-width: 720px) {
   .tabela-pedidos thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -523,7 +525,8 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
   .tabela-pedidos .col-destino { order: 4; flex-basis: 100%; font-size: 0.875em; color: var(--texto-secundario); }
   .tabela-pedidos .col-origem { order: 5; }
   .tabela-pedidos .col-situacao { order: 6; }
-  .tabela-pedidos .col-scpi { order: 7; }
+  /* No cartão, os dois selos voltam a ficar lado a lado, quebrando linha se faltar largura. */
+  .situacao-selos { flex-direction: row; flex-wrap: wrap; gap: 6px var(--esp-1); }
 }
 /* No tablet, cabe tudo na primeira linha: o Nº com os selos ao lado e a data à direita; embaixo,
    quem pediu e o destino. No celular, os selos ficam embaixo, como acima. */
@@ -531,10 +534,9 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
   .tabela-pedidos .col-numero { flex: none; margin-right: var(--esp-meio); }
   .tabela-pedidos .col-origem { order: 2; }
   .tabela-pedidos .col-situacao { order: 3; }
-  .tabela-pedidos .col-scpi { order: 4; }
-  .tabela-pedidos .col-data { order: 5; margin-left: auto; }
-  .tabela-pedidos .col-pessoa { order: 6; margin-top: 2px; }
-  .tabela-pedidos .col-destino { order: 7; }
+  .tabela-pedidos .col-data { order: 4; margin-left: auto; }
+  .tabela-pedidos .col-pessoa { order: 5; margin-top: 2px; }
+  .tabela-pedidos .col-destino { order: 6; }
 }
 .botao-suave[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
 

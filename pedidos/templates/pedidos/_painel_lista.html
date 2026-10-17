@@ -14,7 +14,6 @@ Lista do painel (a view devolve só este trecho quando recebe `HX-Request`). Na 
         <th scope="col">Pessoa</th>
         <th scope="col">Destino / centro de custo</th>
         <th scope="col">Situação</th>
-        <th scope="col">SCPI</th>
       </tr>
     </thead>
     <tbody>
@@ -26,8 +25,7 @@ Lista do painel (a view devolve só este trecho quando recebe `HX-Request`). Na 
         <td class="tabela-data col-data">{{ p.criado_em|date:"d/m/Y H:i" }}</td>
         <td class="col-pessoa"{% if p.origem != "AVULSA" %} data-rotulo="Solicitante"{% endif %}>{% if p.origem == "AVULSA" %}<span class="texto-secundario">Recebedor:</span> {{ a.recebedor|default:"—" }}{% else %}{{ p.solicitante }}{% if a %}<span class="texto-secundario">, recebeu:</span> {{ a.recebedor }}{% endif %}{% endif %}</td>
         <td class="col-destino" data-rotulo="{% if p.origem == "AVULSA" %}Centro de custo{% else %}Destino{% endif %}">{% if p.origem == "AVULSA" %}{{ a.centro_custo }} · {{ a.tipo_saida }}{% else %}{{ p.destino }}{% endif %}</td>
-        <td class="col-situacao"><span class="selo {{ situacao.chave|badge_situacao }}">{{ situacao.rotulo }}</span></td>
-        <td class="col-scpi"><span class="selo {{ scpi.chave|badge_scpi }}">SCPI: {{ scpi.rotulo }}</span></td>
+        <td class="col-situacao"><div class="situacao-selos"><span class="selo {{ situacao.chave|badge_situacao }}">{{ situacao.rotulo }}</span><span class="selo {{ scpi.chave|badge_scpi }}">SCPI: {{ scpi.rotulo }}</span></div></td>
       </tr>
       {% endwith %}
       {% endfor %}

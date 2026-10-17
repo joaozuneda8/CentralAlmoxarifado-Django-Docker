@@ -258,6 +258,8 @@ def test_dropdown_js_select_digitavel_so_aceita_uma_opcao_da_lista():
     js = open(finders.find("interface/js/dropdown.js"), encoding="utf-8").read()
     assert 'hasAttribute("data-dropdown-digitavel")' in js and "function montarDigitavel" in js
     assert "if (d.digitavel) atualizarGatilho(d);" in js
+    # O aria-activedescendant vai para o campo visível, não para o <select> escondido.
+    assert 'return d.tipo === "combo" ? d.controle : d.lista;' in js
     assert 'd.digitavel && k === "Enter"' in js
 
 

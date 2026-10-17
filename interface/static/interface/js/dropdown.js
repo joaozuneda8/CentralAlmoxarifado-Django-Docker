@@ -182,9 +182,10 @@
     });
   }
 
-  // Quem recebe o foco e o `aria-activedescendant`: o próprio campo (campo com lista) ou a lista.
+  // Quem recebe o foco e o `aria-activedescendant`: o campo de texto visível (campo com lista e select
+  // digitável, onde o <select> escondido só guarda o valor) ou a lista.
   function teclado(d) {
-    return d.tipo === "combo" ? d.campo : d.lista;
+    return d.tipo === "combo" ? d.controle : d.lista;
   }
 
   function selecionada(d, o) {

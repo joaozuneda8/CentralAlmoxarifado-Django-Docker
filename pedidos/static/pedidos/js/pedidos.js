@@ -29,11 +29,14 @@
   });
 
   // Esc na quantidade aberta (adicionar ou alterar em dois passos) só a fecha; o painel de
-  // resultados e a gaveta do pedido ficam abertos.
+  // resultados e a gaveta do pedido ficam abertos. Na linha do pedido, o botão que a abre (a linha
+  // toda) fica fora da ação: o Esc nele também a fecha.
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Escape" || !e.target.closest) return;
     var acao = e.target.closest("[data-adicionar].aberto");
     var alterar = e.target.closest("[data-alterar].aberto");
+    if (!alterar && e.target.matches("[data-alterar-abrir]")) alterar = acaoDeAlterar(e.target);
+    if (alterar && !alterar.classList.contains("aberto")) alterar = null;
     if (!acao && !alterar) return;
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -51,10 +54,21 @@
     return evento;
   }
 
+  // A linha do pedido: o botão que a abre (a linha toda, transparente) e a ação (`[data-alterar]`, com a
+  // quantidade, o Confirmar e o Remover) são irmãos dentro do <li>.
+  function botaoDeAlterar(linha) {
+    var item = linha && linha.closest("li");
+    return item && item.querySelector("[data-alterar-abrir]");
+  }
+  function acaoDeAlterar(botao) {
+    var item = botao && botao.closest("li");
+    return item && item.querySelector("[data-alterar]");
+  }
+
   function fecharAlteracao(linha, devolverFoco) {
     if (!linha || !linha.classList.contains("aberto")) return;
     linha.classList.remove("aberto");
-    var abrir = linha.querySelector("[data-alterar-abrir]");
+    var abrir = botaoDeAlterar(linha);
     if (!abrir) return;
     abrir.setAttribute("aria-expanded", "false");
     if (devolverFoco) abrir.focus();
@@ -73,7 +87,8 @@
     "click",
     function (e) {
       var botao = e.target.closest && e.target.closest("[hx-post]");
-      if (!botao) return;
+      // O <form hx-post> também casa (é ancestral de todo clique): só vale o botão que dispara outro envio.
+      if (!botao || botao.matches("form")) return;
       document.querySelectorAll("[data-alterar].aberto").forEach(function (linha) {
         cancelarAlteracao(linha, false);
       });
@@ -86,7 +101,7 @@
       if (outra !== linha) cancelarAlteracao(outra);
     });
     linha.classList.add("aberto");
-    linha.querySelector("[data-alterar-abrir]").setAttribute("aria-expanded", "true");
+    botaoDeAlterar(linha).setAttribute("aria-expanded", "true");
     var campo = linha.querySelector("[data-qtd-carrinho]");
     campo.focus();
     var fim = campo.value.length; // cursor no fim do número, sem selecioná-lo
@@ -97,7 +112,11 @@
     var alvo = e.target;
     if (!alvo || !alvo.closest) return;
     var abrir = alvo.closest("[data-alterar-abrir]");
-    if (abrir) return abrirAlteracao(abrir.closest("[data-alterar]"));
+    if (abrir) {
+      var linha = acaoDeAlterar(abrir);
+      // Tocar de novo na linha aberta a fecha, voltando à quantidade de antes (como o ✕).
+      return linha.classList.contains("aberto") ? cancelarAlteracao(linha) : abrirAlteracao(linha);
+    }
     var cancelar = alvo.closest("[data-alterar-cancelar]");
     if (cancelar) return cancelarAlteracao(cancelar.closest("[data-alterar]"));
     var confirmar = alvo.closest("[data-alterar-confirmar]");
@@ -765,8 +784,9 @@
 
   // Nome e destino lembrados neste aparelho (só neste navegador, nunca no servidor). O nome é
   // gravado enquanto se digita; a tela de sucesso (`data-lembrar-*`) grava os dois. O formulário
-  // novo preenche os campos que estiverem vazios (o destino só se ainda estiver na lista) e mostra
-  // "Não é você? Limpar". Sem armazenamento (aba anônima, bloqueado), nada acontece.
+  // novo preenche os campos que estiverem vazios (o destino só se ainda estiver na lista). Cada campo
+  // tem o seu "Limpar" (`data-limpar-campo`), visível enquanto ele tem valor, que apaga o campo e o
+  // que ficou lembrado dele. Sem armazenamento (aba anônima, bloqueado), nada é lembrado.
   var CHAVE_LEMBRADO = "almoxarifado.solicitante";
 
   function lerLembrado() {
@@ -799,28 +819,33 @@
       return;
     }
     var form = document.querySelector("[data-formulario-pedido]");
-    var botao = form && form.querySelector("[data-esquecer-solicitante]");
+    if (!form) return;
+    mostrarLimpar(form);
     // Só no formulário novo: depois de um envio recusado, os campos ficam como a pessoa deixou.
-    if (!botao || form.hasAttribute("data-lembrado-aplicado")) return;
+    if (form.hasAttribute("data-lembrado-aplicado")) return;
     if (form.querySelector("[data-resumo-erros]")) return;
     form.setAttribute("data-lembrado-aplicado", "");
     var dados = lerLembrado();
     if (!dados) return;
     var nome = form.querySelector("#solicitante");
     var destino = form.querySelector("#destino");
-    var preencheu = false;
     if (nome && !nome.value && typeof dados.solicitante === "string" && dados.solicitante) {
       preencher(nome, dados.solicitante);
-      preencheu = true;
     }
     var opcoes = Array.prototype.map.call(document.querySelectorAll("#destinos option"), function (o) {
       return o.value;
     });
     if (destino && !destino.value && opcoes.indexOf(dados.destino) !== -1) {
       preencher(destino, dados.destino);
-      preencheu = true;
     }
-    botao.hidden = !preencheu;
+  }
+
+  // O "Limpar" de cada campo só aparece com o campo preenchido.
+  function mostrarLimpar(form) {
+    Array.prototype.forEach.call(form.querySelectorAll("[data-limpar-campo]"), function (botao) {
+      var campo = form.querySelector("#" + botao.getAttribute("data-limpar-campo"));
+      botao.hidden = !campo || !campo.value;
+    });
   }
 
   document.addEventListener("DOMContentLoaded", aplicarLembrado);
@@ -829,7 +854,9 @@
   // O último nome escrito, mesmo sem enviar o pedido; apagar o campo esquece o nome.
   document.addEventListener("input", function (e) {
     var nome = e.target;
-    if (nome.id !== "solicitante" || !nome.closest("[data-formulario-pedido]")) return;
+    var formulario = nome.closest && nome.closest("[data-formulario-pedido]");
+    if (formulario) mostrarLimpar(formulario);
+    if (nome.id !== "solicitante" || !formulario) return;
     var dados = lerLembrado() || {};
     var valor = nome.value.trim();
     if (valor) dados.solicitante = valor;
@@ -838,18 +865,25 @@
     else esquecerLembrado();
   });
 
+  // Escolher um destino na lista dispara só "change".
+  document.addEventListener("change", function (e) {
+    var form = e.target.closest && e.target.closest("[data-formulario-pedido]");
+    if (form) mostrarLimpar(form);
+  });
+
   document.addEventListener("click", function (e) {
-    var botao = e.target.closest && e.target.closest("[data-esquecer-solicitante]");
+    var botao = e.target.closest && e.target.closest("[data-limpar-campo]");
     if (!botao) return;
     var form = botao.closest("[data-formulario-pedido]");
-    ["#solicitante", "#destino"].forEach(function (seletor) {
-      var campo = form && form.querySelector(seletor);
-      if (campo) preencher(campo, "");
-    });
-    esquecerLembrado();
-    botao.hidden = true;
-    var nome = form && form.querySelector("#solicitante");
-    if (nome) nome.focus();
+    var chave = botao.getAttribute("data-limpar-campo");
+    var campo = form && form.querySelector("#" + chave);
+    if (!campo) return;
+    preencher(campo, "");
+    var dados = lerLembrado() || {};
+    delete dados[chave];
+    if (dados.solicitante || dados.destino) gravarLembrado(dados);
+    else esquecerLembrado();
+    campo.focus();
   });
 
   // "Seu pedido" (_resumo_pedido.html, _carrinho.html). Sem largura para a coluna ao lado dos
@@ -880,9 +914,10 @@
     observador = new ResizeObserver(function (entradas) {
       var compacto = entradas[0].contentRect.width < LARGURA_LADO_A_LADO;
       document.documentElement.toggleAttribute("data-gaveta", compacto);
+      // A largura mudou, e com ela a quebra dos nomes: o painel de resultados é medido de novo.
+      agendarAjuste();
       if (compacto) return;
       fecharGaveta();
-      soltarLimite(); // a altura da busca calculada para a tela estreita não vale mais
     });
     observador.observe(area);
   }
@@ -982,10 +1017,12 @@
     if (barra && !primeiraVez) barra.classList.add("carrinho-barra-pulso");
   }
 
-  // Adicionar em dois passos (formulários públicos e saída avulsa, _resultados.html): "Adicionar" abre a
-  // quantidade do material (uma aberta por vez), já com a do pedido se ele estiver lá; "Confirmar"
-  // manda ao servidor como antes, e "Atualizar" (material já no pedido) troca a quantidade da linha
-  // do pedido, sem somar. Esc ou o ✕ fecham. Sem JavaScript, a quantidade fica sempre à vista.
+  // Adicionar em dois passos (formulários públicos e saída avulsa, _resultados.html): tocar na linha do
+  // material abre a quantidade (uma aberta por vez; tocar de novo na linha aberta a fecha), já com a do
+  // pedido se ele estiver lá; "Confirmar" manda ao servidor como antes, e "Atualizar" (material já no
+  // pedido) troca a quantidade da linha do pedido, sem somar. Esc ou o ✕ fecham. Com um aberto, as
+  // outras linhas ficam recuadas (pedidos.css), mas clicáveis. Sem JavaScript, a quantidade fica sempre
+  // à vista.
   var DURACAO_FEITO = 2000;
 
   function nomeDoMaterial(item) {
@@ -1004,26 +1041,34 @@
     return null;
   }
 
-  // Rótulo do "Adicionar" de cada resultado: com o material no pedido, "Alterar (N)", que faz as
-  // vezes do selo "No pedido" (a linha não ganha nada que mude a altura).
+  // Selo "N no pedido" de cada resultado (ao lado da informação do material) e o rótulo do botão que
+  // abre a linha para o leitor de tela: com o material no pedido, "Alterar …, N no pedido".
   function rotularAbrir(item) {
     var abrir = item && item.querySelector("[data-adicionar-abrir]");
-    if (!abrir || abrir.hasAttribute("data-feito")) return;
+    if (!abrir) return;
     var noPedido = campoNoPedido(item);
     var nome = nomeDoMaterial(item);
-    if (noPedido) {
-      abrir.textContent = "Alterar (" + noPedido.defaultValue + ")";
-      abrir.setAttribute("aria-label", "Alterar " + nome + ", " + noPedido.defaultValue + " no pedido");
-    } else {
-      abrir.textContent = "Adicionar";
-      abrir.setAttribute("aria-label", "Adicionar " + nome);
+    var selo = item.querySelector("[data-selo-pedido]");
+    if (selo) {
+      selo.hidden = !noPedido;
+      if (noPedido) selo.querySelector("[data-selo-texto]").textContent = noPedido.defaultValue + " no pedido";
     }
+    abrir.setAttribute(
+      "aria-label",
+      noPedido ? "Alterar " + nome + ", " + noPedido.defaultValue + " no pedido" : "Adicionar " + nome
+    );
+  }
+
+  // O botão que abre a linha fica dentro do material (não da ação, que só existe aberta).
+  function botaoDeAbrir(acao) {
+    var item = acao && acao.closest("li");
+    return item && item.querySelector("[data-adicionar-abrir]");
   }
 
   function fecharQuantidade(acao, devolverFoco) {
     if (!acao || !acao.classList.contains("aberto")) return;
     acao.classList.remove("aberto");
-    var abrir = acao.querySelector("[data-adicionar-abrir]");
+    var abrir = botaoDeAbrir(acao);
     if (!abrir) return;
     abrir.setAttribute("aria-expanded", "false");
     if (devolverFoco) abrir.focus();
@@ -1041,19 +1086,28 @@
     confirmar.setAttribute("aria-label", rotulo + " " + nomeDoMaterial(item));
     acao.toggleAttribute("data-atualizar", !!noPedido);
     acao.classList.add("aberto");
-    acao.querySelector("[data-adicionar-abrir]").setAttribute("aria-expanded", "true");
+    botaoDeAbrir(acao).setAttribute("aria-expanded", "true");
     campo.focus();
     var fim = campo.value.length; // cursor no fim do número, sem selecioná-lo
     campo.setSelectionRange(fim, fim);
   }
 
-  // Retorno de quem confirmou: o "Adicionar" (ou o botão do painel do atendimento) mostra o feito por 2 s
-  // e o leitor de tela ouve o nome do material.
+  // Retorno de quem confirmou: o selo "no pedido" pisca por 2 s (nas linhas em dois passos, sem
+  // botão) ou o botão do painel do atendimento mostra o feito; o leitor de tela ouve o nome do material.
   function mostrarFeito(item, botao, texto) {
     var anuncio = document.querySelector("[data-anuncio-adicionado]");
     var nome = nomeDoMaterial(item);
     if (anuncio && nome) anuncio.textContent = nome + (texto === "Adicionado" ? " adicionado." : ": quantidade atualizada.");
-    if (!botao) return;
+    if (!botao) {
+      var selo = item && item.querySelector("[data-selo-pedido]");
+      if (!selo) return;
+      selo.classList.add("selo-pulso");
+      clearTimeout(selo._voltar);
+      selo._voltar = setTimeout(function () {
+        selo.classList.remove("selo-pulso");
+      }, DURACAO_FEITO);
+      return;
+    }
     if (!botao.hasAttribute("data-feito")) botao.setAttribute("data-original", botao.innerHTML);
     botao.setAttribute("data-feito", "");
     botao.textContent = texto; // sem ícone: cabe na largura fixa do botão (a linha não muda de altura)
@@ -1072,7 +1126,11 @@
     var alvo = e.target;
     if (!alvo || !alvo.closest) return;
     var abrir = alvo.closest("[data-adicionar-abrir]");
-    if (abrir) return abrirQuantidade(abrir.closest("[data-adicionar]"));
+    if (abrir) {
+      var acao = abrir.closest("li").querySelector("[data-adicionar]");
+      // Tocar de novo na linha aberta a fecha.
+      return acao.classList.contains("aberto") ? fecharQuantidade(acao, true) : abrirQuantidade(acao);
+    }
     var cancelar = alvo.closest("[data-adicionar-cancelar]");
     if (cancelar) fecharQuantidade(cancelar.closest("[data-adicionar]"), true);
   });
@@ -1109,7 +1167,7 @@
     if (!acao.isConnected) return;
     if (document.querySelector("#carrinho [data-carrinho-alerta].aviso-erro")) return;
     fecharQuantidade(acao, true);
-    mostrarFeito(acao.closest("li"), acao.querySelector("[data-adicionar-abrir]"), "Atualizado");
+    mostrarFeito(acao.closest("li"), null, "Atualizado");
   });
 
   // "Confirmar": o HTMX 4 dispara o `htmx:after:swap` no botão que fez a requisição (ele fica na
@@ -1123,7 +1181,7 @@
     var acao = botao.closest("[data-adicionar]");
     if (!acao) return mostrarFeito(item, botao, "Adicionado"); // um passo só
     fecharQuantidade(acao, true);
-    mostrarFeito(item, acao.querySelector("[data-adicionar-abrir]"), "Adicionado");
+    mostrarFeito(item, null, "Adicionado");
   }
   document.addEventListener("htmx:after:swap", avisarAdicionado);
 
@@ -1143,22 +1201,12 @@
     return document.getElementById("resultados");
   }
 
-  // O painel abre logo abaixo do campo de busca (o filtro de grupo fica acima dele).
-  function posicionarPainel() {
-    var p = painel();
-    var area = p && p.closest("[data-busca-area]");
-    var campo = area && area.querySelector(".busca-principal");
-    if (!campo) return;
-    var base = campo.getBoundingClientRect().bottom - area.getBoundingClientRect().top;
-    area.style.setProperty("--busca-base", Math.round(base) + "px");
-  }
-  window.addEventListener("resize", posicionarPainel);
-  // `toggle` não sobe pela árvore: escuta na captura. Abrir ou fechar o filtro move a busca.
+  // O painel fica no fluxo, logo abaixo do campo de busca (o filtro de grupo fica acima dele).
+  // `toggle` não sobe pela árvore: escuta na captura.
   document.addEventListener(
     "toggle",
     function (e) {
       if (!e.target.matches || !e.target.matches("[data-busca-filtro]")) return;
-      posicionarPainel();
       // Os resultados cairiam por cima da lista de grupos: saem enquanto se escolhe e voltam com a
       // escolha (o `change` abaixo os abre de novo).
       if (e.target.open) fecharPainel(false);
@@ -1183,13 +1231,10 @@
     if (recolher) filtro.open = false;
   }
 
-  // Na tela estreita (com a gaveta do pedido: `data-gaveta` no <html>, que segue a largura da área
-  // dos passos), o painel que abre embaixo da busca (ou a lista de grupos embaixo do filtro) ficava
-  // cortado no pé da tela, atrás da barra "Seu pedido": a página rola para o elemento ficar no topo,
-  // descontando a barra fixa do almoxarifado (a .app-lateral vira barra no topo). Só rola para baixo.
-  function estreito() {
-    return document.documentElement.hasAttribute("data-gaveta");
-  }
+  // O painel que abre embaixo da busca (ou a lista de grupos embaixo do filtro) ficava cortado no pé
+  // da tela (no celular, atrás da barra "Seu pedido"): em qualquer tela, a página rola para o
+  // elemento ficar no topo, descontando a barra do almoxarifado quando ela é uma barra no topo (a
+  // .app-lateral do celular; na tela larga ela é uma coluna). Só rola para baixo.
   // Com "reduzir movimento", o clean.css zera as transições: a rolagem também não anima.
   function rolagemSuave() {
     var campo = document.querySelector(".campo-entrada");
@@ -1200,11 +1245,12 @@
   function topoLivre() {
     var topo = 8;
     var barra = document.querySelector(".app-lateral");
-    if (barra && getComputedStyle(barra).position === "sticky") topo += barra.getBoundingClientRect().bottom;
+    var noTopo = barra && barra.offsetWidth >= window.innerWidth / 2;
+    if (noTopo && getComputedStyle(barra).position === "sticky") topo += barra.getBoundingClientRect().bottom;
     return topo;
   }
   function trazerAoTopo(el, depois) {
-    if (!el || !estreito()) return;
+    if (!el) return;
     var topo = topoLivre();
     requestAnimationFrame(function () {
       var delta = el.getBoundingClientRect().top - topo;
@@ -1225,89 +1271,126 @@
     });
   }
 
-  // Na tela estreita o painel fica no fluxo da página (pedidos.css), logo abaixo da busca: a página
-  // cresce com ele e o espaço reservado à barra "Seu pedido" vale para ele. Com o teclado virtual
-  // aberto, a área visível é menor que a janela (no iOS a janela não muda): o painel encolhe até o
-  // que sobra acima do teclado e da barra, mas não abaixo de 160px. Encolher o painel encolhe a
-  // página; no fim dela, a página sobe, o painel desce e o limite encolheria de novo, sem parar.
-  function caberNaTela() {
+  // O painel fica no fluxo da página (pedidos.css), logo abaixo da busca: o cartão e a página crescem
+  // com ele, e o espaço reservado à barra "Seu pedido" (celular) vale para ele. A altura é a mesma em
+  // qualquer tela (computador, tablet, celular): o cabeçalho e as LINHAS_VISIVEIS primeiras linhas,
+  // medidas fechadas; o resto rola dentro do painel. Com mais que isso a página rola, não o painel.
+  var LINHAS_VISIVEIS = 5;
+  function alturaDoPainel() {
     var p = painel();
-    if (!p || !p.classList.contains("aberto") || !estreito()) return;
+    if (!p || !p.classList.contains("aberto")) return;
     var area = p.closest("[data-busca-area]");
-    var barra = document.querySelector(".carrinho-barra");
-    var base = window.innerHeight;
-    var vv = window.visualViewport;
-    if (vv) base = Math.min(base, vv.offsetTop + vv.height);
-    if (barra && getComputedStyle(barra).display !== "none") base = Math.min(base, barra.getBoundingClientRect().top);
-    var livre = base - 8 - p.getBoundingClientRect().top;
-    area.style.setProperty("--busca-limite", Math.max(160, Math.round(livre)) + "px");
+    var linhas = p.querySelectorAll("li.material");
+    if (linhas.length <= LINHAS_VISIVEIS) return area.style.removeProperty("--busca-limite");
+    // O topo da primeira linha de fora = o cabeçalho + as linhas visíveis (o painel é o offsetParent).
+    var alto = linhas[LINHAS_VISIVEIS].offsetTop;
+    // Uma linha aberta (quantidade à mostra) é mais alta que fechada: não conta o que ela acrescenta.
+    var aberta = p.querySelector("[data-adicionar].aberto");
+    var dela = aberta && aberta.closest("li");
+    if (dela && Array.prototype.indexOf.call(linhas, dela) < LINHAS_VISIVEIS) {
+      alto -= aberta.offsetHeight + (parseFloat(getComputedStyle(dela).rowGap) || 0);
+    }
+    area.style.setProperty("--busca-limite", Math.round(alto) + 2 + "px"); // + as bordas do painel
   }
   function soltarLimite() {
     var area = document.querySelector("[data-busca-area]");
     if (area) area.style.removeProperty("--busca-limite");
   }
-  // O teclado virtual, a troca dos resultados e o tamanho da tela mudam o espaço; a rolagem não
-  // (o painel rola junto com a página). Na tela larga o painel volta a flutuar, sem o limite.
+  // A troca dos resultados e o tamanho da tela mudam a altura das linhas (o nome quebra mais ou menos).
   var ajusteAgendado = false;
   function agendarAjuste() {
-    if (!estreito()) return soltarLimite();
     if (ajusteAgendado) return;
     ajusteAgendado = true;
     requestAnimationFrame(function () {
       ajusteAgendado = false;
-      caberNaTela();
+      alturaDoPainel();
     });
   }
   window.addEventListener("resize", agendarAjuste);
-  if (window.visualViewport) window.visualViewport.addEventListener("resize", agendarAjuste);
   document.addEventListener("htmx:after:swap", agendarAjuste);
 
   function abrirPainel() {
     var p = painel();
     if (!p) return;
-    if (p.classList.contains("fechando")) {
-      // Reaberto no meio da saída: fica aberto, sem repetir a entrada.
-      p.classList.remove("fechando");
-      p.removeEventListener("animationend", p._fimFechamento);
+    // O abrir e fechar animados são os da base dos dropdowns (dropdown.js, `.painel-flutuante`).
+    var estado = window.Dropdown.abrirPainel(p);
+    // Reaberto no meio da saída: fica aberto, sem repetir a entrada.
+    if (estado === "reaberto") {
       var campo = document.getElementById("busca-q");
       if (campo) campo.setAttribute("aria-expanded", "true");
       return;
     }
-    if (p.classList.contains("aberto")) return;
-    posicionarPainel();
-    p.classList.add("aberto");
+    if (estado === "ja") return;
     var busca = document.getElementById("busca-q");
     if (busca) busca.setAttribute("aria-expanded", "true");
-    trazerAoTopo(document.querySelector(".busca-principal"), caberNaTela);
+    alturaDoPainel();
+    trazerAoTopo(document.querySelector(".busca-principal"));
   }
 
   function fecharPainel(devolverFoco) {
     var p = painel();
-    if (!p || !p.classList.contains("aberto") || p.classList.contains("fechando")) return;
-    var fim = function (e) {
-      if (e && e.target !== p) return; // animação de algo dentro do painel
-      p.removeEventListener("animationend", fim);
-      if (!p.classList.contains("fechando")) return;
-      p.classList.remove("fechando", "aberto");
-      soltarLimite();
-    };
-    // A saída anima (pedidos.css); o painel some de vez quando ela acaba. Sem animação (reduzir
-    // movimento), some na hora.
-    p._fimFechamento = fim;
-    p.addEventListener("animationend", fim);
-    p.classList.add("fechando");
-    if (getComputedStyle(p).animationName === "none") fim();
-    // Reserva: com a aba em segundo plano a animação não roda e o `animationend` não vem.
-    else setTimeout(fim, 250);
+    if (!p || !window.Dropdown.fecharPainel(p, soltarLimite)) return;
     var busca = document.getElementById("busca-q");
+    esconderDica();
     if (!busca) return;
     busca.setAttribute("aria-expanded", "false");
+    if (aoToque()) busca.setAttribute("inputmode", "none");
     if (devolverFoco) busca.focus();
   }
 
   function dentroDaBusca(alvo) {
     return !!(alvo && alvo.closest && (alvo.closest("[data-busca-area]") || alvo.closest("dialog")));
   }
+
+  // Celular e tablet: o primeiro toque no campo abre a lista sem o teclado (`inputmode="none"`), que
+  // cobriria os resultados, e uma dica pede o segundo toque, que libera o teclado para digitar e
+  // filtrar. Com a lista fechada o campo volta a ficar sem teclado. Mouse e teclado físico não mudam.
+  var sobDica = null;
+  function aoToque() {
+    return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  }
+  function dicaBusca() {
+    return document.querySelector("[data-busca-dica]");
+  }
+  function esconderDica() {
+    clearTimeout(sobDica);
+    var dica = dicaBusca();
+    if (dica) dica.hidden = true;
+  }
+  function mostrarDica() {
+    var dica = dicaBusca();
+    if (!dica) return;
+    dica.hidden = false;
+    clearTimeout(sobDica);
+    sobDica = setTimeout(esconderDica, 6000);
+  }
+  var liberarNoClique = false;
+  document.addEventListener(
+    "pointerdown",
+    function (e) {
+      var campo = e.target;
+      if (campo.id !== "busca-q" || !aoToque()) return;
+      var p = painel();
+      var aberto = p && window.Dropdown.painelAberto(p);
+      if (aberto && campo.getAttribute("inputmode") === "none") {
+        // Segundo toque: o teclado só sobe quando o campo ganha o foco de novo, dentro do clique.
+        campo.removeAttribute("inputmode");
+        liberarNoClique = true;
+        esconderDica();
+      } else if (!aberto) {
+        campo.setAttribute("inputmode", "none");
+        abrirPainel();
+        mostrarDica();
+      }
+    },
+    true
+  );
+  document.addEventListener("click", function (e) {
+    if (!liberarNoClique || e.target.id !== "busca-q") return;
+    liberarNoClique = false;
+    e.target.blur();
+    e.target.focus();
+  });
 
   document.addEventListener("focusin", function (e) {
     if (e.target.id === "busca-q") return abrirPainel();
@@ -1317,7 +1400,9 @@
     if (!dentroDaBusca(e.target)) fecharPainel(false);
   });
   document.addEventListener("input", function (e) {
-    if (e.target.id === "busca-q") abrirPainel();
+    if (e.target.id !== "busca-q") return;
+    esconderDica();
+    abrirPainel();
   });
   // "Limpar" volta a "Todos os grupos" pelo mesmo `change` da escolha (HTMX, resumo e resultados).
   document.addEventListener("click", function (e) {

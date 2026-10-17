@@ -66,7 +66,12 @@ def test_nome_do_solicitante_nao_sugere_nomes(client, fluxo):
     campo = re.search(r'<input id="solicitante"[^>]*>', r).group(0)
     assert " list=" not in campo and 'autocomplete="off"' in campo
     assert 'id="funcionarios"' not in r and "Ana Exemplo" not in r
-    assert "Fica guardado neste aparelho para o próximo pedido." in r
+    # A dica dos dados guardados fica logo abaixo do título do passo, e o campo a descreve.
+    assert (
+        '<h2>Seus dados</h2><p id="solicitante-dica" class="texto-secundario">'
+        "Ficam guardados no seu aparelho para o próximo pedido.</p>"
+    ) in r
+    assert 'aria-describedby="solicitante-dica' in campo
 
 
 @pytest.mark.parametrize(
@@ -181,8 +186,10 @@ def test_destino_fica_junto_do_nome_com_a_orientacao(client):
         assert 'name="solicitante"' in passo1 and 'name="destino"' in passo1
         assert 'list="destinos"' in passo1
         assert "O que pôr aqui?" not in passo1 and "<details" not in passo1
-        dica = "Posto de trabalho, placa do veículo ou setor."
-        assert f'<p id="destino-dica" class="campo-dica">{dica}</p>' in passo1
+        # A orientação é a dica dentro do próprio campo (placeholder), sem parágrafo embaixo.
+        campo = re.search(r'<input id="destino"[^>]*>', passo1).group(0)
+        assert 'placeholder="Posto de trabalho, placa do veículo ou setor"' in campo
+        assert "destino-dica" not in passo1
         assert 'name="destino"' not in r.text[r.text.index('<h2 id="obs-titulo">') :]
         for opcao in ("ETA I", "ETA II", "PICKUP 01 — ABC1D23"):
             assert f'<option value="{opcao}">' in r.text
@@ -322,7 +329,7 @@ def test_resultados_em_painel_preso_a_busca(client):
     busca = area[: area.index('id="resultados"')]
     assert 'aria-expanded="false" aria-controls="resultados"' in busca
     assert '<div class="campo busca-principal">' in busca
-    assert '<div id="resultados" class="busca-painel" aria-live="polite">' in area
+    assert '<div id="resultados" class="painel-flutuante busca-painel" aria-live="polite">' in area
     assert 'class="lista-materiais"' in area
 
 
@@ -441,12 +448,15 @@ def test_formulario_tem_o_titulo_publico(client, fluxo, titulo):
     assert "Formulário" not in r[: r.index("<h1>")].split("<body", 1)[-1]
 
 
-def test_formulario_oferece_esquecer_os_dados_lembrados(client):
+def test_formulario_oferece_limpar_nome_e_destino_dentro_do_campo(client):
     r = client.get(reverse("pedidos:formulario", args=["limpeza"])).text
-    botao = r[: r.index("Não é você? Limpar")]
-    botao = botao[botao.rindex("<button") :]
-    assert 'type="button"' in botao and "data-esquecer-solicitante" in botao
-    assert "hidden" in botao  # o pedidos.js mostra quando preencheu algo
+    for campo in ("solicitante", "destino"):
+        i = r.index(f'data-limpar-campo="{campo}"')
+        botao = r[r.rindex("<button", 0, i) : r.index("</button>", i)]
+        assert 'type="button"' in botao and "hidden" in botao  # o pedidos.js mostra com valor
+        # O botão fica dentro do campo (.com-acao), logo depois do input.
+        antes = r[: r.rindex("<button", 0, i)]
+        assert antes.rstrip().endswith(">") and f'id="{campo}"' in antes[antes.rindex("com-acao") :]
 
 
 def test_sucesso_diz_o_que_lembrar_no_aparelho(client, django_capture_on_commit_callbacks):
@@ -470,7 +480,7 @@ def test_pedidos_js_lembra_so_no_aparelho_e_com_cuidado():
 
     js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
     assert '"almoxarifado.solicitante"' in js
-    assert "[data-lembrar-solicitante]" in js and "[data-esquecer-solicitante]" in js
+    assert "[data-lembrar-solicitante]" in js and "[data-limpar-campo]" in js
     # O nome é gravado enquanto se digita, não só depois do envio.
     digitar = js[js.index("// O último nome escrito, mesmo sem enviar o pedido") :]
     digitar = digitar[: digitar.index("\n  });")]
@@ -534,3 +544,14 @@ def test_botao_do_fim_so_aparece_sem_javascript(client):
     assert 'type="submit"' in final[: final.index("</div>")]
     css = open(finders.find("pedidos/css/pedidos.css"), encoding="utf-8").read()
     assert ".js .acoes-final { display: none; }" in css
+
+
+def test_pedidos_js_so_cancela_a_alteracao_aberta_com_hx_post_de_botao():
+    # O próprio <form hx-post> é ancestral de todo clique dentro do pedido: sem excluí-lo, o −, o +
+    # e o "Confirmar" da quantidade aberta a cancelariam (e restaurariam o valor) antes de agirem.
+    from django.contrib.staticfiles import finders
+
+    js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
+    trecho = js[js.index('closest("[hx-post]")') :]
+    trecho = trecho[: trecho.index("forEach")]
+    assert 'matches("form")' in trecho

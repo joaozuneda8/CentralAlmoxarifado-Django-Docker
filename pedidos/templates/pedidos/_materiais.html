@@ -52,10 +52,12 @@ pedido" ficam lado a lado; senão, um embaixo do outro.
              aria-expanded="false" aria-controls="resultados"
              hx-get="{{ url_materiais }}" hx-trigger="input changed delay:300ms, search"
              hx-target="#resultados" hx-include="#busca-materiais">
+      {# No toque, o primeiro toque só abre a lista, sem teclado; esta dica (pedidos.js) pede o segundo. #}
+      <span class="busca-dica" data-busca-dica role="status" hidden>Toque de novo no campo para digitar e filtrar por nome.</span>
     </div>
   </div>
 </div>
-<div id="resultados" class="busca-painel" aria-live="polite">{% include "pedidos/_resultados.html" %}</div>
+<div id="resultados" class="painel-flutuante busca-painel" aria-live="polite">{% include "pedidos/_resultados.html" %}</div>
 </div>
 {# Anúncio para o leitor de tela de cada material adicionado (pedidos.js); fora do #resultados, que o HTMX troca. #}
 <p class="visually-hidden" role="status" data-anuncio-adicionado></p>

@@ -251,6 +251,29 @@ def test_mensagens_por_nivel(nivel, classe, papel):
     assert classe in html and f'role="{papel}"' in html and "Texto" in html
 
 
+def test_dropdown_js_select_digitavel_so_aceita_uma_opcao_da_lista():
+    # `data-dropdown-digitavel`: o controle é um campo de texto que filtra a lista, mas o <select>
+    # guarda o valor, o texto não escolhido volta ao escolhido ao fechar e o Enter nunca envia o
+    # formulário.
+    js = open(finders.find("interface/js/dropdown.js"), encoding="utf-8").read()
+    assert 'hasAttribute("data-dropdown-digitavel")' in js and "function montarDigitavel" in js
+    assert "if (d.digitavel) atualizarGatilho(d);" in js
+    # O aria-activedescendant vai para o campo visível, não para o <select> escondido.
+    assert 'return d.tipo === "combo" ? d.controle : d.lista;' in js
+    assert 'd.digitavel && k === "Enter"' in js
+
+
+def test_dropdown_js_repetir_a_mesma_letra_percorre_as_opcoes():
+    # "aa" conta como uma letra só e anda pelas opções a partir da ativa (como no <select> nativo);
+    # letras diferentes buscam o prefixo inteiro.
+    js = open(finders.find("interface/js/dropdown.js"), encoding="utf-8").read()
+    trecho = js[js.index("function pularPara") :]
+    trecho = trecho[: trecho.index("function aoTeclar")]
+    assert r"/^(.)\1+$/.test(d.digitado)" in trecho
+    assert "d.digitado = d.digitado.charAt(0)" in trecho  # o acumulado volta à letra repetida
+    assert "busca.length === 1 ? d.ativo + 1 : 0" in trecho
+
+
 @pytest.mark.django_db
 def test_dropdown_js_existe_e_o_nativo_continua_na_pagina(client):
     from tests.cenario import montar_cenario

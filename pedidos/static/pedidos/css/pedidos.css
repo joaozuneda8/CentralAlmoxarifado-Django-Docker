@@ -19,7 +19,11 @@ html:not([data-gaveta]) .pedido-resumo .carrinho-gaveta { padding: 0; background
    no celular, os alvos de toque seguem com 44px.) */
 html:not([data-gaveta]) .pedido-resumo > #carrinho { scrollbar-width: thin; }
 html:not([data-gaveta]) .pedido-resumo .carrinho-cabecalho { position: sticky; top: 0; z-index: 1; padding-bottom: var(--esp-1); background: var(--destaque-superficie); }
-html:not([data-gaveta]) .pedido-resumo .carrinho-linha { padding: 8px 0; gap: var(--esp-meio) var(--esp-1); }
+/* Divisores do pedido: o --borda cinza some sobre o fundo azul do cartão; um azul mais marcado separa
+   os materiais (e fecha o último) na coluna ao lado e na gaveta. */
+.carrinho-lista .carrinho-linha { border-top-color: rgba(37, 99, 235, 0.3); }
+.carrinho-lista .carrinho-linha:last-child { border-bottom: 1px solid rgba(37, 99, 235, 0.3); }
+html:not([data-gaveta]) .pedido-resumo .carrinho-linha { padding: 8px 12px; gap: var(--esp-meio) var(--esp-1); }
 html:not([data-gaveta]) .pedido-resumo .quantidade .botao-icone { width: 30px; height: 30px; }
 html:not([data-gaveta]) .pedido-resumo .quantidade-campo { width: 44px; min-height: 30px; font-size: 15px; }
 html:not([data-gaveta]) .acoes-final { display: none; }
@@ -69,36 +73,38 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .busca-filtro[open] .busca-filtro-alternar { background: var(--superficie); }
 .busca-filtro-ativo .busca-filtro-alternar { border-color: rgba(37, 99, 235, 0.35); background: var(--destaque-superficie); color: var(--destaque-hover); }
 .busca-filtro-ativo .busca-filtro-valor { color: var(--destaque-hover); }
-.busca-filtro-campo { margin-top: var(--esp-1); }
+/* A lista de grupos brota direto do <summary>: o botão do dropdown.js (que repetiria "Todos os grupos"
+   embaixo dele) fica escondido, e o pedidos.js o aciona por código ao abrir o <details>. A seta e o
+   valor escolhido já estão no resumo. */
+.busca-filtro-campo .dropdown-gatilho { display: none; }
 /* No celular, o rótulo "Grupo e subgrupo:" cede espaço ao valor escolhido. */
 @media (max-width: 480px) { .busca-filtro-ativo .busca-filtro-rotulo { display: none; } }
 .busca-principal .campo-busca .icone { left: 16px; width: 22px; height: 22px; color: var(--destaque); }
 .busca-principal .campo-entrada { min-height: 56px; padding-left: 50px; font-size: 18px; border: 2px solid var(--destaque); }
 .busca-principal .campo-entrada:focus { box-shadow: 0 0 0 4px var(--destaque-superficie); }
+/* Dica do primeiro toque (celular e tablet): o texto aparece sob o campo, sobre o começo da lista,
+   com a seta apontando para ele. Some sozinha, ao digitar ou ao fechar a lista. */
+.busca-dica {
+  position: absolute; left: 0; top: calc(100% + 10px); z-index: 31; pointer-events: none;
+  width: max-content; max-width: min(18rem, calc(100vw - 2 * var(--esp-2)));
+  padding: 8px 12px; border-radius: var(--raio-controle); background: var(--texto); color: var(--fundo);
+  font-size: 12.5px; line-height: 1.45; box-shadow: 0 8px 30px rgba(0, 0, 0, .09);
+  animation: dica-surge var(--transicao) both;
+}
+.busca-dica[hidden] { display: none; }
+.busca-dica::after { content: ""; position: absolute; bottom: 100%; left: 20px; border: 6px solid transparent; border-bottom-color: var(--texto); }
 .busca-painel { margin-top: var(--esp-1); }
 .busca-painel .lista-materiais { max-height: none; }
+/* A casca (borda, sombra, entrada e saída animadas) vem de `.painel-flutuante` (componentes.css),
+   a mesma dos painéis do dropdown.js; aqui só o tamanho do painel de resultados. Em qualquer tela
+   (pedidos.js), ele entra no fluxo logo abaixo da busca em vez de flutuar: o cartão do passo e a página
+   crescem com ele (sem painel pendurado para fora do cartão), a busca consegue subir até o topo mesmo
+   perto do fim da página e o espaço reservado à barra "Seu pedido" vale também para ele. A altura
+   (`--busca-limite`) é a do cabeçalho e de 5 linhas, medida pelo JavaScript; 26rem vale até ele medir. Relativo, não
+   estático: os absolutos de dentro (rótulos escondidos) seguem presos a ele e ao seu recorte. */
 .js .busca-painel {
-  position: absolute; left: 0; right: 0; top: var(--busca-base, 100%); z-index: 15;
-  max-height: min(60vh, 32rem, var(--busca-limite, 100vh)); overflow-y: auto;
-  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
-  box-shadow: var(--sombra-elevada);
-}
-.js .busca-painel:not(.aberto) { display: none; }
-/* Abre surgindo de perto da busca e fecha pelo mesmo caminho, mais rápido (pedidos.js põe
-   `fechando` e só tira o `aberto` no fim da animação). Sem movimento, abre e fecha direto. */
-.js .busca-painel.aberto { animation: painel-surge 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.js .busca-painel.fechando { animation: painel-some 0.12s ease-in forwards; pointer-events: none; }
-@keyframes painel-surge { from { opacity: 0; transform: translateY(-4px); } }
-@keyframes painel-some { to { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .js .busca-painel.aberto, .js .busca-painel.fechando { animation: none; } }
-/* Na tela estreita (pedidos.js), o painel entra no fluxo logo abaixo da busca em vez de flutuar:
-   a página cresce com ele, a busca consegue subir até o topo mesmo perto do fim da página e o
-   espaço reservado à barra "Seu pedido" vale também para ele, sem folga inventada no pé. Relativo,
-   não estático: os absolutos de dentro (rótulos escondidos) seguem presos a ele e ao seu recorte. */
-.js[data-gaveta] .busca-painel { position: relative; top: auto; z-index: auto; }
-.js .busca-painel .resultados-cabecalho {
-  position: sticky; top: 0; z-index: 1; margin: 0; padding: 10px var(--esp-2);
-  background: var(--fundo); border-bottom: 1px solid var(--borda);
+  position: relative;
+  max-height: var(--busca-limite, 26rem); overflow-y: auto;
 }
 .js .busca-painel .lista-materiais { border: 0; border-radius: 0; }
 .carrinho-qtd { white-space: nowrap; font-weight: 500; }
@@ -115,18 +121,29 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 /* Na tela, o recibo são dois cartões: o cabeçalho com a situação e a lista de materiais. */
 .recibo { display: grid; gap: var(--entre-blocos); }
 .recibo-bloco { display: grid; gap: var(--esp-3); }
-/* Na tela, os dados do envio ficam à direita do cabeçalho, no espaço ao lado do número; sem
-   largura para os dois, descem para baixo dele. No papel, ficam abaixo (regras de @media print). */
+/* Na tela larga, o cabeçalho tem duas colunas e duas linhas: à esquerda o número e, embaixo, a observação; à
+   direita os dados do envio, em subgrade das mesmas linhas, para a observação ficar na linha do Destino e
+   da Requisição SCPI. No tablet e no celular, e no papel (regras de @media print), tudo desce em coluna:
+   o número, a observação e os dados. */
 .recibo-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--esp-2) var(--esp-4); }
-.recibo-topo > .pilha { flex: 1 1 340px; min-width: 0; }
+/* Na tela, as linhas do cabeçalho (rótulo, número e situação do recibo) ficam juntas. */
+.recibo-topo > .pilha { flex: 1 1 340px; min-width: 0; gap: var(--esp-1); }
 .recibo-topo > .dados { flex: 0 1 460px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-/* A observação é texto livre: ocupa a linha toda dos dados, embaixo dos campos curtos. */
-.recibo .dados-largo { grid-column: 1 / -1; }
+/* A observação também é um `.dados`: vem depois, para as regras dela vencerem as dos dados do envio. */
+.recibo-topo > .recibo-obs { flex: 1 1 100%; grid-template-columns: minmax(0, 1fr); margin-top: calc(var(--esp-1) - var(--esp-2)); }
+@media screen and (min-width: 1025px) {
+  .recibo-topo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); }
+  .recibo-topo > .pilha { grid-column: 1; grid-row: 1; }
+  .recibo-topo > .dados { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-rows: subgrid; }
+  .recibo-topo-curto > .dados { grid-row: 1; grid-template-rows: none; }
+  .recibo-topo > .recibo-obs { grid-column: 1; grid-row: 2; grid-template-rows: none; margin-top: 0; }
+}
 /* No tablet e no celular, o cabeçalho e os dados não cabem lado a lado: os dados descem e usam a
    largura toda, em quantas colunas couberem (quatro no tablet, duas no celular). */
 @media screen and (max-width: 1024px) {
   .recibo-topo > .pilha, .recibo-topo > .dados { flex-basis: 100%; }
   .recibo-topo > .dados { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
+  .recibo-topo > .recibo-obs { grid-template-columns: minmax(0, 1fr); }
 }
 .recibo-numero { font-size: 28px; }
 .recibo-numero .mono { font-size: 1em; font-weight: 500; }
@@ -232,6 +249,18 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .entrega-estado > [data-estado="parcial"] > span { white-space: nowrap; }
 /* O ícone vai em linha com o texto. */
 .entrega-estado .icone { width: 14px; height: 14px; margin-right: var(--esp-meio); vertical-align: -3px; stroke-width: 2; }
+/* No celular a linha não comporta o estado nem o "Confirmar" ao lado da caixa (a tabela passava da
+   tela): a caixa fica sozinha em cima e embaixo vêm o estado e o "Confirmar", na largura dela. */
+@media screen and (max-width: 640px) {
+  .entrega { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; width: var(--entrega-caixa); align-items: center; gap: var(--esp-meio) var(--esp-1); }
+  .entrega-estado > [data-estado] { white-space: normal; }
+  .entrega-caixa { grid-column: 1 / -1; grid-row: 1; justify-self: end; }
+  .entrega-estado { order: 0; grid-column: 1; grid-row: 2; justify-self: end; }
+  .entrega-confirmar { grid-column: 2; grid-row: 2; }
+  .entrega[data-confirmado] .entrega-confirmar[hidden] { display: none; }
+  .js .recibo-th-entregue > span { margin-right: 0; }
+  .recibo-itens :is(th, td) { padding-inline: var(--esp-meio); }
+}
 /* Só com JavaScript o estado aparece; ele escolhe qual dos textos mostrar. */
 .js .entrega-estado { display: inline-flex; }
 .entrega[data-estado="total"] [data-estado="total"],
@@ -374,6 +403,7 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
   .recibo-numero { font-size: 18px; }
   .recibo-topo { display: grid; gap: 10px; }
   .recibo .dados { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--esp-meio) var(--esp-2); }
+  .recibo .dados.recibo-obs { grid-template-columns: minmax(0, 1fr); }
   .recibo .dados dt { font-size: 9px; }
   .recibo-subtitulo { font-size: 12px; }
   .recibo-itens { font-size: 11px; }
@@ -478,6 +508,8 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 .tabela-pedidos .col-numero a:focus-visible::after { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: var(--raio-controle); }
 .tabela-pedidos .col-pessoa { min-width: 11rem; }
 .tabela-pedidos .col-destino { min-width: 13rem; }
+/* Situação e SCPI numa coluna só: o selo do SCPI embaixo do da situação. */
+.situacao-selos { display: flex; flex-direction: column; align-items: flex-start; gap: var(--esp-meio); }
 /* Estreita (celular, ou tela pequena com a barra lateral): cada pedido vira um cartão. */
 @container (max-width: 720px) {
   .tabela-pedidos thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -493,7 +525,8 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
   .tabela-pedidos .col-destino { order: 4; flex-basis: 100%; font-size: 0.875em; color: var(--texto-secundario); }
   .tabela-pedidos .col-origem { order: 5; }
   .tabela-pedidos .col-situacao { order: 6; }
-  .tabela-pedidos .col-scpi { order: 7; }
+  /* No cartão, os dois selos voltam a ficar lado a lado, quebrando linha se faltar largura. */
+  .situacao-selos { flex-direction: row; flex-wrap: wrap; gap: 6px var(--esp-1); }
 }
 /* No tablet, cabe tudo na primeira linha: o Nº com os selos ao lado e a data à direita; embaixo,
    quem pediu e o destino. No celular, os selos ficam embaixo, como acima. */
@@ -501,10 +534,9 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
   .tabela-pedidos .col-numero { flex: none; margin-right: var(--esp-meio); }
   .tabela-pedidos .col-origem { order: 2; }
   .tabela-pedidos .col-situacao { order: 3; }
-  .tabela-pedidos .col-scpi { order: 4; }
-  .tabela-pedidos .col-data { order: 5; margin-left: auto; }
-  .tabela-pedidos .col-pessoa { order: 6; margin-top: 2px; }
-  .tabela-pedidos .col-destino { order: 7; }
+  .tabela-pedidos .col-data { order: 4; margin-left: auto; }
+  .tabela-pedidos .col-pessoa { order: 5; margin-top: 2px; }
+  .tabela-pedidos .col-destino { order: 6; }
 }
 .botao-suave[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
 
@@ -544,8 +576,12 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 .formulario-pedido .campo-com-erro .campo-entrada:focus { box-shadow: 0 0 0 3px var(--erro-superficie); }
 
 /* "Não é você? Limpar" (nome e destino lembrados), discreto e com área de toque de 44px. */
-.botao-esquecer { justify-self: start; min-height: var(--altura-controle); padding-left: 0; text-decoration: underline; text-underline-offset: 2px; }
-.botao-esquecer[hidden] { display: none; }
+/* "Limpar" dentro do campo (nome e destino): no destino, à esquerda da seta do dropdown. */
+.acao-limpar { right: 10px; }
+.com-acao:has(.acao-limpar:not([hidden])) .campo-entrada { padding-right: 96px; text-overflow: ellipsis; }
+.com-acao:has(.dropdown) .acao-limpar { right: 40px; }
+/* O wrapper do dropdown já reserva os 44px da seta: o campo só cobre o resto até o botão. */
+.com-acao:has(.dropdown):has(.acao-limpar:not([hidden])) .campo-entrada { padding-right: 84px; }
 
 /* "Adicionado" no lugar do "Adicionar" por 2 s. */
 .botao-adicionado { color: var(--ok-texto); background: var(--ok-superficie); border-color: transparent; }
@@ -558,44 +594,114 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 /* Sem espaço na linha (tela estreita), o "Adicionar" desce em vez de sair do painel. */
 .lista-materiais .material-acao { flex-wrap: wrap; }
 
-/* Adicionar em dois passos (formulários públicos, pedidos.js): fechado, só o "Adicionar"; aberto, a
-   quantidade com "Confirmar" (ou "Atualizar") e o ✕ ocupam a linha toda. Sem JavaScript, a
-   quantidade fica à vista e o ✕ e o "Adicionar" de abrir não aparecem. */
+/* Adicionar em dois passos (formulários públicos e saída avulsa, pedidos.js): a linha inteira do material
+   é o botão que abre a quantidade (`material-abrir`, esticado sobre a linha, transparente); o "+" à
+   direita só indica que clica. Fechada, a linha é só o nome e a informação, com o selo azul claro
+   "N no pedido" quando o material já está lá. Aberta, a ação aparece no pé da célula: a quantidade à
+   esquerda e o "Confirmar" (ou "Atualizar") no canto inferior direito; o ✕ (vermelho) fica no canto
+   superior direito, no lugar do "+". As outras linhas ficam recuadas, mas clicáveis. Sem JavaScript, a
+   quantidade fica à vista e o ✕, o "+" e o botão de abrir não aparecem. */
 .material-qtd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
-.material-abrir, .material-cancelar { display: none; }
-.js [data-adicionar] .material-abrir { display: inline-flex; }
-/* Largura fixa (a do rótulo mais largo, "Adicionado"/"Atualizado"): trocar o rótulo não estreita
-   o nome ao lado nem muda a altura da linha. */
-.material-abrir { flex: none; width: 7.5em; padding-inline: var(--esp-1); white-space: nowrap; }
-.js [data-adicionar] .material-qtd { display: none; }
-.js [data-adicionar].aberto { flex-basis: 100%; }
-.js [data-adicionar].aberto .material-abrir { display: none; }
-.js [data-adicionar].aberto .material-qtd { display: flex; width: 100%; }
-.js [data-adicionar].aberto .material-cancelar { display: inline-flex; width: var(--altura-controle); min-height: var(--altura-controle); }
-.js [data-adicionar].aberto [data-adicionar-confirmar] { flex: 1 1 0; min-width: 0; padding-inline: var(--esp-1); }
-.js [data-adicionar].aberto .material-qtd { flex-wrap: nowrap; }
-/* Fechado, o "Adicionar" fica ao lado do nome, sem uma linha só para ele. */
-.js .material:has([data-adicionar]:not(.aberto)) { flex-wrap: nowrap; align-items: flex-start; }
-.js .material:has([data-adicionar]:not(.aberto)) .material-dados { flex: 1 1 0; }
+.material-abrir, .material-cancelar, .material-mais { display: none; }
+.selo[hidden] { display: none; }
+.selo .icone { width: 12px; height: 12px; }
+.selo-pulso { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.28); transition: box-shadow var(--transicao); }
+.js .material:has([data-adicionar]) {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px;
+  transition: background-color var(--transicao);
+}
+.js .material:has([data-adicionar]) .material-dados { position: relative; transition: opacity var(--transicao); }
+/* O canto do "+" e do ✕ só afasta a primeira linha do nome (um flutuante de uma linha de altura): da
+   segunda em diante o nome usa a largura toda. Fixo nos dois estados, para abrir não refazer a quebra. */
+.js .material:has([data-adicionar]) .material-titulo, .js .carrinho-linha .material-titulo { display: block; }
+.js .material:has([data-adicionar]) .material-titulo::before, .js .carrinho-linha .material-titulo::before {
+  content: ""; float: right; width: 32px; height: 20px;
+}
+/* Selo e unidade longa: o texto da informação quebra por dentro e o selo (que não quebra) desce para a
+   linha de baixo, à esquerda, em vez de entortar a linha. */
+.js .material:has([data-adicionar]) .material-info > .texto-secundario { min-width: 0; }
+.js .material:has([data-adicionar]) .material-no-pedido { flex: none; }
+.js .material-abrir {
+  display: block; position: absolute; z-index: 1; inset: -14px calc(-1 * var(--esp-2));
+  padding: 0; border: 0; border-radius: 0; background: transparent; color: transparent; font-size: 0; cursor: pointer;
+}
+/* O cinza do cursor cobre a célula toda (também a linha da quantidade, quando aberta), não só o botão. */
+.js .material:has([data-adicionar]):hover { background: rgba(15, 14, 12, 0.04); }
+.js .material-abrir:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; }
+.js .material-mais {
+  display: inline-flex; position: absolute; top: 0; right: -2px; width: 20px; height: 20px;
+  color: var(--destaque); pointer-events: none;
+}
+.js .material-mais .icone { width: 20px; height: 20px; }
+/* Aberta: barra azul à esquerda; o "+" dá lugar ao ✕. */
+.js .material:has([data-adicionar].aberto) { box-shadow: inset 3px 0 0 var(--destaque); }
+.js .material:has([data-adicionar].aberto) .material-mais { display: none; }
+/* Com uma aberta, as outras recuam (cinza mais claro, ainda legível: ~5:1) e seguem clicáveis. */
+.js .lista-materiais:has([data-adicionar].aberto) .material:not(:has([data-adicionar].aberto)) .material-dados { opacity: 0.6; }
+.js .lista-materiais:has([data-adicionar].aberto) .material:not(:has([data-adicionar].aberto)):hover .material-dados { opacity: 0.9; }
+/* A ação só existe aberta. Colunas: a quantidade (146px) e o botão (7.5em, até 90px em tela estreita);
+   a linha cabe nos 254px úteis de uma tela de 320px. */
+.js [data-adicionar]:not(.aberto) { display: none; }
+.js [data-adicionar].aberto {
+  display: grid; grid-template-columns: minmax(146px, 1fr) minmax(90px, 7.5em); align-items: center; gap: var(--esp-1);
+  min-height: 46px; /* a altura do stepper */
+}
+.js [data-adicionar].aberto .material-qtd { display: contents; }
+.js [data-adicionar].aberto .quantidade { grid-column: 1; justify-self: start; position: relative; z-index: 2; }
+.js [data-adicionar].aberto [data-adicionar-confirmar] {
+  grid-column: 2; width: 100%; min-width: 0; padding-inline: var(--esp-1); position: relative; z-index: 2;
+}
+.js [data-adicionar].aberto .material-cancelar {
+  position: absolute; z-index: 2; top: 4px; right: 4px; display: inline-flex; width: 40px; min-height: 40px;
+  color: var(--erro-texto);
+}
+.js [data-adicionar].aberto .material-cancelar:hover { background: var(--erro-superficie); color: var(--erro-texto); }
 /* O − / + só funciona com o pedidos.js: sem JavaScript, fica só o campo da quantidade. */
 html:not(.js) [data-quantidade] { display: none; }
 
 /* Saída avulsa (um passo): o botão de adicionar também não muda de largura com o "Adicionado". */
 .material-acao:not([data-adicionar]) [data-adicionar-confirmar] { min-width: 7.5em; white-space: nowrap; }
 
-/* Quantidade de cada linha do pedido em dois passos (formulários públicos, pedidos.js): fechada,
-   o texto ("3 UN") com "Alterar" e "Remover"; aberta, o − / + com "Confirmar" e ✕, que ocupam a
-   linha. Sem JavaScript, o campo fica à vista (vai com o envio). */
+/* Linha do pedido (formulários públicos e saída avulsa, pedidos.js), no mesmo desenho do resultado da
+   busca: a linha inteira é o botão que abre a quantidade (`material-abrir`, esticado sobre ela; o lápis
+   no canto só indica que clica). Fechada: o nome, e embaixo a quantidade ("3 UN") à esquerda e o
+   "Remover" à direita. Aberta: barra azul à esquerda, ✕ vermelho no canto de cima e, embaixo, o − / +
+   à esquerda e o "Confirmar" à direita, no lugar do "Remover". As outras linhas recuam, mas seguem
+   clicáveis. Sem JavaScript, o campo fica à vista (vai com o envio). */
 .carrinho-qtd-area { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
-.carrinho-qtd-texto, .carrinho-alterar, .carrinho-confirmar, .carrinho-cancelar { display: none; }
-.carrinho-qtd-texto { min-width: 4.5em; }
+.carrinho-qtd-texto, .carrinho-confirmar, .carrinho-cancelar { display: none; }
 .carrinho-qtd-texto strong { font-family: var(--fonte-titulo); font-weight: 600; font-variant-numeric: tabular-nums; }
-.js [data-alterar] .carrinho-qtd-texto { display: inline-block; }
-.js [data-alterar] .carrinho-alterar { display: inline-flex; min-height: 36px; padding: 4px 14px; }
-.js [data-alterar] .carrinho-qtd-area { display: none; }
-.js [data-alterar].aberto .carrinho-qtd-texto,
-.js [data-alterar].aberto .carrinho-alterar,
+.js .carrinho-linha {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 8px;
+  padding-inline: 12px; transition: background-color var(--transicao);
+}
+.js .carrinho-linha:hover { background: rgba(15, 14, 12, 0.04); }
+.js .carrinho-linha > .material-abrir { inset: 0; }
+.js .carrinho-linha .material-dados { position: relative; transition: opacity var(--transicao); }
+.js .carrinho-linha .material-mais { right: 0; }
+.js .carrinho-acoes {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--esp-1);
+  transition: opacity var(--transicao);
+}
+.js .carrinho-acoes .carrinho-qtd-texto { display: block; grid-column: 1; min-width: 0; overflow-wrap: anywhere; }
+.js .carrinho-remover { grid-column: 2; justify-self: end; position: relative; z-index: 2; }
+.js .carrinho-qtd-area { display: none; }
+.js .carrinho-qtd-area > .texto-secundario { display: none; }
 .js [data-alterar].aberto .carrinho-remover { display: none; }
-.js [data-alterar].aberto .carrinho-qtd-area { display: flex; flex-wrap: nowrap; width: 100%; }
-.js [data-alterar].aberto .carrinho-confirmar { display: inline-flex; flex: 1 1 0; min-width: 0; padding-inline: var(--esp-1); }
-.js [data-alterar].aberto .carrinho-cancelar { display: inline-flex; width: var(--altura-controle); min-height: var(--altura-controle); }
+.js [data-alterar].aberto .carrinho-qtd-area { display: contents; }
+.js [data-alterar].aberto .quantidade { grid-column: 1; grid-row: 2; justify-self: start; position: relative; z-index: 2; }
+.js [data-alterar].aberto .carrinho-confirmar {
+  display: inline-flex; grid-column: 2; grid-row: 2; min-width: 6.5rem; padding-inline: var(--esp-1); position: relative; z-index: 2;
+}
+.js [data-alterar].aberto .carrinho-cancelar {
+  display: inline-flex; position: absolute; z-index: 2; top: 0; right: 2px; width: 40px; min-height: 40px;
+  color: var(--erro-texto);
+}
+.js [data-alterar].aberto .carrinho-cancelar:hover { background: var(--erro-superficie); color: var(--erro-texto); }
+.js .carrinho-linha:has([data-alterar].aberto) { box-shadow: inset 3px 0 0 var(--destaque); }
+.js .carrinho-linha:has([data-alterar].aberto) .material-mais { display: none; }
+/* Com uma aberta, as outras recuam (cinza mais claro, ainda legível) e seguem clicáveis. */
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)) > .material-dados,
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)) > .carrinho-acoes { opacity: 0.6; }
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)):hover > .material-dados,
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)):hover > .carrinho-acoes { opacity: 0.9; }

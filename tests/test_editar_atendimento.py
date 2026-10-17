@@ -539,3 +539,131 @@ def test_historico_no_detalhe_e_fora_do_recibo(client, logado):
 def test_historico_vazio(client, logado):
     p = criar_pedido(atendido=True, linhas=[("PENDENTE", "")])
     assert "Nenhuma alteração registrada." in detalhe(client, p)
+
+
+# ---------------------------------------------------------------------------
+# Modo de edição do pedido (`pedidos:editar`)
+# ---------------------------------------------------------------------------
+
+
+def url_editar(pedido):
+    return reverse("pedidos:editar", args=[pedido.numero])
+
+
+def post_edicao(pedido, versao=0, **campos):
+    dados = {
+        "versao": str(versao),
+        "data": "2026-10-09",
+        "recebedor": "João",
+        "centro_custo": "ETA II",
+        "placa": "",
+        "obs": "",
+        "entregue-023.001.002": "2",
+        "entregue-008.001.002": "1,5",
+    }
+    dados.update(campos)
+    return dados
+
+
+def test_editar_exige_login(client, atendido):
+    r = client.get(url_editar(atendido))
+    assert r.status_code == 302 and "entrar" in r.url
+
+
+def test_editar_404_sem_pedido(client, logado):
+    assert client.get(reverse("pedidos:editar", args=["P-999999"])).status_code == 404
+
+
+def test_editar_redireciona_quando_lancado(client, logado, atendido):
+    LinhaSaida.objects.update(status="LANCADA", requisicao_scpi="000123/26")
+    r = client.get(url_editar(atendido), follow=True)
+    assert r.redirect_chain[-1][0] == reverse("pedidos:detalhe", args=[atendido.numero])
+    assert "Lançado na requisição 000123/26" in r.text
+
+
+def test_editar_redireciona_sem_atendimento(client, logado, pedido):
+    r = client.get(url_editar(pedido))
+    assert r.status_code == 302
+    assert r.url == reverse("pedidos:detalhe", args=[pedido.numero])
+
+
+def test_editar_preenche_o_formulario(client, logado, pedido, usuario):
+    atender(
+        pedido,
+        usuario,
+        {"023.001.002": "2", "008.001.002": "0", "023.004.001": "1"},
+        adicionados=[Adicionado("023.004.001", "008.001.002")],
+    )
+    html = client.get(url_editar(pedido)).text
+    assert f'action="{url_editar(pedido)}"' in html and "data-editando" in html
+    assert 'name="versao" value="0"' in html
+    assert 'name="recebedor"' in html and 'value="João"' in html
+    assert 'name="entregue-023.001.002" value="2"' in html
+    assert 'name="entregue-008.001.002" value="0"' in html
+    assert 'data-adicionado="023.004.001" data-no-lugar-de="008.001.002"' in html
+    assert 'name="entregue-023.004.001" value="1"' in html
+    assert 'Editando <span class="mono">P-000001</span>.' in html
+    assert "Salvar alterações" in html
+    assert "Voltar ao pedido (descarta as alterações)" in html
+    assert "Confirmar e registrar saída" not in html
+
+
+def test_editar_marca_nao_lancar_vindo_de_automacoes(client, logado, atendido):
+    LinhaSaida.objects.update(status="NAO_LANCAR")
+    assert 'name="nao_lancar" checked' in client.get(url_editar(atendido)).text
+
+
+def test_post_editar_salva_e_volta_ao_detalhe(client, logado, atendido):
+    r = client.post(url_editar(atendido), post_edicao(atendido, recebedor="Ana"), follow=True)
+    assert r.redirect_chain[-1][0] == reverse("pedidos:detalhe", args=[atendido.numero])
+    assert "Alterações salvas no pedido P-000001." in r.text
+    assert "Recebedor: João → Ana" in r.text
+    assert Atendimento.objects.get().recebedor == "Ana"
+
+
+def test_post_com_recibo_impresso_avisa_que_voltou(client, logado, atendido):
+    Atendimento.objects.update(recibo_impresso_em=timezone.now())
+    r = client.post(url_editar(atendido), post_edicao(atendido, recebedor="Ana"), follow=True)
+    assert "O recibo voltou para impressão." in r.text
+
+
+def test_post_erro_de_validacao_volta_ao_formulario(client, logado, atendido):
+    r = client.post(url_editar(atendido), post_edicao(atendido, recebedor=""))
+    assert r.status_code == 200
+    assert "Informe quem recebeu o material." in r.text and "data-editando" in r.text
+
+
+def test_post_em_lancamento_mostra_alteracoes_nao_gravadas_sem_salvar(client, logado, atendido):
+    LinhaSaida.objects.update(status="EM_LANCAMENTO")
+    r = client.post(url_editar(atendido), post_edicao(atendido, recebedor="Ana"))
+    assert r.status_code == 200
+    assert "Suas alterações não foram gravadas." in r.text
+    assert "Recebedor: João → Ana" in r.text and "data-copiar-resumo" in r.text
+    assert "Salvar alterações" not in r.text and "data-editando" not in r.text
+
+
+def test_post_versao_antiga_oferece_editar_de_novo(client, logado, atendido, usuario):
+    assert editar(atendido, usuario, dados=saida(recebedor="Ana")).ok
+    r = client.post(url_editar(atendido), post_edicao(atendido, versao=0, recebedor="Bruno"))
+    assert r.status_code == 200
+    assert "Ana salvou alterações neste pedido" in r.text
+    assert "Recebedor: Ana → Bruno" in r.text
+    assert f'href="{url_editar(atendido)}"' in r.text
+    assert "Editar de novo a partir do que está gravado" in r.text
+
+
+def test_busca_e_adicionar_aceitam_editavel_e_recusam_bloqueado(client, logado, atendido):
+    busca = reverse("pedidos:atendimento_materiais", args=[atendido.numero])
+    adicionar = reverse("pedidos:atendimento_adicionar", args=[atendido.numero])
+    assert client.get(busca, {"q": "papel"}).status_code == 200
+    post = {"adicionar": "023.004.001", "qtd-023.004.001": "1"}
+    assert client.post(adicionar, post).status_code == 200
+    LinhaSaida.objects.update(status="LANCADA", requisicao_scpi="000123/26")
+    assert client.get(busca, {"q": "papel"}).status_code == 404
+    assert client.post(adicionar, post).status_code == 404
+
+
+def test_atendimento_continua_igual(client, logado, pedido):
+    html = detalhe(client, pedido)
+    assert f'action="{reverse("pedidos:atender", args=[pedido.numero])}"' in html
+    assert "data-editando" not in html and "Confirmar e registrar saída" in html

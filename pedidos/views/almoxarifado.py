@@ -30,15 +30,18 @@ from pedidos.regras import (
     AB,
     AVULSA,
     ERRO,
+    NAO_LANCAR,
     Adicionado,
     DadosSaida,
     EnvioSaida,
     edicao_permitida,
+    frase_diferenca,
     qtd_br,
 )
 from pedidos.servicos import (
     catalogo_de,
     confirmar_atendimento,
+    editar_atendimento,
     erros_de_vinculo,
     marcar_recibos_impressos,
     recibos_alterados,
@@ -225,9 +228,135 @@ def atender(request, numero):
     return render(request, "pedidos/detalhe.html", contexto)
 
 
+def _linha_gravada(pedido, item: ItemPedido) -> dict:
+    """Material acrescentado já gravado, no formato de `_linha_adicionada` (nome e unidade do
+    próprio item: ele pode ter saído do catálogo)."""
+    trocado = item.no_lugar_de
+    return {
+        "item": None,
+        "codigo": item.codigo,
+        "nome": item.material,
+        "unidade": item.unidade,
+        "qtd": _formatar_qtd(pedido, item.qtd_entregue),
+        "no_lugar_de": trocado.codigo if trocado else "",
+        "no_lugar_de_nome": trocado.material if trocado else "",
+    }
+
+
+def _contexto_edicao_atendimento(pedido, **extra) -> dict:
+    """O detalhe com o formulário do atendimento preenchido com o que está gravado."""
+    atendimento = pedido.atendimento
+    opcoes = opcoes_saida()
+    linhas = [linha for linha in pedido.linhas]
+    # "Não lançar" marcado em Automações muda as linhas, não o atendimento: o formulário o
+    # mostra marcado, e salvar o grava no atendimento (a recriação das linhas não o desfaz).
+    nao_lancar = atendimento.nao_lancar or bool(
+        linhas and all(linha.status == NAO_LANCAR for linha in linhas)
+    )
+    contexto = {
+        "atendivel": True,
+        "editando": True,
+        "versao": pedido.versao,
+        "campos": {
+            "data": atendimento.data_efetiva.isoformat(),
+            "recebedor": atendimento.recebedor,
+            "centro_custo": atendimento.centro_custo,
+            "tipo": atendimento.tipo_saida,
+            "placa": atendimento.placa,
+            "obs": atendimento.obs,
+        },
+        "nao_lancar": nao_lancar,
+        "entregues": {
+            i.codigo: _formatar_qtd(pedido, i.qtd_entregue) for i in _itens_pedidos(pedido)
+        },
+        "adicionados": [
+            _linha_gravada(pedido, i)
+            for i in pedido.itens.all()
+            if i.origem == ItemPedido.Origem.ALMOXARIFADO
+        ],
+        "tipo_fixo": TIPO_ATENDIMENTO if TIPO_ATENDIMENTO in opcoes["tipos"] else "",
+        **opcoes,
+    }
+    contexto.update(extra)
+    return _contexto_detalhe(pedido, **contexto)
+
+
+def _recusa_da_edicao(resposta) -> dict:
+    """O que a faixa do modo de edição mostra quando o salvar foi recusado sem erro de campo
+    (o lote entrou em lançamento, ou outra pessoa salvou antes)."""
+    return {
+        "editando": True,
+        "recusa_edicao": resposta.motivo,
+        "mensagem_edicao": resposta.mensagem,
+        "nao_gravadas": [frase_diferenca(d) for d in resposta.diferencas],
+    }
+
+
+def _avisar_salvo(request, resposta, recibo_estava_impresso: bool) -> None:
+    texto = resposta.mensagem
+    if resposta.diferencas and recibo_estava_impresso:
+        texto += " O recibo voltou para impressão."
+    messages.success(request, texto)
+    if resposta.diferencas:
+        messages.info(
+            request, "O que mudou: " + "; ".join(frase_diferenca(d) for d in resposta.diferencas)
+        )
+
+
 @login_required
 def editar(request, numero):
-    raise Http404("Edição ainda não disponível.")
+    """Modo de edição do atendimento (ou da saída avulsa) até o robô lançar o lote no SCPI."""
+    pedido = _pedido(numero)
+    atendimento = pedido.atendimento_ou_none
+    edicao = edicao_permitida(atendimento is not None, pedido.linhas)
+    if request.method != "POST":
+        if not edicao.permitida:
+            if edicao.motivo:
+                messages.info(request, edicao.motivo)
+            return redirect("pedidos:detalhe", numero=numero)
+        return render(request, "pedidos/detalhe.html", _contexto_edicao_atendimento(pedido))
+
+    try:
+        versao = int(request.POST.get("versao", ""))
+    except ValueError:
+        messages.error(request, "Versão do pedido inválida. Abra a edição de novo.")
+        return redirect("pedidos:detalhe", numero=numero)
+    recibo_estava_impresso = bool(atendimento and atendimento.recibo_impresso_em)
+    dados, nao_lancar = _dados_do_atendimento(request.POST)
+    qtds = {i.codigo: request.POST.get(f"entregue-{i.codigo}", "") for i in pedido.itens.all()}
+    adicionados = _adicionados_enviados(request.POST)
+    qtds.update({a.codigo: request.POST.get(f"entregue-{a.codigo}", "") for a in adicionados})
+    resposta = editar_atendimento(
+        pedido.id,
+        versao,
+        dados,
+        qtds,
+        nao_lancar=nao_lancar,
+        adicionados=adicionados,
+        usuario=request.user,
+    )
+    if resposta.ok:
+        _avisar_salvo(request, resposta, recibo_estava_impresso)
+        return redirect("pedidos:detalhe", numero=numero)
+    pedido = _pedido(numero)
+    if resposta.motivo:
+        contexto = _contexto_detalhe(pedido, **_recusa_da_edicao(resposta))
+        return render(request, "pedidos/detalhe.html", contexto)
+    if not resposta.erros:
+        messages.error(request, resposta.mensagem)
+        return redirect("pedidos:detalhe", numero=numero)
+    contexto = _contexto_edicao_atendimento(
+        pedido,
+        versao=versao,
+        campos=request.POST,
+        nao_lancar=nao_lancar,
+        entregues=qtds,
+        adicionados=_linhas_adicionadas(pedido, adicionados, qtds),
+        codigos_erro={e.codigo for e in resposta.erros if e.codigo},
+        mensagem=resposta.mensagem,
+        erros=resposta.erros,
+    )
+    return render(request, "pedidos/detalhe.html", contexto)
 
 
 def _adicionados_enviados(post) -> list[Adicionado]:
@@ -249,11 +378,13 @@ def _linha_adicionada(pedido, a: Adicionado, qtd: str, catalogo: dict) -> dict:
     avulsa (a unidade é a do SCPI), a quantidade digitada e o item pedido que ele substitui."""
     item = catalogo.get(a.codigo)
     trocado = next((i for i in _itens_pedidos(pedido) if i.codigo == a.no_lugar_de), None)
+    # Fora do catálogo (acrescentado gravado que ficou oculto, na edição): o nome gravado.
+    gravado = next((i for i in pedido.itens.all() if i.codigo == a.codigo), None)
     return {
         "item": item,
         "codigo": a.codigo,
-        "nome": item.nome if item else a.codigo,
-        "unidade": item.unidade if item else "",
+        "nome": item.nome if item else (gravado.material if gravado else a.codigo),
+        "unidade": item.unidade if item else (gravado.unidade if gravado else ""),
         "qtd": qtd,
         "no_lugar_de": a.no_lugar_de,
         "no_lugar_de_nome": trocado.material if trocado else a.no_lugar_de,
@@ -265,11 +396,15 @@ def _linhas_adicionadas(pedido, adicionados, qtds) -> list[dict]:
     return [_linha_adicionada(pedido, a, qtds.get(a.codigo, ""), catalogo) for a in adicionados]
 
 
-def _pedido_pendente(numero):
-    """Pedido ainda por atender (não avulso, sem atendimento): só nele se acrescenta material."""
+def _pedido_com_atendimento_aberto(numero):
+    """Pedido (não avulso) ainda por atender, ou atendido e ainda editável: só nele se
+    acrescenta ou troca material."""
     pedido = _pedido(numero)
-    if pedido.origem == AVULSA or pedido.atendimento_ou_none is not None:
-        raise Http404("Pedido sem atendimento pendente.")
+    atendido = pedido.atendimento_ou_none is not None
+    if pedido.origem == AVULSA or (
+        atendido and not edicao_permitida(True, pedido.linhas).permitida
+    ):
+        raise Http404("Pedido sem atendimento aberto.")
     return pedido
 
 
@@ -278,7 +413,7 @@ def atendimento_materiais(request, numero):
     """Busca do material que o almoxarifado acrescenta ao atendimento (troca ou acréscimo):
     catálogo da saída avulsa, com o resultado entrando no grupo dos acrescentados. Na troca
     (`no_lugar_de`), a quantidade já vem com a pedida do item trocado."""
-    pedido = _pedido_pendente(numero)
+    pedido = _pedido_com_atendimento_aberto(numero)
     fluxo = FLUXOS["avulsa"]
     no_lugar_de = request.GET.get("no_lugar_de", "")
     trocado = next((i for i in _itens_pedidos(pedido) if i.codigo == no_lugar_de), None)
@@ -319,7 +454,7 @@ def atendimento_adicionar(request, numero):
     (fora do catálogo, bloqueado, repetido, troca inválida ou quantidade inválida), devolve só
     a mensagem, com status 200 (o `htmx-config` não troca respostas 4xx) e o alvo trocado para
     `#adicionar-erro`."""
-    pedido = _pedido_pendente(numero)
+    pedido = _pedido_com_atendimento_aberto(numero)
     catalogo = _catalogo_avulsa()
     codigo = request.POST.get("adicionar", "").strip()
     novo = Adicionado(codigo, request.POST.get("no_lugar_de", "").strip())

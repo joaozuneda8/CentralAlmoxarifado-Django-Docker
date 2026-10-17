@@ -1,0 +1,20 @@
+{% comment %}
+Faixa do modo de edição (atendimento e saída avulsa), no topo da página: o que acontece ao salvar
+ou, depois de um salvar recusado (`recusa_edicao`), por quê e o que não foi gravado.
+{% endcomment %}<div id="edicao-faixa" class="nao-imprimir">
+{% if recusa_edicao == "lancamento" %}
+<div class="aviso aviso-erro" role="alert">{% include "interface/_icone.html" with nome="cadeado" %}<div class="pilha">
+  <p><strong>Suas alterações não foram gravadas.</strong> {{ mensagem_edicao }}</p>
+  {% include "pedidos/_nao_gravadas.html" %}
+  <p><a class="botao botao-secundario" href="{% url 'pedidos:detalhe' pedido.numero %}">Ver o pedido</a></p>
+</div></div>
+{% elif recusa_edicao == "versao" %}
+<div class="aviso aviso-atencao" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<div class="pilha">
+  <p><strong>Suas alterações não foram gravadas.</strong> {{ mensagem_edicao }}</p>
+  {% include "pedidos/_nao_gravadas.html" %}
+  <p><a class="botao botao-secundario" href="{% url 'pedidos:editar' pedido.numero %}">{% include "interface/_icone.html" with nome="lapis" %}Editar de novo a partir do que está gravado</a></p>
+</div></div>
+{% else %}
+<div class="aviso {% if lote_com_erro %}aviso-atencao{% else %}aviso-info{% endif %}" role="note">{% include "interface/_icone.html" with nome="lapis" %}<p><strong>Editando <span class="mono">{{ pedido.numero }}</span>.</strong> Nada é gravado até você salvar.{% if pedido.atendimento.recibo_impresso_em %} Salvar alterações devolve o recibo para impressão.{% endif %}{% if lote_com_erro %} Corrija e salve: o lote volta para a fila do próximo lançamento.{% endif %}</p></div>
+{% endif %}
+</div>

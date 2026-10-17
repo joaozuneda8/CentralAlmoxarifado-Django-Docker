@@ -364,7 +364,14 @@
     d.raiz.removeAttribute("data-aberto");
     d.controle.setAttribute("aria-expanded", "false");
     if (aberto === d) aberto = null;
-    if (devolverFoco) d.controle.focus();
+    // Gatilho escondido (o filtro de grupo abre direto do <summary> do <details>): o painel pertence ao
+    // <details>, que fecha junto (senão ficaria aberto, com a seta para cima e nada embaixo), e o foco
+    // volta ao resumo.
+    var detalhes = d.controle.offsetParent === null ? d.raiz.closest("details") : null;
+    if (detalhes) detalhes.open = false;
+    if (!devolverFoco) return;
+    var alvo = detalhes ? detalhes.querySelector(":scope > summary") : d.controle;
+    if (alvo) alvo.focus();
   }
 
   function escolher(d, i) {
@@ -654,10 +661,29 @@
     iniciar(document);
   });
 
+  // Painel que brota do <summary> de um <details> (o filtro de grupo): tocar no próprio resumo não conta
+  // como "fora" (senão o painel e o <details> fecham no toque e o clique os abriria de novo): quem fecha
+  // é o clique do resumo, e o `toggle` abaixo fecha o painel junto.
+  function noResumoDoPainel(d, alvo) {
+    var detalhes = d.raiz.closest("details");
+    var resumo = alvo.closest && alvo.closest("summary");
+    return !!(detalhes && resumo && resumo.parentNode === detalhes);
+  }
+
   document.addEventListener("pointerdown", function (e) {
-    if (aberto && !aberto.raiz.contains(e.target)) fechar(aberto, false);
+    if (aberto && !aberto.raiz.contains(e.target) && !noResumoDoPainel(aberto, e.target)) fechar(aberto, false);
   });
   document.addEventListener("focusin", function (e) {
-    if (aberto && !aberto.raiz.contains(e.target)) fechar(aberto, false);
+    if (aberto && !aberto.raiz.contains(e.target) && !noResumoDoPainel(aberto, e.target)) fechar(aberto, false);
   });
+  // `toggle` não sobe pela árvore: escuta na captura. Fechar o <details> do painel fecha o painel.
+  document.addEventListener(
+    "toggle",
+    function (e) {
+      if (aberto && e.target.tagName === "DETAILS" && !e.target.open && e.target.contains(aberto.raiz)) {
+        fechar(aberto, false);
+      }
+    },
+    true
+  );
 })();

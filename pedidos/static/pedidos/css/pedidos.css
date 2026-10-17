@@ -73,7 +73,10 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .busca-filtro[open] .busca-filtro-alternar { background: var(--superficie); }
 .busca-filtro-ativo .busca-filtro-alternar { border-color: rgba(37, 99, 235, 0.35); background: var(--destaque-superficie); color: var(--destaque-hover); }
 .busca-filtro-ativo .busca-filtro-valor { color: var(--destaque-hover); }
-.busca-filtro-campo { margin-top: var(--esp-1); }
+/* A lista de grupos brota direto do <summary>: o botão do dropdown.js (que repetiria "Todos os grupos"
+   embaixo dele) fica escondido, e o pedidos.js o aciona por código ao abrir o <details>. A seta e o
+   valor escolhido já estão no resumo. */
+.busca-filtro-campo .dropdown-gatilho { display: none; }
 /* No celular, o rótulo "Grupo e subgrupo:" cede espaço ao valor escolhido. */
 @media (max-width: 480px) { .busca-filtro-ativo .busca-filtro-rotulo { display: none; } }
 .busca-principal .campo-busca .icone { left: 16px; width: 22px; height: 22px; color: var(--destaque); }

@@ -251,6 +251,16 @@ def test_mensagens_por_nivel(nivel, classe, papel):
     assert classe in html and f'role="{papel}"' in html and "Texto" in html
 
 
+def test_dropdown_js_repetir_a_mesma_letra_percorre_as_opcoes():
+    # "aa" conta como uma letra só e anda pelas opções a partir da ativa (como no <select> nativo);
+    # letras diferentes buscam o prefixo inteiro.
+    js = open(finders.find("interface/js/dropdown.js"), encoding="utf-8").read()
+    trecho = js[js.index("function pularPara") :]
+    trecho = trecho[: trecho.index("function aoTeclar")]
+    assert r"/^(.)\1+$/.test(d.digitado)" in trecho
+    assert "busca.length === 1 ? d.ativo + 1 : 0" in trecho
+
+
 @pytest.mark.django_db
 def test_dropdown_js_existe_e_o_nativo_continua_na_pagina(client):
     from tests.cenario import montar_cenario

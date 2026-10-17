@@ -563,20 +563,23 @@ def test_pedidos_js_abre_confirma_e_cancela_a_quantidade():
 
 @pytest.mark.django_db
 def test_quantidade_do_pedido_altera_em_dois_passos_no_formulario_publico(client):
-    # Fechada, a linha mostra a quantidade como texto, com "Alterar"; ele abre o − / + com
-    # "Confirmar" e ✕. Sem JavaScript, o − / + fica à vista e vai com o envio do formulário.
+    # No mesmo desenho do resultado da busca: a linha inteira é o botão (`material-abrir`) que
+    # abre o − / + com "Confirmar" e ✕, o lápis só indica que clica e o "Remover" fica embaixo.
+    # Sem JavaScript, o − / + fica à vista e vai com o envio do formulário.
     montar_cenario()
     r = client.post(
         reverse("pedidos:carrinho", args=["ab"]),
         {"adicionar": "016.005.010", "qtd-016.005.010": "3"},
     ).text
     linha = r[r.index('<li class="carrinho-linha') : r.index("</li>")]
-    acoes = linha[linha.index("data-alterar>") :]
-    assert '<span class="carrinho-qtd-texto"><strong>3</strong> UN</span>' in acoes
-    abrir = acoes[acoes.index("data-alterar-abrir") :]
+    abrir = linha[linha.index("data-alterar-abrir") :]
     abrir = abrir[: abrir.index("</button>")]
+    assert 'class="material-abrir"' in linha and "Alterar a quantidade de" in abrir
     assert 'aria-expanded="false"' in abrir and 'aria-controls="carrinho-qtd-area-1"' in abrir
-    assert ">Alterar" in abrir
+    assert '<span class="material-mais" aria-hidden="true">' in linha  # o lápis
+    acoes = linha[linha.index("data-alterar>") :]
+    assert "data-alterar-abrir" not in acoes  # o botão da linha está fora da ação
+    assert '<span class="carrinho-qtd-texto"><strong>3</strong> UN</span>' in acoes
     area = acoes[acoes.index('id="carrinho-qtd-area-1"') :]
     assert 'name="item_qtd"' in area and "data-alterar-confirmar" in area
     cancelar = area[area.index("data-alterar-cancelar") :]

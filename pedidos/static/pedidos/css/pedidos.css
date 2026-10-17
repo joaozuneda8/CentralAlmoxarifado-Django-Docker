@@ -23,7 +23,7 @@ html:not([data-gaveta]) .pedido-resumo .carrinho-cabecalho { position: sticky; t
    os materiais (e fecha o último) na coluna ao lado e na gaveta. */
 .carrinho-lista .carrinho-linha { border-top-color: rgba(37, 99, 235, 0.3); }
 .carrinho-lista .carrinho-linha:last-child { border-bottom: 1px solid rgba(37, 99, 235, 0.3); }
-html:not([data-gaveta]) .pedido-resumo .carrinho-linha { padding: 8px 0; gap: var(--esp-meio) var(--esp-1); }
+html:not([data-gaveta]) .pedido-resumo .carrinho-linha { padding: 8px 12px; gap: var(--esp-meio) var(--esp-1); }
 html:not([data-gaveta]) .pedido-resumo .quantidade .botao-icone { width: 30px; height: 30px; }
 html:not([data-gaveta]) .pedido-resumo .quantidade-campo { width: 44px; min-height: 30px; font-size: 15px; }
 html:not([data-gaveta]) .acoes-final { display: none; }
@@ -606,8 +606,10 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 .js .material:has([data-adicionar]) .material-dados { position: relative; transition: opacity var(--transicao); }
 /* O canto do "+" e do ✕ só afasta a primeira linha do nome (um flutuante de uma linha de altura): da
    segunda em diante o nome usa a largura toda. Fixo nos dois estados, para abrir não refazer a quebra. */
-.js .material:has([data-adicionar]) .material-titulo { display: block; }
-.js .material:has([data-adicionar]) .material-titulo::before { content: ""; float: right; width: 32px; height: 20px; }
+.js .material:has([data-adicionar]) .material-titulo, .js .carrinho-linha .material-titulo { display: block; }
+.js .material:has([data-adicionar]) .material-titulo::before, .js .carrinho-linha .material-titulo::before {
+  content: ""; float: right; width: 32px; height: 20px;
+}
 /* Selo e unidade longa: o texto da informação quebra por dentro e o selo (que não quebra) desce para a
    linha de baixo, à esquerda, em vez de entortar a linha. */
 .js .material:has([data-adicionar]) .material-info > .texto-secundario { min-width: 0; }
@@ -653,22 +655,46 @@ html:not(.js) [data-quantidade] { display: none; }
 /* Saída avulsa (um passo): o botão de adicionar também não muda de largura com o "Adicionado". */
 .material-acao:not([data-adicionar]) [data-adicionar-confirmar] { min-width: 7.5em; white-space: nowrap; }
 
-/* Quantidade de cada linha do pedido em dois passos (formulários públicos, pedidos.js): fechada,
-   o texto ("3 UN") com "Alterar" e "Remover"; aberta, o − / + com "Confirmar" e ✕, que ocupam a
-   linha. Sem JavaScript, o campo fica à vista (vai com o envio). */
+/* Linha do pedido (formulários públicos e saída avulsa, pedidos.js), no mesmo desenho do resultado da
+   busca: a linha inteira é o botão que abre a quantidade (`material-abrir`, esticado sobre ela; o lápis
+   no canto só indica que clica). Fechada: o nome, e embaixo a quantidade ("3 UN") à esquerda e o
+   "Remover" à direita. Aberta: barra azul à esquerda, ✕ vermelho no canto de cima e, embaixo, o − / +
+   à esquerda e o "Confirmar" à direita, no lugar do "Remover". As outras linhas recuam, mas seguem
+   clicáveis. Sem JavaScript, o campo fica à vista (vai com o envio). */
 .carrinho-qtd-area { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
-.carrinho-qtd-texto, .carrinho-alterar, .carrinho-confirmar, .carrinho-cancelar { display: none; }
-.carrinho-qtd-texto { min-width: 4.5em; }
+.carrinho-qtd-texto, .carrinho-confirmar, .carrinho-cancelar { display: none; }
 .carrinho-qtd-texto strong { font-family: var(--fonte-titulo); font-weight: 600; font-variant-numeric: tabular-nums; }
-.js [data-alterar] .carrinho-qtd-texto { display: inline-block; }
-.js [data-alterar] .carrinho-alterar { display: inline-flex; min-height: 36px; padding: 4px 14px; }
-.js [data-alterar] .carrinho-qtd-area { display: none; }
-.js [data-alterar].aberto .carrinho-qtd-texto,
-.js [data-alterar].aberto .carrinho-alterar,
+.js .carrinho-linha {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 8px;
+  padding-inline: 12px; transition: background-color var(--transicao);
+}
+.js .carrinho-linha:hover { background: rgba(15, 14, 12, 0.04); }
+.js .carrinho-linha > .material-abrir { inset: 0; }
+.js .carrinho-linha .material-dados { position: relative; transition: opacity var(--transicao); }
+.js .carrinho-linha .material-mais { right: 0; }
+.js .carrinho-acoes {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--esp-1);
+  transition: opacity var(--transicao);
+}
+.js .carrinho-acoes .carrinho-qtd-texto { display: block; grid-column: 1; min-width: 0; overflow-wrap: anywhere; }
+.js .carrinho-remover { grid-column: 2; justify-self: end; position: relative; z-index: 2; }
+.js .carrinho-qtd-area { display: none; }
+.js .carrinho-qtd-area > .texto-secundario { display: none; }
 .js [data-alterar].aberto .carrinho-remover { display: none; }
-/* Unidade longa (a do limpeza, "EMBALAGEM 500 g"): a linha quebra e o "Confirmar" com o ✕ descem,
-   em vez de passar da largura do pedido. */
-.js [data-alterar].aberto .carrinho-qtd-area { display: flex; flex-wrap: wrap; width: 100%; min-width: 0; }
-.js [data-alterar].aberto .carrinho-qtd-area > .texto-secundario { min-width: 0; overflow-wrap: anywhere; }
-.js [data-alterar].aberto .carrinho-confirmar { display: inline-flex; flex: 1 1 7rem; min-width: 7rem; padding-inline: var(--esp-1); }
-.js [data-alterar].aberto .carrinho-cancelar { display: inline-flex; width: var(--altura-controle); min-height: var(--altura-controle); }
+.js [data-alterar].aberto .carrinho-qtd-area { display: contents; }
+.js [data-alterar].aberto .quantidade { grid-column: 1; grid-row: 2; justify-self: start; position: relative; z-index: 2; }
+.js [data-alterar].aberto .carrinho-confirmar {
+  display: inline-flex; grid-column: 2; grid-row: 2; min-width: 6.5rem; padding-inline: var(--esp-1); position: relative; z-index: 2;
+}
+.js [data-alterar].aberto .carrinho-cancelar {
+  display: inline-flex; position: absolute; z-index: 2; top: 0; right: 2px; width: 40px; min-height: 40px;
+  color: var(--erro-texto);
+}
+.js [data-alterar].aberto .carrinho-cancelar:hover { background: var(--erro-superficie); color: var(--erro-texto); }
+.js .carrinho-linha:has([data-alterar].aberto) { box-shadow: inset 3px 0 0 var(--destaque); }
+.js .carrinho-linha:has([data-alterar].aberto) .material-mais { display: none; }
+/* Com uma aberta, as outras recuam (cinza mais claro, ainda legível) e seguem clicáveis. */
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)) > .material-dados,
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)) > .carrinho-acoes { opacity: 0.6; }
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)):hover > .material-dados,
+.js .carrinho-lista:has([data-alterar].aberto) .carrinho-linha:not(:has([data-alterar].aberto)):hover > .carrinho-acoes { opacity: 0.9; }

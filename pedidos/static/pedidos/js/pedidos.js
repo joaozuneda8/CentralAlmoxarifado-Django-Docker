@@ -29,11 +29,14 @@
   });
 
   // Esc na quantidade aberta (adicionar ou alterar em dois passos) só a fecha; o painel de
-  // resultados e a gaveta do pedido ficam abertos.
+  // resultados e a gaveta do pedido ficam abertos. Na linha do pedido, o botão que a abre (a linha
+  // toda) fica fora da ação: o Esc nele também a fecha.
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Escape" || !e.target.closest) return;
     var acao = e.target.closest("[data-adicionar].aberto");
     var alterar = e.target.closest("[data-alterar].aberto");
+    if (!alterar && e.target.matches("[data-alterar-abrir]")) alterar = acaoDeAlterar(e.target);
+    if (alterar && !alterar.classList.contains("aberto")) alterar = null;
     if (!acao && !alterar) return;
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -51,10 +54,21 @@
     return evento;
   }
 
+  // A linha do pedido: o botão que a abre (a linha toda, transparente) e a ação (`[data-alterar]`, com a
+  // quantidade, o Confirmar e o Remover) são irmãos dentro do <li>.
+  function botaoDeAlterar(linha) {
+    var item = linha && linha.closest("li");
+    return item && item.querySelector("[data-alterar-abrir]");
+  }
+  function acaoDeAlterar(botao) {
+    var item = botao && botao.closest("li");
+    return item && item.querySelector("[data-alterar]");
+  }
+
   function fecharAlteracao(linha, devolverFoco) {
     if (!linha || !linha.classList.contains("aberto")) return;
     linha.classList.remove("aberto");
-    var abrir = linha.querySelector("[data-alterar-abrir]");
+    var abrir = botaoDeAlterar(linha);
     if (!abrir) return;
     abrir.setAttribute("aria-expanded", "false");
     if (devolverFoco) abrir.focus();
@@ -87,7 +101,7 @@
       if (outra !== linha) cancelarAlteracao(outra);
     });
     linha.classList.add("aberto");
-    linha.querySelector("[data-alterar-abrir]").setAttribute("aria-expanded", "true");
+    botaoDeAlterar(linha).setAttribute("aria-expanded", "true");
     var campo = linha.querySelector("[data-qtd-carrinho]");
     campo.focus();
     var fim = campo.value.length; // cursor no fim do número, sem selecioná-lo
@@ -98,7 +112,11 @@
     var alvo = e.target;
     if (!alvo || !alvo.closest) return;
     var abrir = alvo.closest("[data-alterar-abrir]");
-    if (abrir) return abrirAlteracao(abrir.closest("[data-alterar]"));
+    if (abrir) {
+      var linha = acaoDeAlterar(abrir);
+      // Tocar de novo na linha aberta a fecha, voltando à quantidade de antes (como o ✕).
+      return linha.classList.contains("aberto") ? cancelarAlteracao(linha) : abrirAlteracao(linha);
+    }
     var cancelar = alvo.closest("[data-alterar-cancelar]");
     if (cancelar) return cancelarAlteracao(cancelar.closest("[data-alterar]"));
     var confirmar = alvo.closest("[data-alterar-confirmar]");

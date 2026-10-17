@@ -386,9 +386,11 @@ def test_adicionar_recusa_material_do_pedido_e_vinculos_invalidos(client, pedido
     assert "não pode ser adicionado" in _recusa(r)
 
 
-def test_adicionar_e_busca_so_em_pedido_pendente(client, pedido, logado):
+def test_adicionar_e_busca_so_em_atendimento_aberto(client, pedido, logado):
+    # Pedido atendido ainda se edita (e acrescenta) até o lançamento; lançado, não.
     x = livres(pedido)[0].codigo
-    for p in (criar_pedido(atendido=True), criar_pedido(origem=AVULSA, atendido=True)):
+    lancado = criar_pedido(atendido=True, linhas=[("LANCADA", "000001/26")])
+    for p in (lancado, criar_pedido(origem=AVULSA, atendido=True)):
         assert client.get(_url("atendimento_materiais", p), {"q": "a"}).status_code == 404
         r = client.post(_url("atendimento_adicionar", p), {"adicionar": x, f"qtd-{x}": "1"})
         assert r.status_code == 404

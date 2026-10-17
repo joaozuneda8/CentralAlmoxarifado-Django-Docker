@@ -1463,4 +1463,194 @@
     var resumo = detalhes.querySelector("summary");
     if (resumo) resumo.focus();
   });
+
+  // Modo de edição do atendimento e da saída avulsa (`form[data-editando]`). As quantidades gravadas
+  // abrem confirmadas; cada campo diferente do que estava gravado ganha o destaque "alterado" e o
+  // rodapé conta as alterações (por campo da saída e por material). Sair da página com alteração
+  // pede confirmação, e o "Descartar" também. O resumo de um salvar recusado se copia com um botão.
+  function formEdicao() {
+    return document.querySelector("form[data-editando]");
+  }
+
+  // Só o que a edição grava conta como alteração: os campos da saída e os materiais. A busca, o
+  // filtro de grupo e os campos de quantidade dos resultados não.
+  var CAMPOS_DA_SAIDA = ["data", "recebedor", "centro_custo", "tipo", "placa", "obs", "nao_lancar"];
+
+  // A unidade de alteração de um campo: o próprio campo da saída, ou o material dele (quantidade,
+  // troca, presença no carrinho). `null` para o que não é dado da saída.
+  function unidadeDoCampo(campo) {
+    var nome = campo.name;
+    if (!nome || campo.disabled) return null;
+    if (CAMPOS_DA_SAIDA.indexOf(nome) !== -1) return nome;
+    if (nome === "item_qtd") {
+      var linha = campo.closest(".carrinho-linha[data-codigo]");
+      return linha ? "material:" + linha.getAttribute("data-codigo") : null;
+    }
+    if (nome === "adicionado") return "material:" + campo.value;
+    if (nome.indexOf("entregue-") === 0) return "material:" + nome.slice("entregue-".length);
+    if (nome.indexOf("no-lugar-de-") === 0) return "material:" + nome.slice("no-lugar-de-".length);
+    return null;
+  }
+
+  function valorDoCampo(campo) {
+    if (campo.type === "checkbox") return campo.checked ? "1" : "";
+    if (campo.name === "adicionado") return "+";
+    if (campo.name.indexOf("no-lugar-de-") === 0) return ">" + campo.value;
+    return campo.value;
+  }
+
+  // Campos do formulário (também os de fora dele, ligados por `form=`), agrupados por unidade.
+  // O retrato é por valor, não por elemento: o HTMX troca o carrinho e os acrescentados por
+  // elementos novos, e o mesmo conteúdo continua sem alteração.
+  function unidadesDaEdicao(form) {
+    var unidades = {};
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      var chave = unidadeDoCampo(campo);
+      if (chave === null) return;
+      unidades[chave] = (unidades[chave] === undefined ? "" : unidades[chave] + "|") + valorDoCampo(campo);
+    });
+    return unidades;
+  }
+
+  var unidadesIniciais = null;
+  var descartando = false;
+
+  function contarAlteracoes(form) {
+    var atuais = unidadesDaEdicao(form);
+    var chaves = {};
+    Object.keys(unidadesIniciais).concat(Object.keys(atuais)).forEach(function (k) { chaves[k] = true; });
+    return Object.keys(chaves).filter(function (k) { return unidadesIniciais[k] !== atuais[k]; }).length;
+  }
+
+  // Valor de abertura de cada campo de quantidade, pelo nome (o HTMX troca os elementos, o nome
+  // fica): é o "era" da nota do material.
+  var valoresIniciais = {};
+
+  function chaveDoValor(campo) {
+    var linha = campo.name === "item_qtd" && campo.closest(".carrinho-linha[data-codigo]");
+    return linha ? "item_qtd:" + linha.getAttribute("data-codigo") : campo.name;
+  }
+
+  // Onde a nota vai, sem empurrar o campo: no material, embaixo do nome (como o "Trocado por …"),
+  // com o valor de antes; nos dados da saída, na linha do rótulo.
+  function notaDoCampo(campo, caixa) {
+    if (caixa.classList.contains("campo")) {
+      return { lugar: caixa.querySelector(".campo-rotulo") || caixa, classe: "campo-dica-alterado", texto: "alterado" };
+    }
+    var antes = valoresIniciais[chaveDoValor(campo)];
+    var unidade = caixa.querySelector(".entrega-un");
+    var texto = antes === undefined
+      ? "Incluído nesta edição"
+      : "Alterado: era " + antes + (unidade ? " " + unidade.textContent.trim() : "");
+    if (caixa.classList.contains("entrega")) {
+      var linha = caixa.closest("tr");
+      return { lugar: linha ? linha.cells[0] : caixa, classe: "recibo-nota campo-dica-alterado", texto: texto };
+    }
+    return { lugar: caixa.querySelector(".material-dados") || caixa, classe: "campo-dica campo-dica-alterado", texto: texto };
+  }
+
+  // O destaque fica no invólucro do campo (`.campo`, `.entrega`, linha do carrinho), e a nota com
+  // o texto, para não depender só da cor.
+  function destacarCampo(campo, atuais) {
+    var chave = unidadeDoCampo(campo);
+    var caixa = campo.closest(".campo, .entrega, .carrinho-linha");
+    if (chave === null || !caixa) return;
+    var mudou = unidadesIniciais[chave] !== atuais[chave];
+    caixa.classList.toggle("campo-alterado", mudou);
+    var nota = notaDoCampo(campo, caixa);
+    var existente = nota.lugar.querySelector(":scope > .campo-dica-alterado");
+    if (!mudou) {
+      if (existente) existente.remove();
+      return;
+    }
+    if (!existente) {
+      existente = document.createElement("span");
+      nota.lugar.appendChild(existente);
+    }
+    existente.className = nota.classe;
+    existente.textContent = nota.texto;
+  }
+
+  function atualizarEdicao() {
+    var form = formEdicao();
+    if (!form || !unidadesIniciais) return;
+    var atuais = unidadesDaEdicao(form);
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (campo.type === "hidden") return;
+      destacarCampo(campo, atuais);
+    });
+    var n = contarAlteracoes(form);
+    var contagem = document.querySelector("[data-contagem-alteracoes]");
+    if (contagem) contagem.textContent = n === 0 ? "" : n === 1 ? "1 alteração" : n + " alterações";
+  }
+
+  function iniciarEdicao() {
+    var copiar = document.querySelector("[data-copiar-resumo]");
+    if (copiar && navigator.clipboard) copiar.hidden = false;
+    var form = formEdicao();
+    if (!form) return;
+    // Quantidades gravadas já valem: abrem confirmadas (as trocadas o `iniciarTrocas` confirmou).
+    document.querySelectorAll(".entrega[data-pode-confirmar]:not([data-confirmado])").forEach(function (bloco) {
+      var estado = bloco.getAttribute("data-estado");
+      if (estado === "invalido" || estado === "acima") return;
+      if (estado === "zero" && bloco.closest("tr[data-adicionado]")) return;
+      confirmarEntrega(bloco);
+    });
+    unidadesIniciais = unidadesDaEdicao(form);
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (unidadeDoCampo(campo) !== null && campo.type !== "hidden") valoresIniciais[chaveDoValor(campo)] = campo.value;
+    });
+    atualizarEdicao();
+  }
+  document.addEventListener("DOMContentLoaded", iniciarEdicao);
+  document.addEventListener("input", atualizarEdicao);
+  document.addEventListener("change", atualizarEdicao);
+  document.addEventListener("htmx:after:swap", function () { setTimeout(atualizarEdicao, 0); });
+  // A faixa voltou encerrada (o lote entrou em lançamento): nada mais se salva nesta página.
+  document.addEventListener("htmx:after:swap", function () {
+    var form = formEdicao();
+    if (!form || !document.querySelector("[data-edicao-encerrada]")) return;
+    document.querySelectorAll('button[type="submit"], [data-carrinho-enviar]').forEach(function (botao) {
+      if (botao.form !== form && !botao.hasAttribute("data-carrinho-enviar")) return;
+      botao.disabled = true;
+    });
+    descartando = true;
+  });
+  // Troca, acréscimo e o − e o + mudam os campos por código, sem `input`.
+  document.addEventListener("click", function () { setTimeout(atualizarEdicao, 0); });
+
+  document.addEventListener("submit", function (e) {
+    if (e.target.matches && e.target.matches("form[data-editando]")) descartando = true;
+  });
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest && e.target.closest("[data-descartar-edicao], .link-voltar");
+    var form = formEdicao();
+    if (!link || !form || !unidadesIniciais || contarAlteracoes(form) === 0) return;
+    if (!window.confirm("Descartar as alterações?")) {
+      e.preventDefault();
+      return;
+    }
+    descartando = true;
+  });
+  window.addEventListener("beforeunload", function (e) {
+    var form = formEdicao();
+    if (descartando || !form || !unidadesIniciais || contarAlteracoes(form) === 0) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
+  document.addEventListener("click", function (e) {
+    var botao = e.target.closest && e.target.closest("[data-copiar-resumo]");
+    if (!botao) return;
+    var lista = document.querySelector("[data-resumo-alteracoes]");
+    var texto = Array.prototype.map.call(lista.querySelectorAll("li"), function (li) {
+      return "- " + li.textContent.trim();
+    }).join("\n");
+    navigator.clipboard.writeText(texto).then(function () {
+      var rotulo = botao.querySelector("span");
+      var antes = rotulo.textContent;
+      rotulo.textContent = "Copiado";
+      setTimeout(function () { rotulo.textContent = antes; }, 2000);
+    });
+  });
 })();

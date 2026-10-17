@@ -9,9 +9,11 @@ import re
 import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
+
+from django.utils import timezone
 
 _ACENTOS = re.compile("[̀-ͯ]")
 _NAO_ALFANUMERICO = re.compile("[^A-Z0-9]")
@@ -625,6 +627,177 @@ def situacao_pedido(origem: str, atendido: bool, itens) -> Situacao:
         "Aguardando atendimento",
         "Pedido enviado; o almoxarifado ainda não confirmou.",
     )
+
+
+# ---------------------------------------------------------------------------
+# Edição do atendimento: até quando se edita e o que mudou
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Edicao:
+    """Se o atendimento ainda pode ser editado, pelas linhas de saída do lote."""
+
+    chave: str  # "antes_do_atendimento" | "editavel" | "suspensa" | "bloqueada"
+    motivo: str  # texto da tela; vazio quando se pode editar
+    numeros: tuple[str, ...] = ()
+    lancado_em: datetime | None = None
+
+    @property
+    def permitida(self) -> bool:
+        return self.chave == "editavel"
+
+
+def _data_hora(momento: datetime) -> str:
+    if timezone.is_aware(momento):
+        momento = timezone.localtime(momento)
+    return momento.strftime("%d/%m/%Y %H:%M")
+
+
+def edicao_permitida(atendido: bool, linhas) -> Edicao:
+    """Editável enquanto nenhuma linha foi lançada nem está em lançamento: `PENDENTE`,
+    `NAO_LANCAR` e `ERRO` sem número de requisição. `EM_LANCAMENTO` e `VERIFICAR` suspendem
+    (ainda não se sabe se entrou no SCPI); lançada ou com número bloqueia de vez."""
+    if not atendido:
+        return Edicao("antes_do_atendimento", "")
+    linhas = list(linhas)
+    lancadas = [r for r in linhas if r.status == LANCADA or texto(r.requisicao_scpi)]
+    if lancadas:
+        numeros = tuple(
+            dict.fromkeys(texto(r.requisicao_scpi) for r in lancadas if texto(r.requisicao_scpi))
+        )
+        datas = [r.lancado_em for r in lancadas if r.lancado_em]
+        quando = max(datas) if datas else None
+        onde = f"na requisição {', '.join(numeros)}" if numeros else "no SCPI"
+        em = f" em {_data_hora(quando)}" if quando else ""
+        return Edicao(
+            "bloqueada",
+            f"Lançado {onde}{em}; correções são feitas no SCPI.",
+            numeros,
+            quando,
+        )
+    if any(r.status in (EM_LANCAMENTO, VERIFICAR) for r in linhas):
+        return Edicao(
+            "suspensa",
+            "Edição suspensa: o robô não confirmou se a requisição foi gravada no SCPI. "
+            "Resolva em Automações.",
+        )
+    return Edicao("editavel", "")
+
+
+ROTULOS_CABECALHO = (
+    "Data efetiva",
+    "Recebedor",
+    "Centro de custo",
+    "Tipo de saída",
+    "Placa",
+    "Observações",
+    "Não lançar no SCPI",
+)
+
+
+@dataclass(frozen=True)
+class EstadoAtendimento:
+    """O que a edição pode mudar, gravado ou enviado, para comparar."""
+
+    cabecalho: tuple[str, ...]  # na ordem de `cabecalho_saida`
+    entregues: dict  # código -> quantidade (itens pedidos; na avulsa, todos)
+    adicionados: dict  # código -> (no_lugar_de, quantidade)
+    nomes: dict  # código -> material, para as frases
+
+
+def _valor_cabecalho(i: int, valor: str) -> str:
+    if i == 0 and valor:
+        try:
+            return date.fromisoformat(valor).strftime("%d/%m/%Y")
+        except ValueError:
+            return valor
+    if i == 6:
+        return "Sim" if valor else "Não"
+    return valor
+
+
+def _qtd_texto(q) -> str:
+    return "" if q is None else qtd_br(q)
+
+
+def diferencas_atendimento(gravado: EstadoAtendimento, enviado: EstadoAtendimento) -> list[dict]:
+    """O que muda do gravado para o enviado, em textos (vai para o histórico, em JSON):
+    cabeçalho da saída, quantidades entregues e materiais acrescentados pelo almoxarifado."""
+    nomes = {**gravado.nomes, **enviado.nomes}
+    difs: list[dict] = []
+    for i, (antes, depois) in enumerate(zip(gravado.cabecalho, enviado.cabecalho, strict=True)):
+        if texto(antes) != texto(depois):
+            difs.append(
+                {
+                    "campo": ROTULOS_CABECALHO[i],
+                    "antes": _valor_cabecalho(i, texto(antes)),
+                    "depois": _valor_cabecalho(i, texto(depois)),
+                }
+            )
+
+    def material(codigo, mudanca, antes, depois):
+        return {
+            "codigo": codigo,
+            "material": nomes.get(codigo, codigo),
+            "mudanca": mudanca,
+            "antes": antes,
+            "depois": depois,
+        }
+
+    codigos = list(dict.fromkeys([*gravado.entregues, *enviado.entregues]))
+    for codigo in codigos:
+        if codigo not in enviado.entregues:
+            difs.append(material(codigo, "removido", _qtd_texto(gravado.entregues[codigo]), ""))
+        elif codigo not in gravado.entregues:
+            difs.append(material(codigo, "incluido", "", _qtd_texto(enviado.entregues[codigo])))
+        elif gravado.entregues[codigo] != enviado.entregues[codigo]:
+            difs.append(
+                material(
+                    codigo,
+                    "entregue",
+                    _qtd_texto(gravado.entregues[codigo]),
+                    _qtd_texto(enviado.entregues[codigo]),
+                )
+            )
+
+    for codigo, (lugar, qtd) in enviado.adicionados.items():
+        if codigo not in gravado.adicionados:
+            difs.append(material(codigo, "incluido", "", _qtd_texto(qtd)))
+            continue
+        lugar_antes, qtd_antes = gravado.adicionados[codigo]
+        if texto(lugar_antes) != texto(lugar):
+            difs.append(
+                material(
+                    codigo,
+                    "troca",
+                    nomes.get(lugar_antes, lugar_antes) if lugar_antes else "",
+                    nomes.get(lugar, lugar) if lugar else "",
+                )
+            )
+        if qtd_antes != qtd:
+            difs.append(material(codigo, "entregue", _qtd_texto(qtd_antes), _qtd_texto(qtd)))
+    for codigo, (_, qtd) in gravado.adicionados.items():
+        if codigo not in enviado.adicionados:
+            difs.append(material(codigo, "removido", _qtd_texto(qtd), ""))
+    return difs
+
+
+def frase_diferenca(d: dict) -> str:
+    """Uma diferença de `diferencas_atendimento` em frase, para a tela."""
+    if "campo" in d:
+        return f"{d['campo']}: {d['antes'] or '—'} → {d['depois'] or '—'}"
+    nome = f"{d['material']} ({d['codigo']})"
+    mudanca = d["mudanca"]
+    if mudanca == "entregue":
+        return f"{nome}: entregue {d['antes'] or '—'} → {d['depois'] or '—'}"
+    if mudanca == "incluido":
+        return f"{nome}: incluído, {d['depois']}"
+    if mudanca == "removido":
+        return f"{nome}: removido (era {d['antes']})"
+    if d["depois"]:
+        return f"{nome}: agora no lugar de {d['depois']}"
+    return f"{nome}: deixou de ser troca"
 
 
 # ---------------------------------------------------------------------------

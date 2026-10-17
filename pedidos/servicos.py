@@ -14,12 +14,14 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from catalogo.catalogos import ItemCatalogo, catalogo_ab, catalogo_avulsa, catalogo_limpeza
 from catalogo.models import CentroCusto, Opcao
 from pedidos.models import (
     TRAVA_LANCAMENTO,
+    AlteracaoPedido,
     Atendimento,
     ExecucaoRobo,
     ItemPedido,
@@ -36,6 +38,7 @@ from pedidos.regras import (
     LIMPEZA,
     NAO_LANCAR,
     PENDENTE,
+    ROTULOS_CABECALHO,
     TIPOS_SAIDA_PADRAO,
     VERIFICAR,
     Adicionado,
@@ -45,8 +48,12 @@ from pedidos.regras import (
     EnvioPedido,
     EnvioSaida,
     Erro,
+    EstadoAtendimento,
     ItemSaida,
     atendimento_confere,
+    cabecalho_saida,
+    diferencas_atendimento,
+    edicao_permitida,
     marcado_nao_lancar,
     norm_placa,
     norm_u,
@@ -79,6 +86,8 @@ class Resposta:
     divergente: bool = False
     pedido: Pedido | None = None
     telegram: str = ""
+    motivo: str = ""  # recusa da edição: "lancamento" ou "versao"
+    diferencas: list[dict] = field(default_factory=list)
 
 
 def mensagem_divergente(numero: str) -> str:
@@ -472,6 +481,110 @@ def _erros_de_troca_entregue(
     ]
 
 
+def _validar_atendimento(
+    pedido: Pedido,
+    itens: list[ItemPedido],
+    dados: DadosSaida,
+    parsed: dict,
+    adicionados: list[Adicionado],
+    qtds_adicionadas: dict[str, Decimal | None],
+    nao_lancar: bool,
+    *,
+    hoje: date,
+    catalogo_extra: dict[str, ItemCatalogo] | None = None,
+) -> tuple[list[Adicionado], dict[str, ItemCatalogo], list[Erro]]:
+    """Regras do atendimento (e da edição dele): dados da saída, quantidades entregues e os
+    materiais acrescentados. Devolve os acrescentados sem repetição, o catálogo usado (o da
+    saída avulsa, com `catalogo_extra` por cima) e os erros."""
+    lista_centros, tipos = centros(), tipos_saida()
+
+    def validar(itens_saida, catalogo=None):
+        return validar_saida(
+            dados,
+            itens_saida,
+            centros=lista_centros,
+            tipos=tipos,
+            hoje=hoje,
+            catalogo=catalogo,
+            regra_inteira=pedido.origem == AB,
+        )
+
+    catalogo = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
+    catalogo.update(catalogo_extra or {})
+    unicos, erros_adicionados = _erros_dos_adicionados(
+        adicionados, itens, qtds_adicionadas, catalogo, validar
+    )
+    # Os acrescentados entram aqui só para contar no "ao menos um material"; seus erros
+    # por material vêm de `_erros_dos_adicionados`.
+    codigos_unicos = {a.codigo for a in unicos}
+    v = validar(
+        [ItemSaida(i.codigo, parsed[i.codigo], i.qtd_pedida) for i in itens]
+        + [ItemSaida(a.codigo, qtds_adicionadas[a.codigo]) for a in unicos]
+    )
+    erros = (
+        erros_de_tamanho(
+            {
+                "Recebedor": dados.recebedor,
+                "Centro de custo": dados.centro_custo,
+                "Observações": dados.obs,
+            },
+            None,
+        )
+        + [e for e in v.erros if e.codigo is None or e.codigo not in codigos_unicos]
+        + erros_adicionados
+        + _erros_de_troca_entregue(unicos, itens, parsed)
+        + erros_extras_da_saida(dados, nao_lancar, v.centro)
+    )
+    return unicos, catalogo, erros
+
+
+def estado_gravado(pedido: Pedido) -> EstadoAtendimento:
+    """O que a edição pode mudar, como está gravado (o pedido precisa estar atendido)."""
+    todos = list(pedido.itens.all())
+    por_id = {i.id: i for i in todos}
+    avulsa = pedido.origem == AVULSA
+    cabecalho = cabecalho_atendimento(pedido.atendimento)
+    # "Não lançar" marcado em Automações muda as linhas, não o atendimento: o formulário de
+    # edição já abre marcado, então não é diferença.
+    status = set(pedido.atendimento.linhas.values_list("status", flat=True))
+    if status == {NAO_LANCAR}:
+        cabecalho = (*cabecalho[:6], "1")
+    return EstadoAtendimento(
+        cabecalho=cabecalho,
+        entregues={
+            i.codigo: i.qtd_entregue
+            for i in todos
+            if avulsa or i.origem == ItemPedido.Origem.PEDIDO
+        },
+        adicionados={
+            i.codigo: (por_id[i.no_lugar_de_id].codigo if i.no_lugar_de_id else "", i.qtd_entregue)
+            for i in todos
+            if not avulsa and i.origem == ItemPedido.Origem.ALMOXARIFADO
+        },
+        nomes={i.codigo: i.material for i in todos},
+    )
+
+
+def estado_enviado(
+    pedido: Pedido,
+    dados: DadosSaida,
+    nao_lancar: bool,
+    parsed: dict,
+    adicionados: list[Adicionado],
+    qtds_adicionadas: dict,
+    nomes_extra: dict[str, str] | None = None,
+) -> EstadoAtendimento:
+    """O que chegou do formulário de edição, no formato de `estado_gravado`."""
+    return EstadoAtendimento(
+        cabecalho=cabecalho_saida(dados, nao_lancar),
+        entregues=dict(parsed),
+        adicionados={
+            a.codigo: (texto(a.no_lugar_de), qtds_adicionadas.get(a.codigo)) for a in adicionados
+        },
+        nomes={**{i.codigo: i.material for i in pedido.itens.all()}, **(nomes_extra or {})},
+    )
+
+
 def confirmar_atendimento(
     pedido_id: uuid.UUID,
     atendimento_id: uuid.UUID,
@@ -519,43 +632,15 @@ def confirmar_atendimento(
                 "Nada foi gravado.",
             )
 
-        lista_centros, tipos, dia = centros(), tipos_saida(), hoje or timezone.localdate()
-
-        def validar(itens_saida, catalogo=None):
-            return validar_saida(
-                dados,
-                itens_saida,
-                centros=lista_centros,
-                tipos=tipos,
-                hoje=dia,
-                catalogo=catalogo,
-                regra_inteira=pedido.origem == AB,
-            )
-
-        catalogo = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
-        unicos, erros_adicionados = _erros_dos_adicionados(
-            adicionados, itens, qtds_adicionadas, catalogo, validar
-        )
-        # Os acrescentados entram aqui só para contar no "ao menos um material"; seus erros
-        # por material vêm de `_erros_dos_adicionados`.
-        codigos_unicos = {a.codigo for a in unicos}
-        v = validar(
-            [ItemSaida(i.codigo, parsed[i.codigo], i.qtd_pedida) for i in itens]
-            + [ItemSaida(a.codigo, qtds_adicionadas[a.codigo]) for a in unicos]
-        )
-        erros = (
-            erros_de_tamanho(
-                {
-                    "Recebedor": dados.recebedor,
-                    "Centro de custo": dados.centro_custo,
-                    "Observações": dados.obs,
-                },
-                None,
-            )
-            + [e for e in v.erros if e.codigo is None or e.codigo not in codigos_unicos]
-            + erros_adicionados
-            + _erros_de_troca_entregue(unicos, itens, parsed)
-            + erros_extras_da_saida(dados, nao_lancar, v.centro)
+        unicos, catalogo, erros = _validar_atendimento(
+            pedido,
+            itens,
+            dados,
+            parsed,
+            adicionados,
+            qtds_adicionadas,
+            nao_lancar,
+            hoje=hoje or timezone.localdate(),
         )
         if erros:
             return Resposta(ok=False, mensagem="Corrija os dados da saída.", erros=erros)
@@ -587,6 +672,300 @@ def confirmar_atendimento(
     return Resposta(ok=True, numero=pedido.numero, pedido=pedido)
 
 
+# ---------------------------------------------------------------------------
+# Edição do atendimento (e da saída avulsa) até o lançamento no SCPI
+# ---------------------------------------------------------------------------
+
+MENSAGEM_NADA_MUDOU = "Nada mudou; nada foi gravado."
+
+
+def item_catalogo_gravado(item: ItemPedido) -> ItemCatalogo:
+    """Material já gravado no pedido, aceito na edição mesmo que tenha saído do catálogo."""
+    return ItemCatalogo(
+        codigo=item.codigo,
+        nome=item.material,
+        unidade=item.unidade,
+        categoria="",
+        grupo=item.grupo,
+        subgrupo=item.subgrupo,
+        estoque=Decimal(0),
+        disponivel=0,
+        duplicado=False,
+    )
+
+
+def _erros_de_valor_sumido(gravado: tuple[str, ...], dados: DadosSaida) -> list[Erro]:
+    """Centro de custo, tipo ou placa que a pessoa não mexeu, mas que deixou de existir: a
+    edição recusa (o robô também recusaria) e diz por quê."""
+    lista_centros = centros()
+    sumidos = []
+    centro = texto(dados.centro_custo)
+    if (
+        centro
+        and norm_u(centro) == norm_u(gravado[2])
+        and not any(norm_u(c.descricao) == norm_u(centro) for c in lista_centros)
+    ):
+        sumidos.append(ROTULOS_CABECALHO[2])
+    tipo = texto(dados.tipo)
+    if tipo and tipo == gravado[3] and tipo not in tipos_saida():
+        sumidos.append(ROTULOS_CABECALHO[3])
+    placa = norm_placa(dados.placa)
+    if (
+        placa
+        and placa == gravado[4]
+        and not any(norm_placa(c.placa) == placa for c in lista_centros)
+    ):
+        sumidos.append(ROTULOS_CABECALHO[4])
+    return [Erro(None, f"{r}: o valor gravado não existe mais. Escolha outro.") for r in sumidos]
+
+
+def _conferir_edicao(pedido: Pedido, linhas, versao: int, diferencas: list) -> Resposta | None:
+    """Recusa a edição de um lote que entrou em lançamento e a de quem abriu uma versão
+    anterior (salvo o reenvio igual ao gravado). `None` quando pode seguir."""
+    edicao = edicao_permitida(True, linhas)
+    if not edicao.permitida:
+        return Resposta(
+            ok=False,
+            motivo="lancamento",
+            mensagem=edicao.motivo,
+            diferencas=diferencas,
+            numero=pedido.numero,
+        )
+    if versao == pedido.versao:
+        return None
+    if not diferencas:
+        return Resposta(
+            ok=True,
+            reenvio=True,
+            mensagem=f"As alterações já estavam salvas no pedido {pedido.numero}.",
+            numero=pedido.numero,
+            pedido=pedido,
+        )
+    ultima = pedido.alteracoes.select_related("usuario").first()
+    if ultima is None:
+        quem = "Outra pessoa salvou alterações neste pedido."
+    else:
+        nome = ultima.usuario.get_full_name() or ultima.usuario.username
+        quem = f"{nome} salvou alterações neste pedido às {timezone.localtime(ultima.em):%H:%M}."
+    return Resposta(
+        ok=False, motivo="versao", mensagem=quem, diferencas=diferencas, numero=pedido.numero
+    )
+
+
+def _gravar_edicao(
+    pedido: Pedido,
+    atendimento: Atendimento,
+    dados: DadosSaida,
+    nao_lancar: bool,
+    pares,
+    diferencas: list,
+    linhas_antigas: list[LinhaSaida],
+    usuario,
+) -> None:
+    """Grava o cabeçalho do atendimento, a versão, o histórico e as linhas de saída novas. As
+    linhas nunca são atualizadas no lugar: apagadas e recriadas, com IDs novos, o robô que leu
+    o lote antes da edição o encontra mudado e o pula (`lancamento._travar`)."""
+    atendimento.data_efetiva = date.fromisoformat(texto(dados.data))
+    atendimento.recebedor = texto(dados.recebedor)
+    atendimento.centro_custo = texto(dados.centro_custo)
+    atendimento.tipo_saida = texto(dados.tipo)
+    atendimento.placa = norm_placa(dados.placa)
+    atendimento.obs = texto(dados.obs)
+    atendimento.nao_lancar = nao_lancar
+    atendimento.recibo_impresso_em = None
+    atendimento.save()
+    pedido.versao += 1
+    pedido.save(update_fields=["versao"])
+    AlteracaoPedido.objects.create(
+        pedido=pedido,
+        usuario=usuario,
+        versao=pedido.versao,
+        diferencas=diferencas,
+        scpi_antes=[
+            {
+                "seq": linha.seq,
+                "status": linha.status,
+                "mensagem": linha.mensagem,
+                "requisicao_scpi": linha.requisicao_scpi,
+            }
+            for linha in linhas_antigas
+        ],
+    )
+    LinhaSaida.objects.filter(atendimento=atendimento).delete()
+    _gravar_linhas(atendimento, pares, pedido.numero)
+    quando = timezone.localtime().strftime("%d/%m/%Y %H:%M")
+    novas = LinhaSaida.objects.filter(atendimento=atendimento)
+    novas.update(mensagem=f"Refeita na edição de {quando} por {usuario.username}.")
+    # Material marcado sozinho para não lançar (no admin) continua fora do robô. O lote inteiro
+    # marcado vira a caixa "Não lançar" do formulário, e aí vale o que veio dela.
+    sem_lancar = {linha.codigo for linha in linhas_antigas if linha.status == NAO_LANCAR}
+    if len(sem_lancar) < len({linha.codigo for linha in linhas_antigas}):
+        novas.filter(codigo__in=sem_lancar).update(status=NAO_LANCAR)
+
+
+def editar_atendimento(
+    pedido_id: uuid.UUID,
+    versao: int,
+    dados: DadosSaida,
+    qtds: dict[str, str],
+    *,
+    nao_lancar: bool,
+    adicionados: Sequence[Adicionado] = (),
+    usuario,
+    hoje: date | None = None,
+) -> Resposta:
+    """Corrige o atendimento de um pedido enquanto o lote não entrou em lançamento: dados da
+    saída, quantidades entregues e materiais acrescentados pelo almoxarifado. O que veio do
+    funcionário (cabeçalho, materiais e quantidades pedidas) nunca muda."""
+    adicionados = [Adicionado(texto(a.codigo), texto(a.no_lugar_de)) for a in adicionados]
+    with transaction.atomic():
+        pedido = Pedido.objects.select_for_update().filter(pk=pedido_id).first()
+        atendimento = pedido.atendimento_ou_none if pedido is not None else None
+        if atendimento is None or pedido.origem == AVULSA:
+            return Resposta(ok=False, mensagem="Pedido não encontrado.")
+        linhas = list(
+            LinhaSaida.objects.select_for_update().filter(atendimento=atendimento).order_by("seq")
+        )
+        todos = list(pedido.itens.all())
+        itens = [i for i in todos if i.origem == ItemPedido.Origem.PEDIDO]
+        gravados = {i.codigo: i for i in todos if i.origem == ItemPedido.Origem.ALMOXARIFADO}
+        por_id = {i.id: i for i in todos}
+        conv = parse_inteiro if pedido.origem == AB else parse_qtd_br
+        parsed = {i.codigo: conv(qtds.get(i.codigo, "")) for i in itens}
+        qtds_adicionadas = {a.codigo: _qtd_adicionada(qtds, a.codigo) for a in adicionados}
+
+        mantidos = {
+            a.codigo: item_catalogo_gravado(gravados[a.codigo])
+            for a in adicionados
+            if a.codigo in gravados
+            and (
+                por_id[gravados[a.codigo].no_lugar_de_id].codigo
+                if gravados[a.codigo].no_lugar_de_id
+                else ""
+            )
+            == a.no_lugar_de
+        }
+        catalogo_avulsa = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
+        nomes = {c: catalogo_avulsa[c].nome for c in qtds_adicionadas if c in catalogo_avulsa}
+        diferencas = diferencas_atendimento(
+            estado_gravado(pedido),
+            estado_enviado(pedido, dados, nao_lancar, parsed, adicionados, qtds_adicionadas, nomes),
+        )
+        recusa = _conferir_edicao(pedido, linhas, versao, diferencas)
+        if recusa is not None:
+            return recusa
+
+        unicos, catalogo, erros = _validar_atendimento(
+            pedido,
+            itens,
+            dados,
+            parsed,
+            adicionados,
+            qtds_adicionadas,
+            nao_lancar,
+            hoje=hoje or timezone.localdate(),
+            catalogo_extra=mantidos,
+        )
+        erros = _erros_de_valor_sumido(cabecalho_atendimento(atendimento), dados) + erros
+        if erros:
+            return Resposta(ok=False, mensagem="Corrija os dados da saída.", erros=erros)
+        if not diferencas:
+            return Resposta(
+                ok=True, mensagem=MENSAGEM_NADA_MUDOU, numero=pedido.numero, pedido=pedido
+            )
+
+        do_pedido = {i.codigo: i for i in itens}
+        for item in itens:
+            item.qtd_entregue = Decimal(parsed[item.codigo])
+        ItemPedido.objects.bulk_update(itens, ["qtd_entregue"])
+        ficam = {a.codigo for a in unicos}
+        ItemPedido.objects.filter(
+            pk__in=[i.pk for c, i in gravados.items() if c not in ficam]
+        ).delete()
+        acrescentados = []
+        for a in unicos:
+            item = gravados.get(a.codigo)
+            if item is None:
+                m = catalogo[a.codigo]
+                item = ItemPedido(
+                    pedido=pedido,
+                    codigo=a.codigo,
+                    material=m.nome,
+                    unidade=m.unidade,
+                    grupo=m.grupo,
+                    subgrupo=m.subgrupo,
+                    origem=ItemPedido.Origem.ALMOXARIFADO,
+                    adicionado_por=usuario,
+                    qtd_pedida=None,
+                )
+            item.no_lugar_de = do_pedido.get(a.no_lugar_de)
+            item.qtd_entregue = Decimal(qtds_adicionadas[a.codigo])
+            item.save()
+            acrescentados.append(item)
+        _gravar_edicao(
+            pedido,
+            atendimento,
+            dados,
+            nao_lancar,
+            [(i, i.qtd_entregue) for i in itens + acrescentados],
+            diferencas,
+            linhas,
+            usuario,
+        )
+    return Resposta(
+        ok=True,
+        mensagem=f"Alterações salvas no pedido {pedido.numero}.",
+        numero=pedido.numero,
+        pedido=pedido,
+        diferencas=diferencas,
+    )
+
+
+def _validar_saida_avulsa(envio: EnvioSaida, *, hoje: date, catalogo: dict):
+    """Regras da saída avulsa (e da edição dela). Devolve a soma por código e os erros."""
+    soma = somar_por_codigo(envio.itens, parse_qtd_br)
+    v = validar_saida(
+        envio.dados,
+        [ItemSaida(c, soma.soma[c]) for c in soma.ordem],
+        centros=centros(),
+        tipos=tipos_saida(),
+        hoje=hoje,
+        catalogo=catalogo,
+    )
+    erros = list(v.erros)
+    erros += [
+        Erro(i.codigo, f"Quantidade inválida para {i.codigo} (use vírgula para decimais).")
+        for i in soma.invalidos
+    ]
+    if not soma.ordem and not soma.invalidos:
+        erros.append(Erro(None, "Adicione ao menos um material."))
+    erros += erros_extras_da_saida(envio.dados, envio.nao_lancar, v.centro)
+    erros += erros_de_tamanho(
+        {
+            "Recebedor": envio.dados.recebedor,
+            "Centro de custo": envio.dados.centro_custo,
+            "Observações": envio.dados.obs,
+        },
+        None,
+    )
+    return soma, erros
+
+
+def _gravar_itens_avulsa(pedido: Pedido, soma, por_codigo: dict) -> list[ItemPedido]:
+    return ItemPedido.objects.bulk_create(
+        ItemPedido(
+            pedido=pedido,
+            codigo=c,
+            material=por_codigo[c].nome,
+            unidade=por_codigo[c].unidade,
+            grupo=por_codigo[c].grupo,
+            qtd_pedida=Decimal(soma.soma[c]),
+            qtd_entregue=Decimal(soma.soma[c]),
+        )
+        for c in soma.ordem
+    )
+
+
 def registrar_saida_avulsa(
     envio_id: uuid.UUID, envio: EnvioSaida, *, usuario, hoje: date | None = None
 ) -> Resposta:
@@ -613,30 +992,8 @@ def registrar_saida_avulsa(
         if catalogo is None:
             return Resposta(ok=False, mensagem="O cadastro de materiais não está disponível agora.")
         por_codigo = {i.codigo: i for i in catalogo}
-        soma = somar_por_codigo(envio.itens, parse_qtd_br)
-        v = validar_saida(
-            envio.dados,
-            [ItemSaida(c, soma.soma[c]) for c in soma.ordem],
-            centros=centros(),
-            tipos=tipos_saida(),
-            hoje=hoje or timezone.localdate(),
-            catalogo=por_codigo,
-        )
-        erros = list(v.erros)
-        erros += [
-            Erro(i.codigo, f"Quantidade inválida para {i.codigo} (use vírgula para decimais).")
-            for i in soma.invalidos
-        ]
-        if not soma.ordem and not soma.invalidos:
-            erros.append(Erro(None, "Adicione ao menos um material."))
-        erros += erros_extras_da_saida(envio.dados, envio.nao_lancar, v.centro)
-        erros += erros_de_tamanho(
-            {
-                "Recebedor": envio.dados.recebedor,
-                "Centro de custo": envio.dados.centro_custo,
-                "Observações": envio.dados.obs,
-            },
-            None,
+        soma, erros = _validar_saida_avulsa(
+            envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo
         )
         if erros:
             return Resposta(ok=False, mensagem="Corrija os itens abaixo.", erros=erros)
@@ -647,29 +1004,111 @@ def registrar_saida_avulsa(
             origem=AVULSA,
             registrado_por=usuario,
         )
-        itens = ItemPedido.objects.bulk_create(
-            ItemPedido(
-                pedido=pedido,
-                codigo=c,
-                material=por_codigo[c].nome,
-                unidade=por_codigo[c].unidade,
-                grupo=por_codigo[c].grupo,
-                qtd_pedida=Decimal(soma.soma[c]),
-                qtd_entregue=Decimal(soma.soma[c]),
-            )
-            for c in soma.ordem
-        )
+        itens = _gravar_itens_avulsa(pedido, soma, por_codigo)
         atendimento = _criar_atendimento(envio_id, pedido, envio.dados, envio.nao_lancar, usuario)
         _gravar_linhas(atendimento, [(i, i.qtd_entregue) for i in itens], pedido.numero)
     return Resposta(ok=True, numero=pedido.numero, pedido=pedido)
 
 
-def marcar_recibos_impressos(atendimento_ids, agora: datetime | None = None) -> int:
+def editar_saida_avulsa(
+    pedido_id: uuid.UUID,
+    versao: int,
+    envio: EnvioSaida,
+    *,
+    usuario,
+    hoje: date | None = None,
+) -> Resposta:
+    """Corrige uma saída avulsa enquanto o lote não entrou em lançamento: dados da saída e
+    materiais (o carrinho inteiro substitui os itens)."""
+    with transaction.atomic():
+        pedido = Pedido.objects.select_for_update().filter(pk=pedido_id).first()
+        atendimento = pedido.atendimento_ou_none if pedido is not None else None
+        if atendimento is None or pedido.origem != AVULSA:
+            return Resposta(ok=False, mensagem="Pedido não encontrado.")
+        linhas = list(
+            LinhaSaida.objects.select_for_update().filter(atendimento=atendimento).order_by("seq")
+        )
+        catalogo = catalogo_de(AVULSA)
+        if catalogo is None:
+            return Resposta(ok=False, mensagem="O cadastro de materiais não está disponível agora.")
+        por_codigo = {i.codigo: i for i in catalogo}
+        # Material já na saída continua aceito, mesmo que tenha saído do catálogo.
+        for item in pedido.itens.all():
+            por_codigo.setdefault(item.codigo, item_catalogo_gravado(item))
+        soma, erros = _validar_saida_avulsa(
+            envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo
+        )
+        nomes = {c: por_codigo[c].nome for c in soma.ordem if c in por_codigo}
+        diferencas = diferencas_atendimento(
+            estado_gravado(pedido),
+            estado_enviado(
+                pedido,
+                envio.dados,
+                envio.nao_lancar,
+                {c: soma.soma[c] for c in soma.ordem},
+                [],
+                {},
+                nomes,
+            ),
+        )
+        recusa = _conferir_edicao(pedido, linhas, versao, diferencas)
+        if recusa is not None:
+            return recusa
+        erros = _erros_de_valor_sumido(cabecalho_atendimento(atendimento), envio.dados) + erros
+        if erros:
+            return Resposta(ok=False, mensagem="Corrija os itens abaixo.", erros=erros)
+        if not diferencas:
+            return Resposta(
+                ok=True, mensagem=MENSAGEM_NADA_MUDOU, numero=pedido.numero, pedido=pedido
+            )
+        pedido.itens.all().delete()
+        itens = _gravar_itens_avulsa(pedido, soma, por_codigo)
+        _gravar_edicao(
+            pedido,
+            atendimento,
+            envio.dados,
+            envio.nao_lancar,
+            [(i, i.qtd_entregue) for i in itens],
+            diferencas,
+            linhas,
+            usuario,
+        )
+    return Resposta(
+        ok=True,
+        mensagem=f"Alterações salvas na saída {pedido.numero}.",
+        numero=pedido.numero,
+        pedido=pedido,
+        diferencas=diferencas,
+    )
+
+
+def marcar_recibos_impressos(
+    atendimento_ids, agora: datetime | None = None, versoes: dict | None = None
+) -> int:
     """Marca como impressos os recibos ainda não marcados: reimprimir não muda a data da
-    primeira impressão."""
-    return Atendimento.objects.filter(
-        id__in=list(atendimento_ids), recibo_impresso_em__isnull=True
-    ).update(recibo_impresso_em=agora or timezone.now())
+    primeira impressão. Com `versoes` ({atendimento: versão do pedido na página}), ignora o
+    pedido editado depois que a página abriu: o que saiu na impressora era a versão anterior."""
+    versoes = versoes or {}
+    ids = list(atendimento_ids)
+    conferem = Q(id__in=[i for i in ids if i not in versoes])
+    for atendimento_id, versao in versoes.items():
+        conferem |= Q(id=atendimento_id, pedido__versao=versao)
+    return (
+        Atendimento.objects.filter(id__in=ids, recibo_impresso_em__isnull=True)
+        .filter(conferem)
+        .update(recibo_impresso_em=agora or timezone.now())
+    )
+
+
+def recibos_alterados(versoes: dict) -> list:
+    """Atendimentos ainda não impressos cujo pedido mudou de versão desde que a página abriu."""
+    return [
+        atendimento_id
+        for atendimento_id, versao in versoes.items()
+        if Atendimento.objects.filter(id=atendimento_id, recibo_impresso_em__isnull=True)
+        .exclude(pedido__versao=versao)
+        .exists()
+    ]
 
 
 ACOES_TRAVA = ("lancada", "liberar", "nao_lancar")

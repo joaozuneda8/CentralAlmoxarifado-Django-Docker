@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles import finders
 from django.urls import reverse
 
+from pedidos.models import Pedido
 from pedidos.regras import AVULSA
 from pedidos.servicos import marcar_recibos_impressos
 from tests.cenario import criar_pedido
@@ -174,3 +175,37 @@ def test_detalhe_imprime_o_recibo_e_confirma_a_impressao(client, logado):
     assert r.status_code == 302 and r["Location"] == url
     # Já impresso, a confirmação não aparece mais.
     assert "confirmacao-impressao" not in client.get(url).text
+
+
+# A confirmação de impresso confere a versão do pedido: a impressão de uma versão anterior
+# (outra aba, antes de uma edição) não marca a versão nova.
+
+
+def test_marcar_impresso_com_versao_antiga_e_ignorado():
+    p = criar_pedido(atendido=True)
+    Pedido.objects.filter(pk=p.pk).update(versao=1)
+    a = p.atendimento
+    assert marcar_recibos_impressos([a.id], versoes={a.id: 0}) == 0
+    a.refresh_from_db()
+    assert a.recibo_impresso_em is None
+    assert marcar_recibos_impressos([a.id], versoes={a.id: 1}) == 1
+
+
+def test_detalhe_manda_a_versao_na_confirmacao(client, logado):
+    p = criar_pedido(atendido=True)
+    r = client.get(reverse("pedidos:detalhe", args=[p.numero]))
+    assert f'name="versao-{p.atendimento.id}" value="0"' in r.text
+
+
+def test_view_avisa_quando_o_pedido_mudou(client, logado):
+    p = criar_pedido(atendido=True)
+    Pedido.objects.filter(pk=p.pk).update(versao=1)
+    a = p.atendimento
+    client.post(
+        reverse("pedidos:marcar_impressos"), {"atendimento": str(a.id), f"versao-{a.id}": "0"}
+    )
+    painel = client.get(reverse("pedidos:painel")).text
+    assert "O pedido foi alterado depois de abrir esta página; imprima de novo." in painel
+    assert "Nenhum recibo novo para marcar" not in painel
+    a.refresh_from_db()
+    assert a.recibo_impresso_em is None

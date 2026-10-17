@@ -65,7 +65,7 @@ formulário (o rótulo do caso divergente vem de lá). Igual nos formulários p�
     <p class="texto-secundario">Nenhum material adicionado ainda.</p>
     {% endif %}
     <div class="carrinho-acoes-gaveta carrinho-so-gaveta">
-      {% if carrinho.linhas %}<button type="button" class="botao botao-primario botao-bloco" data-carrinho-enviar>{% include "interface/_icone.html" with nome=fluxo.icone_enviar %}<span data-carrinho-enviar-rotulo>{{ fluxo.rotulo_enviar }}</span></button>{% endif %}
+      {% if carrinho.linhas %}<button type="button" class="botao botao-primario botao-bloco" data-carrinho-enviar>{% if editando %}{% include "interface/_icone.html" with nome="check" %}<span data-carrinho-enviar-rotulo>Salvar alterações</span>{% else %}{% include "interface/_icone.html" with nome=fluxo.icone_enviar %}<span data-carrinho-enviar-rotulo>{{ fluxo.rotulo_enviar }}</span>{% endif %}</button>{% endif %}
       <button type="button" class="botao {% if carrinho.linhas %}botao-secundario{% else %}botao-primario{% endif %} botao-bloco" data-carrinho-continuar>Adicionar mais materiais</button>
     </div>
   </dialog>

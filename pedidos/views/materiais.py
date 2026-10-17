@@ -62,7 +62,13 @@ def _carrinho(request, fluxo: Fluxo):
         resultado = carrinho_mod.remover(linhas, request.POST["remover"])
     else:
         resultado = carrinho_mod.Carrinho(linhas)
-    contexto = {"fluxo": fluxo, "carrinho": resultado, **urls_do_fluxo(fluxo)}
+    contexto = {
+        "fluxo": fluxo,
+        "carrinho": resultado,
+        # Na edição da saída avulsa o formulário leva a versão: o envio diz "Salvar alterações".
+        "editando": "versao" in request.POST,
+        **urls_do_fluxo(fluxo),
+    }
     return render(request, "pedidos/_carrinho.html", contexto)
 
 

@@ -210,3 +210,39 @@ def test_clean_recusa_no_lugar_de_de_outro_pedido_ou_acrescentado():
     novo.no_lugar_de = acrescentado
     with pytest.raises(ValidationError):
         novo.full_clean()
+
+
+# Edição do atendimento: versão do pedido e histórico de alterações.
+
+
+def test_pedido_nasce_na_versao_zero():
+    from tests.cenario import criar_pedido
+
+    assert criar_pedido().versao == 0
+
+
+def test_alteracao_guarda_diferencas_e_scpi_antes():
+    from pedidos.models import AlteracaoPedido
+    from tests.cenario import criar_pedido
+
+    p = criar_pedido(atendido=True)
+    u = get_user_model().objects.create_user(username="00001")
+    a = AlteracaoPedido.objects.create(
+        pedido=p,
+        usuario=u,
+        versao=1,
+        diferencas=[{"campo": "Recebedor", "antes": "João", "depois": "Ana"}],
+        scpi_antes=[{"seq": 1, "status": "PENDENTE", "mensagem": "", "requisicao_scpi": ""}],
+    )
+    assert list(p.alteracoes.all()) == [a]
+    assert a.diferencas[0]["depois"] == "Ana"
+
+
+def test_migration_da_edicao_so_acrescenta():
+    from importlib import import_module
+
+    from django.db.migrations import AddField, CreateModel
+
+    m = import_module("pedidos.migrations.0002_edicao_atendimento").Migration
+    assert m.operations
+    assert {type(op) for op in m.operations} <= {AddField, CreateModel}

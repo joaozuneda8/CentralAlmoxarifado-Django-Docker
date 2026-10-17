@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edição do pedido · Abordagem B</title>
+<style>
+  :root { --tinta:#1f2328; --suave:#6a737d; --linha:#c9ced4; --fundo:#f6f7f8; --azul:#2f6fdb;
+          --ambar:#b7791f; --ambar-f:#fff7e6; --verm:#c53030; --verde:#2f855a; --verde-f:#eefaf2; --cinza-f:#eef0f2; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; color:var(--tinta); background:var(--fundo); }
+  header.doc, section.estado { max-width:1180px; margin:auto; padding:24px 16px 8px; }
+  header.doc h1 { margin:0 0 4px; font-size:20px; } header.doc p { margin:0; color:var(--suave); max-width:80ch; }
+  .estado-rotulo b { font-size:16px; } .estado-rotulo span { color:var(--suave); margin-left:8px; }
+  .tela { position:relative; border:2px solid var(--tinta); border-radius:8px; overflow:hidden; background:#fff; min-height:460px; margin-top:8px; }
+  .lista { padding:16px; opacity:.55; }
+  .lista h2 { margin:0 0 12px; font-size:18px; }
+  table { width:100%; border-collapse:collapse; } th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--cinza-f); font-size:13px; }
+  th { font-size:11px; color:var(--suave); }
+  tr.sel td { background:#eef4ff; }
+  .gaveta { position:absolute; top:0; right:0; bottom:0; width:min(440px, 100%); background:#fff; border-left:2px solid var(--tinta); box-shadow:-8px 0 24px rgba(0,0,0,.08); display:grid; grid-template-rows:auto 1fr auto; }
+  .gaveta header, .gaveta footer { padding:12px 16px; border-bottom:1px solid var(--linha); display:flex; justify-content:space-between; gap:8px; align-items:center; flex-wrap:wrap; }
+  .gaveta footer { border-top:2px solid var(--tinta); border-bottom:0; }
+  .gaveta .corpo { padding:16px; overflow:auto; display:grid; gap:12px; align-content:start; }
+  .mono { font-family:ui-monospace, monospace; }
+  .btn { border:1.5px solid var(--tinta); background:#fff; border-radius:6px; padding:6px 12px; font:inherit; font-size:13px; }
+  .btn.prim { background:var(--tinta); color:#fff; } .btn[aria-disabled=true] { opacity:.45; border-style:dashed; }
+  .selo { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid currentColor; white-space:nowrap; }
+  .selo.verde { color:var(--verde); background:var(--verde-f); } .selo.cinza { color:var(--suave); background:var(--cinza-f); }
+  .campo { display:grid; gap:2px; } .campo label { font-size:11px; color:var(--suave); }
+  .entrada { border:1.5px solid var(--linha); border-radius:4px; padding:5px 8px; min-height:30px; }
+  .aviso { border-left:4px solid var(--suave); background:var(--cinza-f); padding:10px 12px; border-radius:4px; }
+  .nota { font-size:12px; color:var(--suave); border:1px dotted var(--suave); padding:6px 8px; border-radius:4px; background:#fffef5; }
+  .nota::before { content:"✎ anotação do esboço: "; font-weight:600; }
+  .comparar { max-width:1180px; margin:16px auto 40px; padding:0 16px; }
+  .comparar table { background:#fff; border:1px solid var(--linha); }
+  .comparar td:first-child { font-weight:600; width:22%; }
+</style>
+</head>
+<body>
+<header class="doc">
+  <h1>Abordagem B: painel lateral a partir do painel de pedidos (para comparação)</h1>
+  <p>A edição abre numa gaveta à direita, sem sair da lista. Está aqui para comparar; não é a recomendação. Na lista
+  não há wireframe de edição inline: pela quantidade de campos e materiais, ela foi descartada na análise.</p>
+</header>
+
+<section class="estado">
+  <div class="estado-rotulo"><b>B1 · Gaveta editável</b><span>a lista fica atrás, esmaecida</span></div>
+  <div class="tela">
+    <div class="lista"><h2>Pedidos</h2>
+      <table><thead><tr><th>Nº</th><th>Solicitante</th><th>Situação</th><th>SCPI</th></tr></thead>
+        <tbody><tr class="sel"><td class="mono">P-000412</td><td>Maria da Silva</td><td>Atendido</td><td>Aguardando o robô</td></tr>
+        <tr><td class="mono">P-000411</td><td>Carlos Lima</td><td>Atendido</td><td>004213/26</td></tr>
+        <tr><td class="mono">P-000410</td><td>Rita Alves</td><td>Aguardando</td><td>—</td></tr></tbody></table>
+    </div>
+    <aside class="gaveta" aria-label="Editar pedido P-000412">
+      <header><b>Editar <span class="mono">P-000412</span></b><span class="selo verde">✎ Editável</span><button class="btn">✕</button></header>
+      <div class="corpo">
+        <div class="campo"><label>Destino</label><div class="entrada">Oficina Norte</div></div>
+        <div class="campo"><label>Recebedor *</label><div class="entrada">João Pereira</div></div>
+        <div class="campo"><label>Centro de custo *</label><div class="entrada">Manutenção de frota ▾</div></div>
+        <div class="campo"><label>Materiais</label><div class="entrada">Luva nitrílica · 10 &nbsp;|&nbsp; Fita isolante · 5</div></div>
+        <div class="nota">440 px não comportam a tabela de materiais com troca, acréscimo, a busca em painel e o − / +. Ou a gaveta vira página inteira (no tablet e no celular já vira), ou os materiais ficam de fora, e aí a edição não seria completa.</div>
+      </div>
+      <footer><button class="btn">Descartar</button><button class="btn prim">✓ Salvar</button></footer>
+    </aside>
+  </div>
+</section>
+
+<section class="estado">
+  <div class="estado-rotulo"><b>B2 · Gaveta bloqueada</b><span>lançado no SCPI</span></div>
+  <div class="tela" style="min-height:260px">
+    <div class="lista"><h2>Pedidos</h2><p>…</p></div>
+    <aside class="gaveta" aria-label="Pedido P-000411">
+      <header><b><span class="mono">P-000411</span></b><span class="selo cinza">🔒 Lançado</span><button class="btn">✕</button></header>
+      <div class="corpo"><div class="aviso">Lançado na requisição <span class="mono">004213/26</span>. Correções são feitas no SCPI.</div></div>
+      <footer><span></span><button class="btn" aria-disabled="true">🔒 Editar</button></footer>
+    </aside>
+  </div>
+</section>
+
+<div class="comparar">
+  <table>
+    <thead><tr><th></th><th>A · Modo de edição no detalhe</th><th>B · Gaveta na lista</th><th>C · Inline na lista</th></tr></thead>
+    <tbody>
+      <tr><td>Cabe a edição completa</td><td>Sim, reaproveita o formulário do atendimento</td><td>Mal; materiais apertados</td><td>Não</td></tr>
+      <tr><td>Contexto para decidir</td><td>Recibo, situação SCPI e histórico juntos</td><td>Parcial</td><td>Mínimo</td></tr>
+      <tr><td>Sem JavaScript / link direto</td><td>Sim (URL própria)</td><td>Precisa de rota própria de qualquer jeito</td><td>Não</td></tr>
+      <tr><td>Conflito com o robô</td><td>Um único salvar, fácil de explicar</td><td>Igual a A</td><td>Muitos salvamentos pequenos, muitas janelas</td></tr>
+      <tr><td>Rapidez para vários pedidos</td><td>Ida e volta à lista</td><td>Melhor</td><td>Melhor (só campos simples)</td></tr>
+      <tr><td>Custo no código atual</td><td>Baixo: o painel já não tem gavetas</td><td>Alto: componente novo</td><td>Alto</td></tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

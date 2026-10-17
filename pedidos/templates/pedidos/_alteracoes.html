@@ -1,0 +1,18 @@
+{% load pedidos_extras %}{% comment %}
+Histórico das edições do atendimento: só na tela, nunca no recibo impresso.
+{% endcomment %}
+<details class="cartao alteracoes nao-imprimir">
+  <summary>Alterações depois do atendimento ({{ alteracoes|length }})</summary>
+  {% if alteracoes %}
+  <ol class="alteracoes-lista">
+    {% for alteracao in alteracoes %}
+    <li>
+      <p class="texto-secundario texto-pequeno">{{ alteracao.em|date:"d/m/Y H:i" }} · {{ alteracao.usuario.get_full_name|default:alteracao.usuario.username }}</p>
+      <ul>{% for diferenca in alteracao.diferencas %}<li>{{ diferenca|frase_diferenca }}</li>{% endfor %}</ul>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="texto-secundario">Nenhuma alteração registrada.</p>
+  {% endif %}
+</details>

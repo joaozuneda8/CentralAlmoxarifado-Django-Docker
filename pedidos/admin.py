@@ -1,7 +1,14 @@
 from django.contrib import admin
 
 from catalogo.admin import SoLeituraAdmin
-from pedidos.models import Atendimento, ExecucaoRobo, ItemPedido, LinhaSaida, Pedido
+from pedidos.models import (
+    AlteracaoPedido,
+    Atendimento,
+    ExecucaoRobo,
+    ItemPedido,
+    LinhaSaida,
+    Pedido,
+)
 
 
 class ItemPedidoInline(admin.TabularInline):
@@ -41,6 +48,12 @@ class PedidoAdmin(SoLeituraAdmin):
 class AtendimentoAdmin(SoLeituraAdmin):
     list_display = ["pedido", "data_efetiva", "recebedor", "centro_custo", "recibo_impresso_em"]
     search_fields = ["pedido__numero", "recebedor"]
+
+
+@admin.register(AlteracaoPedido)
+class AlteracaoPedidoAdmin(SoLeituraAdmin):
+    list_display = ["pedido", "versao", "em", "usuario"]
+    search_fields = ["pedido__numero"]
 
 
 @admin.register(LinhaSaida)

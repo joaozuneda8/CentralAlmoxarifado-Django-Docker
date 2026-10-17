@@ -910,6 +910,51 @@ def editar_atendimento(
     )
 
 
+def _validar_saida_avulsa(envio: EnvioSaida, *, hoje: date, catalogo: dict):
+    """Regras da saída avulsa (e da edição dela). Devolve a soma por código e os erros."""
+    soma = somar_por_codigo(envio.itens, parse_qtd_br)
+    v = validar_saida(
+        envio.dados,
+        [ItemSaida(c, soma.soma[c]) for c in soma.ordem],
+        centros=centros(),
+        tipos=tipos_saida(),
+        hoje=hoje,
+        catalogo=catalogo,
+    )
+    erros = list(v.erros)
+    erros += [
+        Erro(i.codigo, f"Quantidade inválida para {i.codigo} (use vírgula para decimais).")
+        for i in soma.invalidos
+    ]
+    if not soma.ordem and not soma.invalidos:
+        erros.append(Erro(None, "Adicione ao menos um material."))
+    erros += erros_extras_da_saida(envio.dados, envio.nao_lancar, v.centro)
+    erros += erros_de_tamanho(
+        {
+            "Recebedor": envio.dados.recebedor,
+            "Centro de custo": envio.dados.centro_custo,
+            "Observações": envio.dados.obs,
+        },
+        None,
+    )
+    return soma, erros
+
+
+def _gravar_itens_avulsa(pedido: Pedido, soma, por_codigo: dict) -> list[ItemPedido]:
+    return ItemPedido.objects.bulk_create(
+        ItemPedido(
+            pedido=pedido,
+            codigo=c,
+            material=por_codigo[c].nome,
+            unidade=por_codigo[c].unidade,
+            grupo=por_codigo[c].grupo,
+            qtd_pedida=Decimal(soma.soma[c]),
+            qtd_entregue=Decimal(soma.soma[c]),
+        )
+        for c in soma.ordem
+    )
+
+
 def registrar_saida_avulsa(
     envio_id: uuid.UUID, envio: EnvioSaida, *, usuario, hoje: date | None = None
 ) -> Resposta:
@@ -936,30 +981,8 @@ def registrar_saida_avulsa(
         if catalogo is None:
             return Resposta(ok=False, mensagem="O cadastro de materiais não está disponível agora.")
         por_codigo = {i.codigo: i for i in catalogo}
-        soma = somar_por_codigo(envio.itens, parse_qtd_br)
-        v = validar_saida(
-            envio.dados,
-            [ItemSaida(c, soma.soma[c]) for c in soma.ordem],
-            centros=centros(),
-            tipos=tipos_saida(),
-            hoje=hoje or timezone.localdate(),
-            catalogo=por_codigo,
-        )
-        erros = list(v.erros)
-        erros += [
-            Erro(i.codigo, f"Quantidade inválida para {i.codigo} (use vírgula para decimais).")
-            for i in soma.invalidos
-        ]
-        if not soma.ordem and not soma.invalidos:
-            erros.append(Erro(None, "Adicione ao menos um material."))
-        erros += erros_extras_da_saida(envio.dados, envio.nao_lancar, v.centro)
-        erros += erros_de_tamanho(
-            {
-                "Recebedor": envio.dados.recebedor,
-                "Centro de custo": envio.dados.centro_custo,
-                "Observações": envio.dados.obs,
-            },
-            None,
+        soma, erros = _validar_saida_avulsa(
+            envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo
         )
         if erros:
             return Resposta(ok=False, mensagem="Corrija os itens abaixo.", erros=erros)
@@ -970,21 +993,82 @@ def registrar_saida_avulsa(
             origem=AVULSA,
             registrado_por=usuario,
         )
-        itens = ItemPedido.objects.bulk_create(
-            ItemPedido(
-                pedido=pedido,
-                codigo=c,
-                material=por_codigo[c].nome,
-                unidade=por_codigo[c].unidade,
-                grupo=por_codigo[c].grupo,
-                qtd_pedida=Decimal(soma.soma[c]),
-                qtd_entregue=Decimal(soma.soma[c]),
-            )
-            for c in soma.ordem
-        )
+        itens = _gravar_itens_avulsa(pedido, soma, por_codigo)
         atendimento = _criar_atendimento(envio_id, pedido, envio.dados, envio.nao_lancar, usuario)
         _gravar_linhas(atendimento, [(i, i.qtd_entregue) for i in itens], pedido.numero)
     return Resposta(ok=True, numero=pedido.numero, pedido=pedido)
+
+
+def editar_saida_avulsa(
+    pedido_id: uuid.UUID,
+    versao: int,
+    envio: EnvioSaida,
+    *,
+    usuario,
+    hoje: date | None = None,
+) -> Resposta:
+    """Corrige uma saída avulsa enquanto o lote não entrou em lançamento: dados da saída e
+    materiais (o carrinho inteiro substitui os itens)."""
+    with transaction.atomic():
+        pedido = Pedido.objects.select_for_update().filter(pk=pedido_id).first()
+        atendimento = pedido.atendimento_ou_none if pedido is not None else None
+        if atendimento is None or pedido.origem != AVULSA:
+            return Resposta(ok=False, mensagem="Pedido não encontrado.")
+        linhas = list(
+            LinhaSaida.objects.select_for_update().filter(atendimento=atendimento).order_by("seq")
+        )
+        catalogo = catalogo_de(AVULSA)
+        if catalogo is None:
+            return Resposta(ok=False, mensagem="O cadastro de materiais não está disponível agora.")
+        por_codigo = {i.codigo: i for i in catalogo}
+        # Material já na saída continua aceito, mesmo que tenha saído do catálogo.
+        for item in pedido.itens.all():
+            por_codigo.setdefault(item.codigo, _item_catalogo_gravado(item))
+        soma, erros = _validar_saida_avulsa(
+            envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo
+        )
+        nomes = {c: por_codigo[c].nome for c in soma.ordem if c in por_codigo}
+        diferencas = diferencas_atendimento(
+            estado_gravado(pedido),
+            estado_enviado(
+                pedido,
+                envio.dados,
+                envio.nao_lancar,
+                {c: soma.soma[c] for c in soma.ordem},
+                [],
+                {},
+                nomes,
+            ),
+        )
+        recusa = _conferir_edicao(pedido, linhas, versao, diferencas)
+        if recusa is not None:
+            return recusa
+        erros = _erros_de_valor_sumido(cabecalho_atendimento(atendimento), envio.dados) + erros
+        if erros:
+            return Resposta(ok=False, mensagem="Corrija os itens abaixo.", erros=erros)
+        if not diferencas:
+            return Resposta(
+                ok=True, mensagem=MENSAGEM_NADA_MUDOU, numero=pedido.numero, pedido=pedido
+            )
+        pedido.itens.all().delete()
+        itens = _gravar_itens_avulsa(pedido, soma, por_codigo)
+        _gravar_edicao(
+            pedido,
+            atendimento,
+            envio.dados,
+            envio.nao_lancar,
+            [(i, i.qtd_entregue) for i in itens],
+            diferencas,
+            linhas,
+            usuario,
+        )
+    return Resposta(
+        ok=True,
+        mensagem=f"Alterações salvas na saída {pedido.numero}.",
+        numero=pedido.numero,
+        pedido=pedido,
+        diferencas=diferencas,
+    )
 
 
 def marcar_recibos_impressos(atendimento_ids, agora: datetime | None = None) -> int:

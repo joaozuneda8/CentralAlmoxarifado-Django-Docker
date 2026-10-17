@@ -12,14 +12,24 @@ from django.utils import timezone
 from catalogo.models import CentroCusto, Material
 from pedidos.consultas import fila_do_robo
 from pedidos.models import AlteracaoPedido, Atendimento, ItemPedido, LinhaSaida, Pedido
-from pedidos.regras import AB, LIMPEZA, Adicionado, diferencas_atendimento
+from pedidos.regras import AB, LIMPEZA, Adicionado, EnvioSaida, diferencas_atendimento
 from pedidos.servicos import (
     confirmar_atendimento,
     editar_atendimento,
+    editar_saida_avulsa,
     estado_enviado,
     estado_gravado,
+    registrar_saida_avulsa,
 )
-from tests.cenario import em_paralelo, envio_ab, envio_limpeza, montar_cenario, registrar, saida
+from tests.cenario import (
+    em_paralelo,
+    envio_ab,
+    envio_limpeza,
+    itens,
+    montar_cenario,
+    registrar,
+    saida,
+)
 
 pytestmark = pytest.mark.django_db
 HOJE = date(2026, 10, 9)
@@ -358,4 +368,88 @@ def test_scpi_antes_guarda_a_situacao_anterior(atendido, usuario):
 
 def test_editar_atendimento_recusa_pedido_sem_atendimento(pedido, usuario):
     r = editar(pedido, usuario)
+    assert not r.ok and r.mensagem == "Pedido não encontrado."
+
+
+# ---------------------------------------------------------------------------
+# Serviço `editar_saida_avulsa`
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def avulsa(usuario):
+    montar_cenario()
+    r = registrar_saida_avulsa(
+        uuid.uuid4(),
+        EnvioSaida(saida(), itens(("023.004.001", "1"), ("016.005.010", "2"))),
+        usuario=usuario,
+        hoje=HOJE,
+    )
+    assert r.ok, r.erros
+    return r.pedido
+
+
+def editar_avulsa(pedido, usuario, materiais, dados=None, versao=None):
+    pedido.refresh_from_db()
+    return editar_saida_avulsa(
+        pedido.id,
+        pedido.versao if versao is None else versao,
+        EnvioSaida(dados or saida(), materiais),
+        usuario=usuario,
+        hoje=HOJE,
+    )
+
+
+def test_avulsa_edita_quantidade_e_inclui_material(avulsa, usuario):
+    materiais = itens(("023.004.001", "3"), ("016.005.010", "2"), ("013.006.001", "1"))
+    r = editar_avulsa(avulsa, usuario, materiais)
+    assert r.ok, r.erros
+    assert [(d["codigo"], d["mudanca"]) for d in r.diferencas] == [
+        ("023.004.001", "entregue"),
+        ("013.006.001", "incluido"),
+    ]
+    assert dict(ItemPedido.objects.values_list("codigo", "qtd_entregue")) == {
+        "023.004.001": Decimal(3),
+        "016.005.010": Decimal(2),
+        "013.006.001": Decimal(1),
+    }
+    assert set(LinhaSaida.objects.values_list("codigo", "qtd")) == {
+        ("023.004.001", Decimal(3)),
+        ("016.005.010", Decimal(2)),
+        ("013.006.001", Decimal(1)),
+    }
+    assert Pedido.objects.get().versao == 1
+
+
+def test_avulsa_remove_material(avulsa, usuario):
+    r = editar_avulsa(avulsa, usuario, itens(("023.004.001", "1")))
+    assert r.ok, r.erros
+    assert [(d["codigo"], d["mudanca"]) for d in r.diferencas] == [("016.005.010", "removido")]
+    assert list(ItemPedido.objects.values_list("codigo", flat=True)) == ["023.004.001"]
+    assert LinhaSaida.objects.count() == 1
+
+
+def test_avulsa_lancada_recusa(avulsa, usuario):
+    LinhaSaida.objects.update(status="LANCADA", requisicao_scpi="000123/26")
+    r = editar_avulsa(avulsa, usuario, itens(("023.004.001", "5")))
+    assert not r.ok and r.motivo == "lancamento"
+    assert ItemPedido.objects.get(codigo="023.004.001").qtd_entregue == Decimal(1)
+
+
+def test_avulsa_sem_material_recusa(avulsa, usuario):
+    r = editar_avulsa(avulsa, usuario, ())
+    assert not r.ok
+    assert "Adicione ao menos um material." in textos(r)
+
+
+def test_avulsa_com_material_oculto_inalterado_e_aceita(avulsa, usuario):
+    Material.objects.filter(codigo="016.005.010").update(oculto=True)
+    materiais = itens(("023.004.001", "1"), ("016.005.010", "2"))
+    assert editar_avulsa(avulsa, usuario, materiais, dados=saida(recebedor="Ana")).ok
+
+
+def test_editar_atendimento_recusa_avulsa_e_vice_versa(avulsa, atendido, usuario):
+    r = editar(avulsa, usuario)
+    assert not r.ok and r.mensagem == "Pedido não encontrado."
+    r = editar_avulsa(atendido, usuario, itens(("023.001.002", "1")))
     assert not r.ok and r.mensagem == "Pedido não encontrado."

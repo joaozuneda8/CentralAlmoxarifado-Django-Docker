@@ -134,7 +134,7 @@ textarea.campo-linha:focus { height: 84px; }
 
 /* Painel flutuante: a casca única de todo painel que abre embaixo de um campo, a base do dropdown.js.
    Os painéis dos dropdowns (.dropdown-painel) e o de resultados da busca de materiais (.busca-painel)
-   a usam; mudar aqui muda todos. Aparência: cartão com borda e sombra e a faixa de cabeçalho. Abrir e
+   a usam; mudar aqui muda todos. Aparência: cartão com borda e sombra, sem legenda. Abrir e
    fechar: o `aberto` mostra o painel com a entrada animada, o `fechando` toca a saída (dropdown.js,
    `Dropdown.abrirPainel` e `fecharPainel`, que tiram os dois no fim). Só existe com JavaScript. */
 .painel-flutuante {
@@ -147,15 +147,12 @@ textarea.campo-linha:focus { height: 84px; }
 @keyframes painel-surge { from { opacity: 0; transform: translateY(-4px); } }
 @keyframes painel-some { to { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .js .painel-flutuante.aberto, .js .painel-flutuante.fechando { animation: none; } }
-.js .painel-flutuante-cabecalho { padding: 10px var(--esp-2); border-bottom: 1px solid var(--borda); background: var(--fundo); }
 
 .dropdown-painel {
   position: absolute; left: 0; top: 100%; z-index: 20; margin-top: var(--esp-1);
   min-width: max(100%, 17rem); max-width: min(30rem, calc(100vw - 2 * var(--esp-2)));
   display: flex; flex-direction: column; max-height: min(60vh, 22rem); overflow: hidden;
 }
-.dropdown-topo p { white-space: nowrap; }
-.dropdown-topo { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-meio) var(--esp-2); }
 .dropdown-lista { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; outline: none; }
 .dropdown-grupo { padding: 10px var(--esp-2) 6px; background: var(--superficie); border-bottom: 1px solid var(--borda); }
 .dropdown-opcao {
@@ -430,8 +427,8 @@ html:not(.js) .filtros-alternar { display: none; }
 }
 .quantidade-campo:focus { outline: none; box-shadow: inset 0 0 0 2px var(--destaque); }
 
-/* Resultados da busca: rótulo próprio, para não se confundir com "Seu pedido". */
-.resultados-cabecalho { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--esp-meio) var(--esp-2); margin-bottom: var(--esp-1); }
+/* Resultados da busca sem nenhum material: a frase fica no painel, sem legenda em cima. */
+.resultados-vazio { margin: 0; padding: 14px var(--esp-2); }
 
 /* Carrinho ("Seu pedido"). Sem JavaScript, ou com espaço para a coluna ao lado dos passos
    (pedidos.css): cartão azul na página. Sem esse espaço (menos de 960px; celular, tablet, ou tela

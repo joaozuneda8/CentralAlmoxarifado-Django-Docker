@@ -233,7 +233,7 @@ def test_carrinho_tem_barra_e_gaveta(client):
 def test_resultados_marcaveis_pelo_codigo(client):
     montar_cenario()
     r = client.get(reverse("pedidos:materiais", args=["ab"]), {"q": "fita"})
-    assert '<p class="rotulo-secao">Resultados da busca</p>' in r.text
+    assert "Resultados da busca" not in r.text  # o painel não tem legenda
     assert 'data-codigo="016.005.010"' in r.text
     # O "no pedido" vai no selo `data-selo-pedido` (escondido; o pedidos.js o mostra), não num
     # atributo da linha, também na saída avulsa.

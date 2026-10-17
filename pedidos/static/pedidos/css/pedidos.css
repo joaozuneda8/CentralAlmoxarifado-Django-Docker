@@ -103,7 +103,6 @@ html:not([data-gaveta]) .acoes-final { display: none; }
   position: relative;
   max-height: var(--busca-limite, 26rem); overflow-y: auto;
 }
-.js .busca-painel .resultados-cabecalho { position: sticky; top: 0; z-index: 1; margin: 0; }
 .js .busca-painel .lista-materiais { border: 0; border-radius: 0; }
 .carrinho-qtd { white-space: nowrap; font-weight: 500; }
 .numero-pedido { white-space: nowrap; }

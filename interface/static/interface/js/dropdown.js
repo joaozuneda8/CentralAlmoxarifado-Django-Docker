@@ -153,14 +153,7 @@
     d.id = id;
     d.painel = criar("div", "painel-flutuante dropdown-painel");
 
-    var topo = criar("div", "dropdown-topo");
-    topo.appendChild(criar("p", "rotulo-secao", rotulo));
-    d.contagem = criar("p", "texto-secundario texto-pequeno");
-    topo.appendChild(d.contagem);
-    var cabecalho = criar("div", "painel-flutuante-cabecalho dropdown-cabecalho");
-    cabecalho.appendChild(topo);
-    d.painel.appendChild(cabecalho);
-
+    // Sem legenda (rótulo e contagem): o painel é só a lista; o rótulo vai no `aria-label` dela.
     d.lista = criar("ul", "dropdown-lista");
     d.lista.id = id + "-lista";
     d.lista.setAttribute("role", d.arvore ? "tree" : "listbox");
@@ -237,12 +230,8 @@
       vazio.setAttribute("role", "presentation");
       d.lista.appendChild(vazio);
     }
-    var total = d.opcoes.length;
-    d.contagem.textContent =
-      d.visiveis.length === total
-        ? total + (total === 1 ? " opção" : " opções")
-        : d.visiveis.length + " de " + total;
-    ativar(d, escolhida >= 0 ? escolhida : d.tipo === "select" && d.visiveis.length ? 0 : -1, true);
+    var escolheOPrimeiro = (d.tipo === "select" || d.digitavel) && d.visiveis.length;
+    ativar(d, escolhida >= 0 ? escolhida : escolheOPrimeiro ? 0 : -1, true);
   }
 
   function renderizarArvore(d) {
@@ -299,8 +288,6 @@
       }
       d.lista.appendChild(li);
     });
-    var n = d.arvore.grupos.length;
-    d.contagem.textContent = n + (n === 1 ? " grupo" : " grupos");
     ativar(d, escolhida >= 0 ? escolhida : 0, true);
   }
 

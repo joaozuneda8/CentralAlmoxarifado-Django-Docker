@@ -119,18 +119,29 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 /* Na tela, o recibo são dois cartões: o cabeçalho com a situação e a lista de materiais. */
 .recibo { display: grid; gap: var(--entre-blocos); }
 .recibo-bloco { display: grid; gap: var(--esp-3); }
-/* Na tela, os dados do envio ficam à direita do cabeçalho, no espaço ao lado do número; sem
-   largura para os dois, descem para baixo dele. No papel, ficam abaixo (regras de @media print). */
+/* Na tela larga, o cabeçalho tem duas colunas e duas linhas: à esquerda o número e, embaixo, a observação; à
+   direita os dados do envio, em subgrade das mesmas linhas, para a observação ficar na linha do Destino e
+   da Requisição SCPI. No tablet e no celular, e no papel (regras de @media print), tudo desce em coluna:
+   o número, a observação e os dados. */
 .recibo-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--esp-2) var(--esp-4); }
-.recibo-topo > .pilha { flex: 1 1 340px; min-width: 0; }
+/* Na tela, as linhas do cabeçalho (rótulo, número e situação do recibo) ficam juntas. */
+.recibo-topo > .pilha { flex: 1 1 340px; min-width: 0; gap: var(--esp-1); }
 .recibo-topo > .dados { flex: 0 1 460px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-/* A observação é texto livre: ocupa a linha toda dos dados, embaixo dos campos curtos. */
-.recibo .dados-largo { grid-column: 1 / -1; }
+/* A observação também é um `.dados`: vem depois, para as regras dela vencerem as dos dados do envio. */
+.recibo-topo > .recibo-obs { flex: 1 1 100%; grid-template-columns: minmax(0, 1fr); margin-top: calc(var(--esp-1) - var(--esp-2)); }
+@media screen and (min-width: 1025px) {
+  .recibo-topo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); }
+  .recibo-topo > .pilha { grid-column: 1; grid-row: 1; }
+  .recibo-topo > .dados { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-rows: subgrid; }
+  .recibo-topo-curto > .dados { grid-row: 1; grid-template-rows: none; }
+  .recibo-topo > .recibo-obs { grid-column: 1; grid-row: 2; grid-template-rows: none; margin-top: 0; }
+}
 /* No tablet e no celular, o cabeçalho e os dados não cabem lado a lado: os dados descem e usam a
    largura toda, em quantas colunas couberem (quatro no tablet, duas no celular). */
 @media screen and (max-width: 1024px) {
   .recibo-topo > .pilha, .recibo-topo > .dados { flex-basis: 100%; }
   .recibo-topo > .dados { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
+  .recibo-topo > .recibo-obs { grid-template-columns: minmax(0, 1fr); }
 }
 .recibo-numero { font-size: 28px; }
 .recibo-numero .mono { font-size: 1em; font-weight: 500; }
@@ -390,6 +401,7 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
   .recibo-numero { font-size: 18px; }
   .recibo-topo { display: grid; gap: 10px; }
   .recibo .dados { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--esp-meio) var(--esp-2); }
+  .recibo .dados.recibo-obs { grid-template-columns: minmax(0, 1fr); }
   .recibo .dados dt { font-size: 9px; }
   .recibo-subtitulo { font-size: 12px; }
   .recibo-itens { font-size: 11px; }

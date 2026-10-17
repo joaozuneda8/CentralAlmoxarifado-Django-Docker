@@ -7,12 +7,14 @@ Nunca mostra quem registrou nem quem atendeu.
 {% with a=pedido.atendimento_ou_none situacao=pedido.situacao scpi=pedido.situacao_scpi %}
 <div class="recibo">
   <div class="cartao recibo-bloco">
-  <div class="recibo-topo">
+  <div class="recibo-topo{% if pedido.origem == "AVULSA" %} recibo-topo-curto{% endif %}">
     <div class="pilha">
       <p class="rotulo-secao">Almoxarifado SAEP — {% if pedido.origem == "AVULSA" %}Recibo de saída avulsa{% else %}Recibo de pedido de materiais{% endif %}</p>
       <h2 class="recibo-numero">Nº <span class="mono">{{ pedido.numero }}</span></h2>
       {% if a %}<p class="texto-suave texto-pequeno so-tela">{% if a.recibo_impresso_em %}Recibo impresso em {{ a.recibo_impresso_em|date:"d/m/Y H:i" }}.{% else %}Recibo ainda não impresso.{% endif %}</p>{% endif %}
     </div>
+    {# A observação (texto livre) fica embaixo do número; na tela larga, na mesma linha do Destino e da Requisição SCPI. #}
+    {% if pedido.origem != "AVULSA" %}<dl class="dados recibo-obs{% if not pedido.obs %} so-tela{% endif %}"><div><dt>Observação</dt><dd>{{ pedido.obs|default:"—" }}</dd></div></dl>{% endif %}
     <dl class="dados">
       {% if pedido.origem == "AVULSA" %}
       <div><dt>Registrado em</dt><dd>{{ pedido.criado_em|date:"d/m/Y H:i" }}</dd></div>
@@ -23,7 +25,6 @@ Nunca mostra quem registrou nem quem atendeu.
       {% endif %}
       {# Requisição no SCPI: o número, ou o estado enquanto não há número (só na tela); o que pede ação também vira passo na situação. #}
       <div{% if not scpi.numeros %} class="so-tela"{% endif %}><dt>Requisição SCPI</dt><dd>{% if scpi.chave == "atencao" %}<span class="selo {{ scpi.chave|badge_scpi }}">{{ scpi.rotulo }}</span>{% endif %}{% if scpi.numeros %} <span class="mono">{{ scpi.numeros|join:", " }}</span>{% if scpi.chave == "parcial" %} <span class="texto-secundario so-tela">· o resto aguarda o robô</span>{% endif %}{% elif scpi.chave != "atencao" %}<span class="texto-secundario">{{ scpi.rotulo }}</span>{% endif %}</dd></div>
-      {% if pedido.origem != "AVULSA" %}<div class="dados-largo{% if not pedido.obs %} so-tela{% endif %}"><dt>Observação</dt><dd>{{ pedido.obs|default:"—" }}</dd></div>{% endif %}
     </dl>
   </div>
 

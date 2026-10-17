@@ -42,7 +42,9 @@ from pedidos.servicos import (
     catalogo_de,
     confirmar_atendimento,
     editar_atendimento,
+    editar_saida_avulsa,
     erros_de_vinculo,
+    item_catalogo_gravado,
     marcar_recibos_impressos,
     recibos_alterados,
     registrar_saida_avulsa,
@@ -314,7 +316,10 @@ def editar(request, numero):
             if edicao.motivo:
                 messages.info(request, edicao.motivo)
             return redirect("pedidos:detalhe", numero=numero)
-        return render(request, "pedidos/detalhe.html", _contexto_edicao_atendimento(pedido))
+        if pedido.origem != AVULSA:
+            return render(request, "pedidos/detalhe.html", _contexto_edicao_atendimento(pedido))
+    if pedido.origem == AVULSA:
+        return _editar_avulsa(request, pedido)
 
     try:
         versao = int(request.POST.get("versao", ""))
@@ -357,6 +362,79 @@ def editar(request, numero):
         erros=resposta.erros,
     )
     return render(request, "pedidos/detalhe.html", contexto)
+
+
+def _editar_avulsa(request, pedido):
+    """Modo de edição da saída avulsa: o formulário da saída avulsa, com o carrinho e os dados
+    da saída gravados."""
+    fluxo = FLUXOS["avulsa"]
+    catalogo = catalogo_de(fluxo.origem)
+    por_codigo = {i.codigo: i for i in catalogo or []}
+    atendimento = pedido.atendimento
+    linhas = pedido.linhas
+    contexto = {
+        "fluxo": fluxo,
+        "indisponivel": catalogo is None,
+        "editando": True,
+        "pedido": pedido,
+        "versao": pedido.versao,
+        "lote_com_erro": any(linha.status == ERRO for linha in linhas),
+        "campos": {
+            "data": atendimento.data_efetiva.isoformat(),
+            "recebedor": atendimento.recebedor,
+            "centro_custo": atendimento.centro_custo,
+            "tipo": atendimento.tipo_saida,
+            "placa": atendimento.placa,
+            "obs": atendimento.obs,
+        },
+        "nao_lancar": atendimento.nao_lancar
+        or bool(linhas and all(linha.status == NAO_LANCAR for linha in linhas)),
+        # Material já na saída aparece mesmo que tenha saído do catálogo.
+        "carrinho": carrinho_mod.Carrinho(
+            [
+                carrinho_mod.LinhaCarrinho(
+                    i.codigo, i.qtd_entregue, por_codigo.get(i.codigo) or item_catalogo_gravado(i)
+                )
+                for i in pedido.itens.all()
+            ]
+        ),
+        "codigos_erro": set(),
+        "filtros": [],
+        **contexto_busca(fluxo, catalogo or []),
+        **urls_do_fluxo(fluxo),
+        **opcoes_saida(),
+    }
+    if request.method != "POST":
+        return render(request, "pedidos/avulsa.html", contexto)
+
+    try:
+        versao = int(request.POST.get("versao", ""))
+    except ValueError:
+        messages.error(request, "Versão da saída inválida. Abra a edição de novo.")
+        return redirect("pedidos:detalhe", numero=pedido.numero)
+    recibo_estava_impresso = bool(atendimento.recibo_impresso_em)
+    dados, nao_lancar = dados_saida(request.POST)
+    envio = EnvioSaida(dados, carrinho_mod.itens_enviados(request.POST), nao_lancar)
+    resposta = editar_saida_avulsa(pedido.id, versao, envio, usuario=request.user)
+    if resposta.ok:
+        _avisar_salvo(request, resposta, recibo_estava_impresso)
+        return redirect("pedidos:detalhe", numero=pedido.numero)
+    if resposta.motivo:
+        contexto = _contexto_detalhe(_pedido(pedido.numero), **_recusa_da_edicao(resposta))
+        return render(request, "pedidos/detalhe.html", contexto)
+    if not resposta.erros:
+        messages.error(request, resposta.mensagem)
+        return redirect("pedidos:detalhe", numero=pedido.numero)
+    contexto.update(
+        versao=versao,
+        campos=request.POST,
+        nao_lancar=nao_lancar,
+        carrinho=carrinho_mod.Carrinho(carrinho_mod.ler(request.POST, fluxo, catalogo)),
+        mensagem=resposta.mensagem,
+        erros=resposta.erros,
+        codigos_erro={e.codigo for e in resposta.erros if e.codigo},
+    )
+    return render(request, "pedidos/avulsa.html", contexto)
 
 
 def _adicionados_enviados(post) -> list[Adicionado]:

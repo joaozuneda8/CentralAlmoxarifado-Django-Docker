@@ -673,7 +673,7 @@ def confirmar_atendimento(
 MENSAGEM_NADA_MUDOU = "Nada mudou; nada foi gravado."
 
 
-def _item_catalogo_gravado(item: ItemPedido) -> ItemCatalogo:
+def item_catalogo_gravado(item: ItemPedido) -> ItemCatalogo:
     """Material já gravado no pedido, aceito na edição mesmo que tenha saído do catálogo."""
     return ItemCatalogo(
         codigo=item.codigo,
@@ -825,7 +825,7 @@ def editar_atendimento(
         qtds_adicionadas = {a.codigo: _qtd_adicionada(qtds, a.codigo) for a in adicionados}
 
         mantidos = {
-            a.codigo: _item_catalogo_gravado(gravados[a.codigo])
+            a.codigo: item_catalogo_gravado(gravados[a.codigo])
             for a in adicionados
             if a.codigo in gravados
             and (
@@ -1024,7 +1024,7 @@ def editar_saida_avulsa(
         por_codigo = {i.codigo: i for i in catalogo}
         # Material já na saída continua aceito, mesmo que tenha saído do catálogo.
         for item in pedido.itens.all():
-            por_codigo.setdefault(item.codigo, _item_catalogo_gravado(item))
+            por_codigo.setdefault(item.codigo, item_catalogo_gravado(item))
         soma, erros = _validar_saida_avulsa(
             envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo
         )

@@ -667,3 +667,85 @@ def test_atendimento_continua_igual(client, logado, pedido):
     html = detalhe(client, pedido)
     assert f'action="{reverse("pedidos:atender", args=[pedido.numero])}"' in html
     assert "data-editando" not in html and "Confirmar e registrar saída" in html
+
+
+# ---------------------------------------------------------------------------
+# Modo de edição da saída avulsa
+# ---------------------------------------------------------------------------
+
+
+def post_avulsa(versao=0, materiais=(("023.004.001", "1"), ("016.005.010", "2")), **campos):
+    dados = {
+        "versao": str(versao),
+        "data": "2026-10-09",
+        "recebedor": "João",
+        "centro_custo": "ETA II",
+        "tipo": "BALCÃO",
+        "placa": "",
+        "obs": "",
+        "item_codigo": [c for c, _ in materiais],
+        "item_qtd": [q for _, q in materiais],
+    }
+    dados.update(campos)
+    return dados
+
+
+def test_editar_avulsa_preenche_carrinho_e_saida(client, logado, avulsa):
+    html = client.get(url_editar(avulsa)).text
+    assert f'action="{url_editar(avulsa)}"' in html and "data-editando" in html
+    assert 'name="versao" value="0"' in html and 'name="envio_id"' not in html
+    assert 'value="023.004.001"' in html and 'value="016.005.010"' in html
+    assert 'value="João"' in html
+    assert "Salvar alterações" in html and "Registrar saída" not in html
+    assert "Voltar à saída (descarta as alterações)" in html
+
+
+def test_post_editar_avulsa_salva(client, logado, avulsa):
+    r = client.post(
+        url_editar(avulsa),
+        post_avulsa(materiais=(("023.004.001", "3"), ("016.005.010", "2"))),
+        follow=True,
+    )
+    assert r.redirect_chain[-1][0] == reverse("pedidos:detalhe", args=[avulsa.numero])
+    assert f"Alterações salvas na saída {avulsa.numero}." in r.text
+    assert ItemPedido.objects.get(codigo="023.004.001").qtd_entregue == Decimal(3)
+
+
+def test_post_editar_avulsa_com_erro_volta_ao_formulario(client, logado, avulsa):
+    r = client.post(url_editar(avulsa), post_avulsa(recebedor=""))
+    assert r.status_code == 200 and "data-editando" in r.text
+    assert "Informe quem recebeu o material." in r.text
+
+
+def test_editar_avulsa_com_material_oculto_abre(client, logado, avulsa):
+    Material.objects.filter(codigo="016.005.010").update(oculto=True)
+    r = client.get(url_editar(avulsa))
+    assert r.status_code == 200 and 'value="016.005.010"' in r.text
+
+
+def test_post_editar_avulsa_lancada_mostra_alteracoes_nao_gravadas(client, logado, avulsa):
+    LinhaSaida.objects.update(status="LANCADA", requisicao_scpi="000123/26")
+    r = client.post(url_editar(avulsa), post_avulsa(recebedor="Ana"))
+    assert r.status_code == 200
+    assert "Suas alterações não foram gravadas." in r.text and "Recebedor: João → Ana" in r.text
+
+
+def test_carrinho_da_edicao_continua_salvando(client, logado, avulsa):
+    url = reverse("pedidos:avulsa_carrinho")
+    dados = {"item_codigo": ["023.004.001"], "item_qtd": ["1"], "remover": "023.004.001"}
+    assert (
+        "Registrar saída"
+        in client.post(
+            url, {**dados, "item_codigo": ["023.004.001", "016.005.010"], "item_qtd": ["1", "2"]}
+        ).text
+    )
+    html = client.post(
+        url,
+        {
+            **dados,
+            "versao": "0",
+            "item_codigo": ["023.004.001", "016.005.010"],
+            "item_qtd": ["1", "2"],
+        },
+    ).text
+    assert "Salvar alterações" in html and "Registrar saída" not in html

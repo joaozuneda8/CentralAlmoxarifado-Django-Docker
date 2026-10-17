@@ -45,8 +45,10 @@ from pedidos.regras import (
     EnvioPedido,
     EnvioSaida,
     Erro,
+    EstadoAtendimento,
     ItemSaida,
     atendimento_confere,
+    cabecalho_saida,
     marcado_nao_lancar,
     norm_placa,
     norm_u,
@@ -472,6 +474,104 @@ def _erros_de_troca_entregue(
     ]
 
 
+def _validar_atendimento(
+    pedido: Pedido,
+    itens: list[ItemPedido],
+    dados: DadosSaida,
+    parsed: dict,
+    adicionados: list[Adicionado],
+    qtds_adicionadas: dict[str, Decimal | None],
+    nao_lancar: bool,
+    *,
+    hoje: date,
+    catalogo_extra: dict[str, ItemCatalogo] | None = None,
+) -> tuple[list[Adicionado], dict[str, ItemCatalogo], list[Erro]]:
+    """Regras do atendimento (e da edição dele): dados da saída, quantidades entregues e os
+    materiais acrescentados. Devolve os acrescentados sem repetição, o catálogo usado (o da
+    saída avulsa, com `catalogo_extra` por cima) e os erros."""
+    lista_centros, tipos = centros(), tipos_saida()
+
+    def validar(itens_saida, catalogo=None):
+        return validar_saida(
+            dados,
+            itens_saida,
+            centros=lista_centros,
+            tipos=tipos,
+            hoje=hoje,
+            catalogo=catalogo,
+            regra_inteira=pedido.origem == AB,
+        )
+
+    catalogo = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
+    catalogo.update(catalogo_extra or {})
+    unicos, erros_adicionados = _erros_dos_adicionados(
+        adicionados, itens, qtds_adicionadas, catalogo, validar
+    )
+    # Os acrescentados entram aqui só para contar no "ao menos um material"; seus erros
+    # por material vêm de `_erros_dos_adicionados`.
+    codigos_unicos = {a.codigo for a in unicos}
+    v = validar(
+        [ItemSaida(i.codigo, parsed[i.codigo], i.qtd_pedida) for i in itens]
+        + [ItemSaida(a.codigo, qtds_adicionadas[a.codigo]) for a in unicos]
+    )
+    erros = (
+        erros_de_tamanho(
+            {
+                "Recebedor": dados.recebedor,
+                "Centro de custo": dados.centro_custo,
+                "Observações": dados.obs,
+            },
+            None,
+        )
+        + [e for e in v.erros if e.codigo is None or e.codigo not in codigos_unicos]
+        + erros_adicionados
+        + _erros_de_troca_entregue(unicos, itens, parsed)
+        + erros_extras_da_saida(dados, nao_lancar, v.centro)
+    )
+    return unicos, catalogo, erros
+
+
+def estado_gravado(pedido: Pedido) -> EstadoAtendimento:
+    """O que a edição pode mudar, como está gravado (o pedido precisa estar atendido)."""
+    todos = list(pedido.itens.all())
+    por_id = {i.id: i for i in todos}
+    avulsa = pedido.origem == AVULSA
+    return EstadoAtendimento(
+        cabecalho=cabecalho_atendimento(pedido.atendimento),
+        entregues={
+            i.codigo: i.qtd_entregue
+            for i in todos
+            if avulsa or i.origem == ItemPedido.Origem.PEDIDO
+        },
+        adicionados={
+            i.codigo: (por_id[i.no_lugar_de_id].codigo if i.no_lugar_de_id else "", i.qtd_entregue)
+            for i in todos
+            if not avulsa and i.origem == ItemPedido.Origem.ALMOXARIFADO
+        },
+        nomes={i.codigo: i.material for i in todos},
+    )
+
+
+def estado_enviado(
+    pedido: Pedido,
+    dados: DadosSaida,
+    nao_lancar: bool,
+    parsed: dict,
+    adicionados: list[Adicionado],
+    qtds_adicionadas: dict,
+    nomes_extra: dict[str, str] | None = None,
+) -> EstadoAtendimento:
+    """O que chegou do formulário de edição, no formato de `estado_gravado`."""
+    return EstadoAtendimento(
+        cabecalho=cabecalho_saida(dados, nao_lancar),
+        entregues=dict(parsed),
+        adicionados={
+            a.codigo: (texto(a.no_lugar_de), qtds_adicionadas.get(a.codigo)) for a in adicionados
+        },
+        nomes={**{i.codigo: i.material for i in pedido.itens.all()}, **(nomes_extra or {})},
+    )
+
+
 def confirmar_atendimento(
     pedido_id: uuid.UUID,
     atendimento_id: uuid.UUID,
@@ -519,43 +619,15 @@ def confirmar_atendimento(
                 "Nada foi gravado.",
             )
 
-        lista_centros, tipos, dia = centros(), tipos_saida(), hoje or timezone.localdate()
-
-        def validar(itens_saida, catalogo=None):
-            return validar_saida(
-                dados,
-                itens_saida,
-                centros=lista_centros,
-                tipos=tipos,
-                hoje=dia,
-                catalogo=catalogo,
-                regra_inteira=pedido.origem == AB,
-            )
-
-        catalogo = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
-        unicos, erros_adicionados = _erros_dos_adicionados(
-            adicionados, itens, qtds_adicionadas, catalogo, validar
-        )
-        # Os acrescentados entram aqui só para contar no "ao menos um material"; seus erros
-        # por material vêm de `_erros_dos_adicionados`.
-        codigos_unicos = {a.codigo for a in unicos}
-        v = validar(
-            [ItemSaida(i.codigo, parsed[i.codigo], i.qtd_pedida) for i in itens]
-            + [ItemSaida(a.codigo, qtds_adicionadas[a.codigo]) for a in unicos]
-        )
-        erros = (
-            erros_de_tamanho(
-                {
-                    "Recebedor": dados.recebedor,
-                    "Centro de custo": dados.centro_custo,
-                    "Observações": dados.obs,
-                },
-                None,
-            )
-            + [e for e in v.erros if e.codigo is None or e.codigo not in codigos_unicos]
-            + erros_adicionados
-            + _erros_de_troca_entregue(unicos, itens, parsed)
-            + erros_extras_da_saida(dados, nao_lancar, v.centro)
+        unicos, catalogo, erros = _validar_atendimento(
+            pedido,
+            itens,
+            dados,
+            parsed,
+            adicionados,
+            qtds_adicionadas,
+            nao_lancar,
+            hoje=hoje or timezone.localdate(),
         )
         if erros:
             return Resposta(ok=False, mensagem="Corrija os dados da saída.", erros=erros)

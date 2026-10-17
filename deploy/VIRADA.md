@@ -225,6 +225,9 @@ ou o robô antigo lança uma saída que o Django lançaria de novo.
 - [x] **João:** por último, apagar os `.xlsx` exportados (`dados/importacao/`):
       só depois de arquivar o repositório e de conferir o primeiro lançamento, porque até lá a
       planilha é o único retrato do que veio do sistema antigo.
+      **Exceção registrada:** os arquivos foram apagados em 17/10/2026, antes do primeiro
+      lançamento real, fora da ordem prevista. Até a conferência do primeiro lançamento, a
+      referência do que veio do sistema antigo é o backup do banco (`backup_banco`).
 
 ## 7. Depois da virada
 

@@ -21,7 +21,9 @@ e regra pura é a única que se testa por inteiro.
   serializa o que precisa (`select_for_update` na `Sequencia` e no pedido).
 - Envio repetido NÃO PODE duplicar: o identificador do envio decide se é o mesmo pedido.
 - Fora de `servicos.py`, só o robô de lançamento grava em `pedidos`, e só nos campos `status`,
-  `requisicao_scpi`, `lancado_em` e `mensagem` das `LinhaSaida`.
+  `requisicao_scpi`, `lancado_em` e `mensagem` das `LinhaSaida` (o superusuário também edita
+  esses quatro no admin). A única outra exceção é a migração única das planilhas
+  (`implantacao/migracao.py`), que substitui os pedidos numa transação.
 - Efeito externo (como o aviso no Telegram) sai depois do commit e nunca desfaz a gravação.
 
 Motivo: com uma porta só, as garantias de concorrência e de idempotência valem em todo lugar.
@@ -76,14 +78,16 @@ Motivo: o público é o almoxarifado e os funcionários da operação, e o servi
 ## Restrições técnicas
 
 - Python `>=3.13,<3.14`, Django 6.x, MySQL 8 ou MariaDB; dependências pelo `uv`.
-- Servidor Windows: waitress como serviço NSSM, atrás do Apache em `/almoxarifado`; robôs e
-  importações em processo separado ou pelo Agendador de Tarefas.
-- Configuração num único `config/settings.py` lido do `.env`; segredos só no `.env`, e cada
-  variável nova documentada no `.env.example`.
+- Servidor em Docker Compose (`compose.yaml`): o MariaDB 11.4, o waitress atrás do Apache em
+  `/almoxarifado` (o Apache termina o HTTPS) e o agendador (supercronic com `deploy/crontab`).
+  Robôs e importações rodam em processo separado, disparados pela página ou pelo agendador.
+- Configuração num único `config/settings.py` lido do `.env`; segredos só no `.env` e, a senha
+  do root do banco, no `.env.banco`, que só o container do banco lê. Cada variável nova é
+  documentada no `.env.example` (ou no `.env.banco.example`).
 - Com `DEBUG=0`, `check --deploy --fail-level WARNING` DEVE passar sem avisos.
-- Migrations: até a importação das planilhas no servidor (passo 3 de `deploy/VIRADA.md`), mudança
-  de modelo regenera a migration existente do app. Depois dela, toda mudança de modelo ganha
-  migration nova, nunca regenerada.
+- Migrations: o servidor está em produção com dados reais, então toda mudança de modelo ganha
+  migration nova, nunca regenerada (nem `migrate <app> zero`). A regeneração só valeu antes da
+  importação das planilhas no servidor (passo 3 de `deploy/VIRADA.md`).
 
 ## Fluxo de desenvolvimento
 
@@ -107,4 +111,8 @@ Motivo: o público é o almoxarifado e os funcionários da operação, e o servi
 - Todo plano tem uma verificação de conformidade com estes princípios. Exceção a um princípio
   só com justificativa escrita no plano; o Princípio III não admite exceção.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-12
+**Version**: 1.1.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-17
+
+1.1.0: o servidor passou a ser o Docker Compose (no lugar do Windows com NSSM e Agendador), a
+senha do root do banco foi para o `.env.banco`, a regra das migrations passou à de produção e
+as exceções do Princípio II (admin e migração das planilhas) ficaram escritas.

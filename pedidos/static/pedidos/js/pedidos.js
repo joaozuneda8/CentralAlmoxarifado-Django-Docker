@@ -896,9 +896,10 @@
     observador = new ResizeObserver(function (entradas) {
       var compacto = entradas[0].contentRect.width < LARGURA_LADO_A_LADO;
       document.documentElement.toggleAttribute("data-gaveta", compacto);
+      // A largura mudou, e com ela a quebra dos nomes: o painel de resultados é medido de novo.
+      agendarAjuste();
       if (compacto) return;
       fecharGaveta();
-      soltarLimite(); // a altura da busca calculada para a tela estreita não vale mais
     });
     observador.observe(area);
   }
@@ -1182,22 +1183,12 @@
     return document.getElementById("resultados");
   }
 
-  // O painel abre logo abaixo do campo de busca (o filtro de grupo fica acima dele).
-  function posicionarPainel() {
-    var p = painel();
-    var area = p && p.closest("[data-busca-area]");
-    var campo = area && area.querySelector(".busca-principal");
-    if (!campo) return;
-    var base = campo.getBoundingClientRect().bottom - area.getBoundingClientRect().top;
-    area.style.setProperty("--busca-base", Math.round(base) + "px");
-  }
-  window.addEventListener("resize", posicionarPainel);
-  // `toggle` não sobe pela árvore: escuta na captura. Abrir ou fechar o filtro move a busca.
+  // O painel fica no fluxo, logo abaixo do campo de busca (o filtro de grupo fica acima dele).
+  // `toggle` não sobe pela árvore: escuta na captura.
   document.addEventListener(
     "toggle",
     function (e) {
       if (!e.target.matches || !e.target.matches("[data-busca-filtro]")) return;
-      posicionarPainel();
       // Os resultados cairiam por cima da lista de grupos: saem enquanto se escolhe e voltam com a
       // escolha (o `change` abaixo os abre de novo).
       if (e.target.open) fecharPainel(false);
@@ -1222,13 +1213,10 @@
     if (recolher) filtro.open = false;
   }
 
-  // Na tela estreita (com a gaveta do pedido: `data-gaveta` no <html>, que segue a largura da área
-  // dos passos), o painel que abre embaixo da busca (ou a lista de grupos embaixo do filtro) ficava
-  // cortado no pé da tela, atrás da barra "Seu pedido": a página rola para o elemento ficar no topo,
-  // descontando a barra fixa do almoxarifado (a .app-lateral vira barra no topo). Só rola para baixo.
-  function estreito() {
-    return document.documentElement.hasAttribute("data-gaveta");
-  }
+  // O painel que abre embaixo da busca (ou a lista de grupos embaixo do filtro) ficava cortado no pé
+  // da tela (no celular, atrás da barra "Seu pedido"): em qualquer tela, a página rola para o
+  // elemento ficar no topo, descontando a barra do almoxarifado quando ela é uma barra no topo (a
+  // .app-lateral do celular; na tela larga ela é uma coluna). Só rola para baixo.
   // Com "reduzir movimento", o clean.css zera as transições: a rolagem também não anima.
   function rolagemSuave() {
     var campo = document.querySelector(".campo-entrada");
@@ -1239,11 +1227,12 @@
   function topoLivre() {
     var topo = 8;
     var barra = document.querySelector(".app-lateral");
-    if (barra && getComputedStyle(barra).position === "sticky") topo += barra.getBoundingClientRect().bottom;
+    var noTopo = barra && barra.offsetWidth >= window.innerWidth / 2;
+    if (noTopo && getComputedStyle(barra).position === "sticky") topo += barra.getBoundingClientRect().bottom;
     return topo;
   }
   function trazerAoTopo(el, depois) {
-    if (!el || !estreito()) return;
+    if (!el) return;
     var topo = topoLivre();
     requestAnimationFrame(function () {
       var delta = el.getBoundingClientRect().top - topo;
@@ -1264,41 +1253,42 @@
     });
   }
 
-  // Na tela estreita o painel fica no fluxo da página (pedidos.css), logo abaixo da busca: a página
-  // cresce com ele e o espaço reservado à barra "Seu pedido" vale para ele. Com o teclado virtual
-  // aberto, a área visível é menor que a janela (no iOS a janela não muda): o painel encolhe até o
-  // que sobra acima do teclado e da barra, mas não abaixo de 160px. Encolher o painel encolhe a
-  // página; no fim dela, a página sobe, o painel desce e o limite encolheria de novo, sem parar.
-  function caberNaTela() {
+  // O painel fica no fluxo da página (pedidos.css), logo abaixo da busca: o cartão e a página crescem
+  // com ele, e o espaço reservado à barra "Seu pedido" (celular) vale para ele. A altura é a mesma em
+  // qualquer tela (computador, tablet, celular): o cabeçalho e as LINHAS_VISIVEIS primeiras linhas,
+  // medidas fechadas; o resto rola dentro do painel. Com mais que isso a página rola, não o painel.
+  var LINHAS_VISIVEIS = 5;
+  function alturaDoPainel() {
     var p = painel();
-    if (!p || !p.classList.contains("aberto") || !estreito()) return;
+    if (!p || !p.classList.contains("aberto")) return;
     var area = p.closest("[data-busca-area]");
-    var barra = document.querySelector(".carrinho-barra");
-    var base = window.innerHeight;
-    var vv = window.visualViewport;
-    if (vv) base = Math.min(base, vv.offsetTop + vv.height);
-    if (barra && getComputedStyle(barra).display !== "none") base = Math.min(base, barra.getBoundingClientRect().top);
-    var livre = base - 8 - p.getBoundingClientRect().top;
-    area.style.setProperty("--busca-limite", Math.max(160, Math.round(livre)) + "px");
+    var linhas = p.querySelectorAll("li.material");
+    if (linhas.length <= LINHAS_VISIVEIS) return area.style.removeProperty("--busca-limite");
+    // O topo da primeira linha de fora = o cabeçalho + as linhas visíveis (o painel é o offsetParent).
+    var alto = linhas[LINHAS_VISIVEIS].offsetTop;
+    // Uma linha aberta (quantidade à mostra) é mais alta que fechada: não conta o que ela acrescenta.
+    var aberta = p.querySelector("[data-adicionar].aberto");
+    var dela = aberta && aberta.closest("li");
+    if (dela && Array.prototype.indexOf.call(linhas, dela) < LINHAS_VISIVEIS) {
+      alto -= aberta.offsetHeight + (parseFloat(getComputedStyle(dela).rowGap) || 0);
+    }
+    area.style.setProperty("--busca-limite", Math.round(alto) + 2 + "px"); // + as bordas do painel
   }
   function soltarLimite() {
     var area = document.querySelector("[data-busca-area]");
     if (area) area.style.removeProperty("--busca-limite");
   }
-  // O teclado virtual, a troca dos resultados e o tamanho da tela mudam o espaço; a rolagem não
-  // (o painel rola junto com a página). Na tela larga o painel volta a flutuar, sem o limite.
+  // A troca dos resultados e o tamanho da tela mudam a altura das linhas (o nome quebra mais ou menos).
   var ajusteAgendado = false;
   function agendarAjuste() {
-    if (!estreito()) return soltarLimite();
     if (ajusteAgendado) return;
     ajusteAgendado = true;
     requestAnimationFrame(function () {
       ajusteAgendado = false;
-      caberNaTela();
+      alturaDoPainel();
     });
   }
   window.addEventListener("resize", agendarAjuste);
-  if (window.visualViewport) window.visualViewport.addEventListener("resize", agendarAjuste);
   document.addEventListener("htmx:after:swap", agendarAjuste);
 
   function abrirPainel() {
@@ -1313,10 +1303,10 @@
       return;
     }
     if (estado === "ja") return;
-    posicionarPainel();
     var busca = document.getElementById("busca-q");
     if (busca) busca.setAttribute("aria-expanded", "true");
-    trazerAoTopo(document.querySelector(".busca-principal"), caberNaTela);
+    alturaDoPainel();
+    trazerAoTopo(document.querySelector(".busca-principal"));
   }
 
   function fecharPainel(devolverFoco) {

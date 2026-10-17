@@ -93,16 +93,16 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .busca-painel { margin-top: var(--esp-1); }
 .busca-painel .lista-materiais { max-height: none; }
 /* A casca (borda, sombra, entrada e saída animadas) vem de `.painel-flutuante` (componentes.css),
-   a mesma dos painéis do dropdown.js; aqui só o lugar e o tamanho do painel de resultados. */
+   a mesma dos painéis do dropdown.js; aqui só o tamanho do painel de resultados. Em qualquer tela
+   (pedidos.js), ele entra no fluxo logo abaixo da busca em vez de flutuar: o cartão do passo e a página
+   crescem com ele (sem painel pendurado para fora do cartão), a busca consegue subir até o topo mesmo
+   perto do fim da página e o espaço reservado à barra "Seu pedido" vale também para ele. A altura
+   (`--busca-limite`) é a do cabeçalho e de 5 linhas, medida pelo JavaScript; 26rem vale até ele medir. Relativo, não
+   estático: os absolutos de dentro (rótulos escondidos) seguem presos a ele e ao seu recorte. */
 .js .busca-painel {
-  position: absolute; left: 0; right: 0; top: var(--busca-base, 100%); z-index: 15;
-  max-height: min(60vh, 32rem, var(--busca-limite, 100vh)); overflow-y: auto;
+  position: relative;
+  max-height: var(--busca-limite, 26rem); overflow-y: auto;
 }
-/* Na tela estreita (pedidos.js), o painel entra no fluxo logo abaixo da busca em vez de flutuar:
-   a página cresce com ele, a busca consegue subir até o topo mesmo perto do fim da página e o
-   espaço reservado à barra "Seu pedido" vale também para ele, sem folga inventada no pé. Relativo,
-   não estático: os absolutos de dentro (rótulos escondidos) seguem presos a ele e ao seu recorte. */
-.js[data-gaveta] .busca-painel { position: relative; top: auto; z-index: auto; }
 .js .busca-painel .resultados-cabecalho { position: sticky; top: 0; z-index: 1; margin: 0; }
 .js .busca-painel .lista-materiais { border: 0; border-radius: 0; }
 .carrinho-qtd { white-space: nowrap; font-weight: 500; }

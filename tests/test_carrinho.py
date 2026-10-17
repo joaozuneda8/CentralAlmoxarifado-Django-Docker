@@ -536,6 +536,19 @@ def test_resultado_da_avulsa_tambem_adiciona_em_dois_passos(client):
     assert '<span class="mono">' in r
 
 
+def test_painel_de_resultados_fica_no_fluxo_com_cinco_linhas_em_qualquer_tela():
+    # O painel não flutua (absoluto): fica no fluxo, o cartão do passo cresce com ele e a altura é a
+    # do cabeçalho e de 5 linhas, a mesma no computador, no tablet e no celular.
+    js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
+    assert "var LINHAS_VISIVEIS = 5;" in js and "function alturaDoPainel" in js
+    assert 'trazerAoTopo(document.querySelector(".busca-principal"))' in js
+    assert "estreito" not in js and "posicionarPainel" not in js and "caberNaTela" not in js
+    css = open(finders.find("pedidos/css/pedidos.css"), encoding="utf-8").read()
+    regra = css[css.index(".js .busca-painel {") :]
+    regra = regra[: regra.index("}")]
+    assert "position: relative" in regra and "absolute" not in regra and "vh" not in regra
+
+
 def test_pedidos_js_abre_confirma_e_cancela_a_quantidade():
     js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
     for gancho in (

@@ -152,7 +152,12 @@ transações precisam se comportar como no servidor.
   informação do material quebra por dentro e o selo desce para a linha de baixo quando a unidade é
   longa (limpeza). Sem JavaScript a quantidade fica à vista, e o painel do atendimento (`um_passo`)
   adiciona ou troca direto, com botão. A coluna do `.passo-corpo` é `minmax(0, 1fr)`, para a busca não
-  alargar com o conteúdo. Há duas buscas de materiais: a pública (formulários) não mostra código nem
+  alargar com o conteúdo. O painel de resultados fica no fluxo da página, em qualquer tela (nunca
+  absoluto: o cartão do passo cresce com ele, sem painel pendurado para fora); ao abrir, o pedidos.js
+  rola o campo ao topo (`trazerAoTopo`, descontando a barra do topo no celular) e dá ao painel a altura
+  do cabeçalho e de 5 linhas (`alturaDoPainel`, `LINHAS_VISIVEIS`, `--busca-limite`), a mesma no
+  computador, no tablet e no celular, medida de novo quando os resultados ou a largura mudam; o resto
+  rola dentro do painel. Há duas buscas de materiais: a pública (formulários) não mostra código nem
   grupo; a do almoxarifado (saída avulsa e atendimento) mostra. A quantidade de cada
   linha do pedido segue o mesmo padrão (`[data-alterar]` em `_carrinho.html`): texto com "Alterar",
   e o campo só manda o `alterar` no "Confirmar" (`hx-trigger="confirmar-quantidade"`), também na

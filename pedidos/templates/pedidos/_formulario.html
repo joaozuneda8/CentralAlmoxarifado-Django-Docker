@@ -26,7 +26,7 @@ campo de cada erro de campo, e se repetem embaixo do próprio campo (`erros_por_
   <div class="pedido-passos pilha-larga">
   <section class="passo">
     <span class="passo-numero" aria-hidden="true">01</span>
-    <div class="passo-cabecalho"><h2>Seus dados</h2></div>
+    <div class="passo-cabecalho"><h2>Seus dados</h2><p id="solicitante-dica" class="texto-secundario">Ficam guardados no seu aparelho para o próximo pedido.</p></div>
     <div class="passo-corpo">
       {% with erros_nome=erros_por_campo|obter:"solicitante" %}
       <div class="campo{% if erros_nome %} campo-com-erro{% endif %}">
@@ -37,19 +37,17 @@ campo de cada erro de campo, e se repetem embaixo do próprio campo (`erros_por_
           <button type="button" class="botao-suave acao-campo acao-limpar" data-limpar-campo="solicitante" aria-label="Limpar o nome completo" hidden>{% include "interface/_icone.html" with nome="fechar" %}<span>Limpar</span></button>
         </div>
         {% include "pedidos/_erro_campo.html" with nome="solicitante" erros=erros_nome %}
-        <p id="solicitante-dica" class="campo-dica">Fica guardado neste aparelho para o próximo pedido.</p>
       </div>
       {% endwith %}
       {% with erros_destino=erros_por_campo|obter:"destino" %}
       <div class="campo{% if erros_destino %} campo-com-erro{% endif %}">
         <label class="campo-rotulo" for="destino">Destino dos materiais</label>
         <div class="com-acao">
-          <input id="destino" class="campo-entrada" type="text" name="destino" maxlength="200" list="destinos" autocomplete="off" value="{{ campos.destino }}" aria-describedby="destino-dica{% if erros_destino %} destino-erro{% endif %}"{% if erros_destino %} aria-invalid="true"{% endif %}>
+          <input id="destino" class="campo-entrada" type="text" name="destino" maxlength="200" list="destinos" autocomplete="off" placeholder="Posto de trabalho, placa do veículo ou setor" value="{{ campos.destino }}"{% if erros_destino %} aria-describedby="destino-erro" aria-invalid="true"{% endif %}>
           <button type="button" class="botao-suave acao-campo acao-limpar" data-limpar-campo="destino" aria-label="Limpar o destino" hidden>{% include "interface/_icone.html" with nome="fechar" %}<span>Limpar</span></button>
         </div>
         {% include "pedidos/_erro_campo.html" with nome="destino" erros=erros_destino %}
         <datalist id="destinos">{% for d in destinos %}<option value="{{ d }}">{% endfor %}</datalist>
-        <p id="destino-dica" class="campo-dica">Posto de trabalho, placa do veículo ou setor.</p>
       </div>
       {% endwith %}
     </div>

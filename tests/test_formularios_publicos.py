@@ -66,7 +66,12 @@ def test_nome_do_solicitante_nao_sugere_nomes(client, fluxo):
     campo = re.search(r'<input id="solicitante"[^>]*>', r).group(0)
     assert " list=" not in campo and 'autocomplete="off"' in campo
     assert 'id="funcionarios"' not in r and "Ana Exemplo" not in r
-    assert "Fica guardado neste aparelho para o próximo pedido." in r
+    # A dica dos dados guardados fica logo abaixo do título do passo, e o campo a descreve.
+    assert (
+        '<h2>Seus dados</h2><p id="solicitante-dica" class="texto-secundario">'
+        "Ficam guardados no seu aparelho para o próximo pedido.</p>"
+    ) in r
+    assert 'aria-describedby="solicitante-dica' in campo
 
 
 @pytest.mark.parametrize(
@@ -181,8 +186,10 @@ def test_destino_fica_junto_do_nome_com_a_orientacao(client):
         assert 'name="solicitante"' in passo1 and 'name="destino"' in passo1
         assert 'list="destinos"' in passo1
         assert "O que pôr aqui?" not in passo1 and "<details" not in passo1
-        dica = "Posto de trabalho, placa do veículo ou setor."
-        assert f'<p id="destino-dica" class="campo-dica">{dica}</p>' in passo1
+        # A orientação é a dica dentro do próprio campo (placeholder), sem parágrafo embaixo.
+        campo = re.search(r'<input id="destino"[^>]*>', passo1).group(0)
+        assert 'placeholder="Posto de trabalho, placa do veículo ou setor"' in campo
+        assert "destino-dica" not in passo1
         assert 'name="destino"' not in r.text[r.text.index('<h2 id="obs-titulo">') :]
         for opcao in ("ETA I", "ETA II", "PICKUP 01 — ABC1D23"):
             assert f'<option value="{opcao}">' in r.text

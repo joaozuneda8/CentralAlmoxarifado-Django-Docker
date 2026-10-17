@@ -1472,36 +1472,42 @@
     return document.querySelector("form[data-editando]");
   }
 
-  // Campos do formulário (também os de fora dele, ligados por `form=`), agrupados por unidade de
-  // alteração: um campo da saída, ou um material (quantidade, troca, presença no carrinho).
+  // Só o que a edição grava conta como alteração: os campos da saída e os materiais. A busca, o
+  // filtro de grupo e os campos de quantidade dos resultados não.
+  var CAMPOS_DA_SAIDA = ["data", "recebedor", "centro_custo", "tipo", "placa", "obs", "nao_lancar"];
+
+  // A unidade de alteração de um campo: o próprio campo da saída, ou o material dele (quantidade,
+  // troca, presença no carrinho). `null` para o que não é dado da saída.
+  function unidadeDoCampo(campo) {
+    var nome = campo.name;
+    if (!nome || campo.disabled) return null;
+    if (CAMPOS_DA_SAIDA.indexOf(nome) !== -1) return nome;
+    if (nome === "item_qtd") {
+      var linha = campo.closest(".carrinho-linha[data-codigo]");
+      return linha ? "material:" + linha.getAttribute("data-codigo") : null;
+    }
+    if (nome === "adicionado") return "material:" + campo.value;
+    if (nome.indexOf("entregue-") === 0) return "material:" + nome.slice("entregue-".length);
+    if (nome.indexOf("no-lugar-de-") === 0) return "material:" + nome.slice("no-lugar-de-".length);
+    return null;
+  }
+
+  function valorDoCampo(campo) {
+    if (campo.type === "checkbox") return campo.checked ? "1" : "";
+    if (campo.name === "adicionado") return "+";
+    if (campo.name.indexOf("no-lugar-de-") === 0) return ">" + campo.value;
+    return campo.value;
+  }
+
+  // Campos do formulário (também os de fora dele, ligados por `form=`), agrupados por unidade.
+  // O retrato é por valor, não por elemento: o HTMX troca o carrinho e os acrescentados por
+  // elementos novos, e o mesmo conteúdo continua sem alteração.
   function unidadesDaEdicao(form) {
     var unidades = {};
-    var codigos = [];
-    var qtds = [];
     Array.prototype.forEach.call(form.elements, function (campo) {
-      if (!campo.name || campo.disabled || campo.type === "submit" || campo.type === "button") return;
-      var nome = campo.name;
-      if (nome === "csrfmiddlewaretoken" || nome === "versao") return;
-      if (campo.type === "checkbox") {
-        unidades[nome] = campo.checked ? "1" : "";
-      } else if (nome === "item_codigo") {
-        codigos.push(campo.value);
-      } else if (nome === "item_qtd") {
-        qtds.push(campo.value);
-      } else if (nome === "adicionado") {
-        unidades["material:" + campo.value] = (unidades["material:" + campo.value] || "") + "|+";
-      } else if (nome.indexOf("entregue-") === 0) {
-        var codigo = nome.slice("entregue-".length);
-        unidades["material:" + codigo] = (unidades["material:" + codigo] || "") + "|" + campo.value;
-      } else if (nome.indexOf("no-lugar-de-") === 0) {
-        var acrescentado = nome.slice("no-lugar-de-".length);
-        unidades["material:" + acrescentado] = (unidades["material:" + acrescentado] || "") + "|>" + campo.value;
-      } else if (nome.indexOf("qtd-") !== 0) {
-        unidades[nome] = campo.value;
-      }
-    });
-    codigos.forEach(function (codigo, i) {
-      unidades["material:" + codigo] = qtds[i] || "";
+      var chave = unidadeDoCampo(campo);
+      if (chave === null) return;
+      unidades[chave] = (unidades[chave] === undefined ? "" : unidades[chave] + "|") + valorDoCampo(campo);
     });
     return unidades;
   }
@@ -1518,12 +1524,11 @@
 
   // O destaque fica no invólucro do campo (`.campo`, `.entrega`, linha do carrinho), com o texto
   // "alterado" para não depender só da cor.
-  function destacarCampo(campo) {
+  function destacarCampo(campo, atuais) {
+    var chave = unidadeDoCampo(campo);
     var caixa = campo.closest(".campo, .entrega, .carrinho-linha");
-    if (!caixa) return;
-    var inicial = campo.getAttribute("data-valor-inicial");
-    var atual = campo.type === "checkbox" ? (campo.checked ? "1" : "") : campo.value;
-    var mudou = inicial === null ? true : inicial !== atual;
+    if (chave === null || !caixa) return;
+    var mudou = unidadesIniciais[chave] !== atuais[chave];
     caixa.classList.toggle("campo-alterado", mudou);
     var nota = caixa.querySelector(":scope > .campo-dica-alterado");
     if (mudou && !nota) {
@@ -1539,10 +1544,10 @@
   function atualizarEdicao() {
     var form = formEdicao();
     if (!form || !unidadesIniciais) return;
+    var atuais = unidadesDaEdicao(form);
     Array.prototype.forEach.call(form.elements, function (campo) {
-      if (!campo.name || campo.type === "hidden" || campo.type === "submit" || campo.type === "button") return;
-      if (campo.name === "csrfmiddlewaretoken" || campo.name.indexOf("qtd-") === 0) return;
-      destacarCampo(campo);
+      if (campo.type === "hidden") return;
+      destacarCampo(campo, atuais);
     });
     var n = contarAlteracoes(form);
     var contagem = document.querySelector("[data-contagem-alteracoes]");
@@ -1560,10 +1565,6 @@
       if (estado === "invalido" || estado === "acima") return;
       if (estado === "zero" && bloco.closest("tr[data-adicionado]")) return;
       confirmarEntrega(bloco);
-    });
-    Array.prototype.forEach.call(form.elements, function (campo) {
-      if (!campo.name) return;
-      campo.setAttribute("data-valor-inicial", campo.type === "checkbox" ? (campo.checked ? "1" : "") : campo.value);
     });
     unidadesIniciais = unidadesDaEdicao(form);
     atualizarEdicao();

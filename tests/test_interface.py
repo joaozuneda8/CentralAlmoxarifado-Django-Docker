@@ -258,6 +258,7 @@ def test_dropdown_js_repetir_a_mesma_letra_percorre_as_opcoes():
     trecho = js[js.index("function pularPara") :]
     trecho = trecho[: trecho.index("function aoTeclar")]
     assert r"/^(.)\1+$/.test(d.digitado)" in trecho
+    assert "d.digitado = d.digitado.charAt(0)" in trecho  # o acumulado volta à letra repetida
     assert "busca.length === 1 ? d.ativo + 1 : 0" in trecho
 
 

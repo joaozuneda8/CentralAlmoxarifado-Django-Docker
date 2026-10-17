@@ -400,8 +400,10 @@
       d.digitado = "";
     }, LIMITE_DIGITACAO);
     // A mesma letra repetida ("aa", "aaa") conta como uma letra só e anda pelas opções a partir da ativa,
-    // como no <select> nativo; letras diferentes buscam o prefixo inteiro, desde o começo.
-    var busca = /^(.)\1+$/.test(d.digitado) ? d.digitado.charAt(0) : d.digitado;
+    // como no <select> nativo (o acumulado volta a ela: "a", "a", "b" busca "ab"); letras diferentes
+    // buscam o prefixo inteiro, desde o começo.
+    if (/^(.)\1+$/.test(d.digitado)) d.digitado = d.digitado.charAt(0);
+    var busca = d.digitado;
     var n = d.visiveis.length;
     var inicio = busca.length === 1 ? d.ativo + 1 : 0;
     for (var k = 0; k < n; k++) {

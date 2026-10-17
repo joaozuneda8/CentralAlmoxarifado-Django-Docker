@@ -20,6 +20,7 @@ from catalogo.catalogos import ItemCatalogo, catalogo_ab, catalogo_avulsa, catal
 from catalogo.models import CentroCusto, Opcao
 from pedidos.models import (
     TRAVA_LANCAMENTO,
+    AlteracaoPedido,
     Atendimento,
     ExecucaoRobo,
     ItemPedido,
@@ -36,6 +37,7 @@ from pedidos.regras import (
     LIMPEZA,
     NAO_LANCAR,
     PENDENTE,
+    ROTULOS_CABECALHO,
     TIPOS_SAIDA_PADRAO,
     VERIFICAR,
     Adicionado,
@@ -49,6 +51,8 @@ from pedidos.regras import (
     ItemSaida,
     atendimento_confere,
     cabecalho_saida,
+    diferencas_atendimento,
+    edicao_permitida,
     marcado_nao_lancar,
     norm_placa,
     norm_u,
@@ -81,6 +85,8 @@ class Resposta:
     divergente: bool = False
     pedido: Pedido | None = None
     telegram: str = ""
+    motivo: str = ""  # recusa da edição: "lancamento" ou "versao"
+    diferencas: list[dict] = field(default_factory=list)
 
 
 def mensagem_divergente(numero: str) -> str:
@@ -657,6 +663,251 @@ def confirmar_atendimento(
             atendimento, [(i, i.qtd_entregue) for i in itens + acrescentados], pedido.numero
         )
     return Resposta(ok=True, numero=pedido.numero, pedido=pedido)
+
+
+# ---------------------------------------------------------------------------
+# Edição do atendimento (e da saída avulsa) até o lançamento no SCPI
+# ---------------------------------------------------------------------------
+
+MENSAGEM_NADA_MUDOU = "Nada mudou; nada foi gravado."
+
+
+def _item_catalogo_gravado(item: ItemPedido) -> ItemCatalogo:
+    """Material já gravado no pedido, aceito na edição mesmo que tenha saído do catálogo."""
+    return ItemCatalogo(
+        codigo=item.codigo,
+        nome=item.material,
+        unidade=item.unidade,
+        categoria="",
+        grupo=item.grupo,
+        subgrupo=item.subgrupo,
+        estoque=Decimal(0),
+        disponivel=0,
+        duplicado=False,
+    )
+
+
+def _erros_de_valor_sumido(gravado: tuple[str, ...], dados: DadosSaida) -> list[Erro]:
+    """Centro de custo, tipo ou placa que a pessoa não mexeu, mas que deixou de existir: a
+    edição recusa (o robô também recusaria) e diz por quê."""
+    lista_centros = centros()
+    sumidos = []
+    centro = texto(dados.centro_custo)
+    if (
+        centro
+        and norm_u(centro) == norm_u(gravado[2])
+        and not any(norm_u(c.descricao) == norm_u(centro) for c in lista_centros)
+    ):
+        sumidos.append(ROTULOS_CABECALHO[2])
+    tipo = texto(dados.tipo)
+    if tipo and tipo == gravado[3] and tipo not in tipos_saida():
+        sumidos.append(ROTULOS_CABECALHO[3])
+    placa = norm_placa(dados.placa)
+    if (
+        placa
+        and placa == gravado[4]
+        and not any(norm_placa(c.placa) == placa for c in lista_centros)
+    ):
+        sumidos.append(ROTULOS_CABECALHO[4])
+    return [Erro(None, f"{r}: o valor gravado não existe mais. Escolha outro.") for r in sumidos]
+
+
+def _conferir_edicao(pedido: Pedido, linhas, versao: int, diferencas: list) -> Resposta | None:
+    """Recusa a edição de um lote que entrou em lançamento e a de quem abriu uma versão
+    anterior (salvo o reenvio igual ao gravado). `None` quando pode seguir."""
+    edicao = edicao_permitida(True, linhas)
+    if not edicao.permitida:
+        return Resposta(
+            ok=False,
+            motivo="lancamento",
+            mensagem=edicao.motivo,
+            diferencas=diferencas,
+            numero=pedido.numero,
+        )
+    if versao == pedido.versao:
+        return None
+    if not diferencas:
+        return Resposta(
+            ok=True,
+            reenvio=True,
+            mensagem=f"As alterações já estavam salvas no pedido {pedido.numero}.",
+            numero=pedido.numero,
+            pedido=pedido,
+        )
+    ultima = pedido.alteracoes.select_related("usuario").first()
+    if ultima is None:
+        quem = "Outra pessoa salvou alterações neste pedido."
+    else:
+        nome = ultima.usuario.get_full_name() or ultima.usuario.username
+        quem = f"{nome} salvou alterações neste pedido às {timezone.localtime(ultima.em):%H:%M}."
+    return Resposta(
+        ok=False, motivo="versao", mensagem=quem, diferencas=diferencas, numero=pedido.numero
+    )
+
+
+def _gravar_edicao(
+    pedido: Pedido,
+    atendimento: Atendimento,
+    dados: DadosSaida,
+    nao_lancar: bool,
+    pares,
+    diferencas: list,
+    linhas_antigas: list[LinhaSaida],
+    usuario,
+) -> None:
+    """Grava o cabeçalho do atendimento, a versão, o histórico e as linhas de saída novas. As
+    linhas nunca são atualizadas no lugar: apagadas e recriadas, com IDs novos, o robô que leu
+    o lote antes da edição o encontra mudado e o pula (`lancamento._travar`)."""
+    atendimento.data_efetiva = date.fromisoformat(texto(dados.data))
+    atendimento.recebedor = texto(dados.recebedor)
+    atendimento.centro_custo = texto(dados.centro_custo)
+    atendimento.tipo_saida = texto(dados.tipo)
+    atendimento.placa = norm_placa(dados.placa)
+    atendimento.obs = texto(dados.obs)
+    atendimento.nao_lancar = nao_lancar
+    atendimento.recibo_impresso_em = None
+    atendimento.save()
+    pedido.versao += 1
+    pedido.save(update_fields=["versao"])
+    AlteracaoPedido.objects.create(
+        pedido=pedido,
+        usuario=usuario,
+        versao=pedido.versao,
+        diferencas=diferencas,
+        scpi_antes=[
+            {
+                "seq": linha.seq,
+                "status": linha.status,
+                "mensagem": linha.mensagem,
+                "requisicao_scpi": linha.requisicao_scpi,
+            }
+            for linha in linhas_antigas
+        ],
+    )
+    LinhaSaida.objects.filter(atendimento=atendimento).delete()
+    _gravar_linhas(atendimento, pares, pedido.numero)
+    quando = timezone.localtime().strftime("%d/%m/%Y %H:%M")
+    LinhaSaida.objects.filter(atendimento=atendimento).update(
+        mensagem=f"Refeita na edição de {quando} por {usuario.username}."
+    )
+
+
+def editar_atendimento(
+    pedido_id: uuid.UUID,
+    versao: int,
+    dados: DadosSaida,
+    qtds: dict[str, str],
+    *,
+    nao_lancar: bool,
+    adicionados: Sequence[Adicionado] = (),
+    usuario,
+    hoje: date | None = None,
+) -> Resposta:
+    """Corrige o atendimento de um pedido enquanto o lote não entrou em lançamento: dados da
+    saída, quantidades entregues e materiais acrescentados pelo almoxarifado. O que veio do
+    funcionário (cabeçalho, materiais e quantidades pedidas) nunca muda."""
+    adicionados = [Adicionado(texto(a.codigo), texto(a.no_lugar_de)) for a in adicionados]
+    with transaction.atomic():
+        pedido = Pedido.objects.select_for_update().filter(pk=pedido_id).first()
+        atendimento = pedido.atendimento_ou_none if pedido is not None else None
+        if atendimento is None or pedido.origem == AVULSA:
+            return Resposta(ok=False, mensagem="Pedido não encontrado.")
+        linhas = list(
+            LinhaSaida.objects.select_for_update().filter(atendimento=atendimento).order_by("seq")
+        )
+        todos = list(pedido.itens.all())
+        itens = [i for i in todos if i.origem == ItemPedido.Origem.PEDIDO]
+        gravados = {i.codigo: i for i in todos if i.origem == ItemPedido.Origem.ALMOXARIFADO}
+        por_id = {i.id: i for i in todos}
+        conv = parse_inteiro if pedido.origem == AB else parse_qtd_br
+        parsed = {i.codigo: conv(qtds.get(i.codigo, "")) for i in itens}
+        qtds_adicionadas = {a.codigo: _qtd_adicionada(qtds, a.codigo) for a in adicionados}
+
+        mantidos = {
+            a.codigo: _item_catalogo_gravado(gravados[a.codigo])
+            for a in adicionados
+            if a.codigo in gravados
+            and (
+                por_id[gravados[a.codigo].no_lugar_de_id].codigo
+                if gravados[a.codigo].no_lugar_de_id
+                else ""
+            )
+            == a.no_lugar_de
+        }
+        catalogo_avulsa = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
+        nomes = {c: catalogo_avulsa[c].nome for c in qtds_adicionadas if c in catalogo_avulsa}
+        diferencas = diferencas_atendimento(
+            estado_gravado(pedido),
+            estado_enviado(pedido, dados, nao_lancar, parsed, adicionados, qtds_adicionadas, nomes),
+        )
+        recusa = _conferir_edicao(pedido, linhas, versao, diferencas)
+        if recusa is not None:
+            return recusa
+
+        unicos, catalogo, erros = _validar_atendimento(
+            pedido,
+            itens,
+            dados,
+            parsed,
+            adicionados,
+            qtds_adicionadas,
+            nao_lancar,
+            hoje=hoje or timezone.localdate(),
+            catalogo_extra=mantidos,
+        )
+        erros = _erros_de_valor_sumido(cabecalho_atendimento(atendimento), dados) + erros
+        if erros:
+            return Resposta(ok=False, mensagem="Corrija os dados da saída.", erros=erros)
+        if not diferencas:
+            return Resposta(
+                ok=True, mensagem=MENSAGEM_NADA_MUDOU, numero=pedido.numero, pedido=pedido
+            )
+
+        do_pedido = {i.codigo: i for i in itens}
+        for item in itens:
+            item.qtd_entregue = Decimal(parsed[item.codigo])
+        ItemPedido.objects.bulk_update(itens, ["qtd_entregue"])
+        ficam = {a.codigo for a in unicos}
+        ItemPedido.objects.filter(
+            pk__in=[i.pk for c, i in gravados.items() if c not in ficam]
+        ).delete()
+        acrescentados = []
+        for a in unicos:
+            item = gravados.get(a.codigo)
+            if item is None:
+                m = catalogo[a.codigo]
+                item = ItemPedido(
+                    pedido=pedido,
+                    codigo=a.codigo,
+                    material=m.nome,
+                    unidade=m.unidade,
+                    grupo=m.grupo,
+                    subgrupo=m.subgrupo,
+                    origem=ItemPedido.Origem.ALMOXARIFADO,
+                    adicionado_por=usuario,
+                    qtd_pedida=None,
+                )
+            item.no_lugar_de = do_pedido.get(a.no_lugar_de)
+            item.qtd_entregue = Decimal(qtds_adicionadas[a.codigo])
+            item.save()
+            acrescentados.append(item)
+        _gravar_edicao(
+            pedido,
+            atendimento,
+            dados,
+            nao_lancar,
+            [(i, i.qtd_entregue) for i in itens + acrescentados],
+            diferencas,
+            linhas,
+            usuario,
+        )
+    return Resposta(
+        ok=True,
+        mensagem=f"Alterações salvas no pedido {pedido.numero}.",
+        numero=pedido.numero,
+        pedido=pedido,
+        diferencas=diferencas,
+    )
 
 
 def registrar_saida_avulsa(

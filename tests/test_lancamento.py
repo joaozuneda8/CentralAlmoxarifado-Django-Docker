@@ -262,3 +262,62 @@ def test_conexao_perdida_ao_travar_vira_falha_critica(dois_lotes, scpi, monkeypa
     with pytest.raises(FalhaCritica, match="não foi possível travar o lote"):
         executar_lancamento(e, scpi.abrir)
     assert not any(c[0] == "salvar" for c in scpi.chamadas)
+
+
+# Edição do atendimento contra o robô: a troca dos IDs das linhas é o que o faz pular o lote.
+
+
+def _editar_recebedor(numero, recebedor):
+    from datetime import date
+
+    from pedidos.models import Pedido
+    from pedidos.servicos import editar_atendimento
+    from tests.cenario import saida
+
+    pedido = Pedido.objects.get(numero=numero)
+    return editar_atendimento(
+        pedido.id,
+        pedido.versao,
+        saida(recebedor=recebedor),
+        {"023.001.002": "2", "008.001.002": "1,5"},
+        nao_lancar=False,
+        usuario=pedido.atendimento.atendido_por,
+        hoje=date(2026, 10, 9),
+    )
+
+
+def test_edicao_entre_a_leitura_e_a_trava_faz_o_robo_pular_o_lote(dois_lotes, scpi, monkeypatch):
+    p, _ = dois_lotes
+    preencher = scpi.preencher
+
+    def preencher_e_editar(req):
+        if req.lote == p:
+            assert _editar_recebedor(p, "Ana").ok
+        preencher(req)
+
+    monkeypatch.setattr(scpi, "preencher", preencher_e_editar)
+    execucao = executar_lancamento(ExecucaoRobo.objects.create(), scpi.abrir)
+    assert execucao.resumo["ignoradas"] == 1 and execucao.resumo["lancadas"] == 1
+    assert set(LinhaSaida.objects.filter(lote=p).values_list("status", flat=True)) == {"PENDENTE"}
+
+    monkeypatch.setattr(scpi, "preencher", preencher)
+    executar_lancamento(ExecucaoRobo.objects.create(), scpi.abrir)
+    assert set(LinhaSaida.objects.filter(lote=p).values_list("status", "recebedor")) == {
+        ("LANCADA", "Ana")
+    }
+
+
+def test_robo_trava_antes_e_a_edicao_e_recusada(dois_lotes, scpi):
+    p, _ = dois_lotes
+    respostas = []
+
+    def editar_durante_o_salvar():
+        if scpi._lote == p:
+            respostas.append(_editar_recebedor(p, "Ana"))
+
+    scpi.ao_salvar = editar_durante_o_salvar
+    executar_lancamento(ExecucaoRobo.objects.create(), scpi.abrir)
+    assert [r.motivo for r in respostas] == ["lancamento"]
+    assert set(LinhaSaida.objects.filter(lote=p).values_list("status", "recebedor")) == {
+        ("LANCADA", "João")
+    }

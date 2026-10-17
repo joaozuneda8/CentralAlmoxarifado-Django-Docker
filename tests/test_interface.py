@@ -251,6 +251,16 @@ def test_mensagens_por_nivel(nivel, classe, papel):
     assert classe in html and f'role="{papel}"' in html and "Texto" in html
 
 
+def test_dropdown_js_select_digitavel_so_aceita_uma_opcao_da_lista():
+    # `data-dropdown-digitavel`: o controle é um campo de texto que filtra a lista, mas o <select>
+    # guarda o valor, o texto não escolhido volta ao escolhido ao fechar e o Enter nunca envia o
+    # formulário.
+    js = open(finders.find("interface/js/dropdown.js"), encoding="utf-8").read()
+    assert 'hasAttribute("data-dropdown-digitavel")' in js and "function montarDigitavel" in js
+    assert "if (d.digitavel) atualizarGatilho(d);" in js
+    assert 'd.digitavel && k === "Enter"' in js
+
+
 def test_dropdown_js_repetir_a_mesma_letra_percorre_as_opcoes():
     # "aa" conta como uma letra só e anda pelas opções a partir da ativa (como no <select> nativo);
     # letras diferentes buscam o prefixo inteiro.

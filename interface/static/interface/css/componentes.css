@@ -129,6 +129,9 @@ textarea.campo-linha:focus { height: 84px; }
 .dropdown[data-aberto] > .campo-entrada { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-superficie); }
 /* block: sem a folga de linha de um inline-block, o wrapper tem a altura do campo e a seta fica no centro. */
 .dropdown-combo { display: block; padding-right: 44px; }
+/* Select digitável travado (o centro de custo, enquanto há placa): como o gatilho travado. */
+.dropdown-combo:disabled { background: var(--superficie); color: var(--texto-secundario); cursor: not-allowed; }
+.dropdown-combo:disabled ~ .dropdown-seta { opacity: 0.4; }
 .dropdown-seta-campo { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .dropdown[data-aberto] .dropdown-seta-campo { transform: translateY(-50%) rotate(180deg); }
 

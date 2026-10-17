@@ -15,6 +15,9 @@
  *   (as letras se acumulam por LIMITE_DIGITACAO ms).
  * - input.campo-entrada[list]: campo com lista. O próprio campo filtra o painel enquanto se digita;
  *   o texto continua livre (quem valida é o servidor).
+ * - select.campo-entrada[data-dropdown-digitavel]: select digitável. O controle é um campo de texto como o
+ *   do campo com lista (filtra a lista enquanto se digita), mas só vale uma opção dela: o <select> guarda
+ *   o valor e o que foi digitado e não escolhido volta ao escolhido ao sair (placa e centro de custo).
  * - select.campo-entrada[data-dropdown-arvore]: cada <optgroup> vira uma pasta (a primeira opção
  *   dele, de valor igual ao rótulo do grupo, é a pasta; as demais, os filhos, ligados por ├─ └─),
  *   fechada até se clicar na seta ou apertar →; escolher a pasta escolhe o grupo inteiro.
@@ -185,7 +188,7 @@
   }
 
   function selecionada(d, o) {
-    if (d.tipo === "select") return o.valor === d.campo.value;
+    if (d.tipo === "select" || d.digitavel) return o.valor === d.campo.value;
     return d.campo.value !== "" && norm(o.valor) === norm(d.campo.value);
   }
 
@@ -357,6 +360,7 @@
 
   function fechar(d, devolverFoco) {
     fecharPainel(d.painel);
+    if (d.digitavel) atualizarGatilho(d); // o que foi digitado e não escolhido não vale: volta ao escolhido
     d.raiz.removeAttribute("data-aberto");
     d.controle.setAttribute("aria-expanded", "false");
     if (aberto === d) aberto = null;
@@ -367,13 +371,19 @@
     var o = d.visiveis[i];
     if (!o) return;
     d.campo.value = o.valor;
-    if (d.tipo === "select") atualizarGatilho(d);
+    if (d.tipo === "select" || d.digitavel) atualizarGatilho(d);
     d.campo.dispatchEvent(new Event("change", { bubbles: true }));
     fechar(d, d.tipo === "select");
   }
 
+  // Mostra no controle o que o <select> guarda: o texto no gatilho (botão) ou, no select digitável, no campo
+  // (vazio quando a opção é a sem valor: aí aparece o `placeholder`, que é o rótulo dela).
   function atualizarGatilho(d) {
     var o = d.campo.options[d.campo.selectedIndex];
+    if (d.digitavel) {
+      d.controle.value = o && d.campo.value !== "" ? o.textContent.trim() : "";
+      return;
+    }
     d.texto.textContent = o ? o.textContent.trim() : "";
     d.controle.classList.toggle("dropdown-vazio", d.campo.value === "");
   }
@@ -408,6 +418,9 @@
         abrir(d, "");
       } else if (d.tipo === "select" && (k === "Enter" || k === " ")) {
         e.preventDefault();
+        abrir(d, "");
+      } else if (d.digitavel && k === "Enter") {
+        e.preventDefault(); // não envia o formulário: abre a lista
         abrir(d, "");
       } else if (d.tipo === "select" && imprimivel) {
         e.preventDefault();
@@ -444,7 +457,7 @@
       if (d.ativo >= 0) {
         e.preventDefault();
         escolher(d, d.ativo);
-      } else if (d.tipo === "select") {
+      } else if (d.tipo === "select" || d.digitavel) {
         e.preventDefault();
       } else {
         fechar(d, false);
@@ -475,9 +488,90 @@
       aoTeclar(d, e);
     });
     d.campo.setAttribute("data-dropdown-pronto", "");
+    // `data-travado` no <select> trava só o dropdown: o <select> segue habilitado, para o valor
+    // ir no envio (campo `disabled` não vai).
+    if (d.campo.tagName !== "SELECT") return;
+    function sincronizarTrava() {
+      var travado = d.campo.hasAttribute("data-travado");
+      d.controle.disabled = travado;
+      if (travado && aberto === d) fechar(d, false);
+    }
+    new MutationObserver(sincronizarTrava).observe(d.campo, {
+      attributes: true,
+      attributeFilter: ["data-travado"],
+    });
+    sincronizarTrava();
+  }
+
+  // Campo de texto que abre a lista e a filtra enquanto se digita: o do campo com lista e o do select
+  // digitável (o mesmo comportamento; muda só o que o campo guarda).
+  function ligarCampoDeTexto(d) {
+    var input = d.controle;
+    input.addEventListener("focus", function () {
+      if (aberto !== d) abrir(d, "");
+      if (d.digitavel) input.select(); // digitar já troca o escolhido
+    });
+    input.addEventListener("click", function () {
+      if (aberto !== d) abrir(d, "");
+    });
+    input.addEventListener("input", function () {
+      if (aberto === d) {
+        d.termo = input.value;
+        renderizar(d);
+      } else {
+        abrir(d, input.value);
+      }
+    });
+  }
+
+  // Select digitável (`data-dropdown-digitavel`): o controle é um campo de texto como o do campo com
+  // lista, mas só vale uma opção da lista (o <select> guarda o valor): o que foi digitado e não
+  // escolhido volta ao escolhido ao sair.
+  function montarDigitavel(select) {
+    var rotuloEl = rotuloDe(select);
+    var d = { tipo: "combo", digitavel: true, campo: select, opcoes: opcoesDoSelect(select), abertos: {} };
+
+    d.raiz = criar("div", "dropdown");
+    select.parentNode.insertBefore(d.raiz, select);
+    d.raiz.appendChild(select);
+    select.classList.add("visually-hidden");
+    select.tabIndex = -1;
+    select.setAttribute("aria-hidden", "true");
+
+    var input = criar("input", select.className.replace("visually-hidden", "").trim() + " dropdown-combo");
+    input.type = "text";
+    input.id = select.id ? select.id + "-gatilho" : "dropdown-gatilho-" + ++contador;
+    input.autocomplete = "off";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-haspopup", "listbox");
+    input.setAttribute("aria-expanded", "false");
+    if (rotuloEl) input.setAttribute("aria-labelledby", rotuloEl.id);
+    var vazia = d.opcoes.filter(function (o) {
+      return o.valor === "";
+    })[0];
+    if (vazia) input.placeholder = vazia.texto;
+    d.controle = input;
+    d.raiz.insertBefore(input, select);
+    var seta = criar("span", "dropdown-seta dropdown-seta-campo");
+    seta.innerHTML = SETA;
+    d.raiz.appendChild(seta);
+
+    finalizar(d, textoDoRotulo(rotuloEl));
+    atualizarGatilho(d);
+    ligarCampoDeTexto(d);
+    // O rótulo (<label for>) e o foco programático chegam ao <select>: passam para o campo.
+    select.addEventListener("focus", function () {
+      input.focus();
+    });
+    // Alteração de fora (outro script troca o valor e dispara `change`).
+    select.addEventListener("change", function () {
+      atualizarGatilho(d);
+    });
   }
 
   function montarSelect(select) {
+    if (select.hasAttribute("data-dropdown-digitavel")) return montarDigitavel(select);
     var rotuloEl = rotuloDe(select);
     var d = { tipo: "select", campo: select, opcoes: opcoesDoSelect(select) };
     d.arvore = select.hasAttribute("data-dropdown-arvore") ? arvoreDoSelect(select) : null;
@@ -518,18 +612,6 @@
     select.addEventListener("change", function () {
       atualizarGatilho(d);
     });
-    // `data-travado` no <select> trava só o dropdown: o <select> segue habilitado, para o valor
-    // ir no envio (campo `disabled` não vai).
-    function sincronizarTrava() {
-      var travado = select.hasAttribute("data-travado");
-      d.controle.disabled = travado;
-      if (travado && aberto === d) fechar(d, false);
-    }
-    new MutationObserver(sincronizarTrava).observe(select, {
-      attributes: true,
-      attributeFilter: ["data-travado"],
-    });
-    sincronizarTrava();
   }
 
   function montarCombo(input) {
@@ -554,21 +636,7 @@
     d.raiz.appendChild(seta);
 
     finalizar(d, textoDoRotulo(rotuloDe(input)));
-
-    input.addEventListener("focus", function () {
-      if (aberto !== d) abrir(d, "");
-    });
-    input.addEventListener("click", function () {
-      if (aberto !== d) abrir(d, "");
-    });
-    input.addEventListener("input", function () {
-      if (aberto === d) {
-        d.termo = input.value;
-        renderizar(d);
-      } else {
-        abrir(d, input.value);
-      }
-    });
+    ligarCampoDeTexto(d);
   }
 
   // ---- início e fechamento ------------------------------------------------------------------------

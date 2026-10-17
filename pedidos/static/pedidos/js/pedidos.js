@@ -1522,23 +1522,53 @@
     return Object.keys(chaves).filter(function (k) { return unidadesIniciais[k] !== atuais[k]; }).length;
   }
 
-  // O destaque fica no invólucro do campo (`.campo`, `.entrega`, linha do carrinho), com o texto
-  // "alterado" para não depender só da cor.
+  // Valor de abertura de cada campo de quantidade, pelo nome (o HTMX troca os elementos, o nome
+  // fica): é o "era" da nota do material.
+  var valoresIniciais = {};
+
+  function chaveDoValor(campo) {
+    var linha = campo.name === "item_qtd" && campo.closest(".carrinho-linha[data-codigo]");
+    return linha ? "item_qtd:" + linha.getAttribute("data-codigo") : campo.name;
+  }
+
+  // Onde a nota vai, sem empurrar o campo: no material, embaixo do nome (como o "Trocado por …"),
+  // com o valor de antes; nos dados da saída, na linha do rótulo.
+  function notaDoCampo(campo, caixa) {
+    if (caixa.classList.contains("campo")) {
+      return { lugar: caixa.querySelector(".campo-rotulo") || caixa, classe: "campo-dica-alterado", texto: "alterado" };
+    }
+    var antes = valoresIniciais[chaveDoValor(campo)];
+    var unidade = caixa.querySelector(".entrega-un");
+    var texto = antes === undefined
+      ? "Incluído nesta edição"
+      : "Alterado: era " + antes + (unidade ? " " + unidade.textContent.trim() : "");
+    if (caixa.classList.contains("entrega")) {
+      var linha = caixa.closest("tr");
+      return { lugar: linha ? linha.cells[0] : caixa, classe: "recibo-nota campo-dica-alterado", texto: texto };
+    }
+    return { lugar: caixa.querySelector(".material-dados") || caixa, classe: "campo-dica campo-dica-alterado", texto: texto };
+  }
+
+  // O destaque fica no invólucro do campo (`.campo`, `.entrega`, linha do carrinho), e a nota com
+  // o texto, para não depender só da cor.
   function destacarCampo(campo, atuais) {
     var chave = unidadeDoCampo(campo);
     var caixa = campo.closest(".campo, .entrega, .carrinho-linha");
     if (chave === null || !caixa) return;
     var mudou = unidadesIniciais[chave] !== atuais[chave];
     caixa.classList.toggle("campo-alterado", mudou);
-    var nota = caixa.querySelector(":scope > .campo-dica-alterado");
-    if (mudou && !nota) {
-      nota = document.createElement("span");
-      nota.className = "campo-dica campo-dica-alterado";
-      nota.textContent = "alterado";
-      caixa.appendChild(nota);
-    } else if (!mudou && nota) {
-      nota.remove();
+    var nota = notaDoCampo(campo, caixa);
+    var existente = nota.lugar.querySelector(":scope > .campo-dica-alterado");
+    if (!mudou) {
+      if (existente) existente.remove();
+      return;
     }
+    if (!existente) {
+      existente = document.createElement("span");
+      nota.lugar.appendChild(existente);
+    }
+    existente.className = nota.classe;
+    existente.textContent = nota.texto;
   }
 
   function atualizarEdicao() {
@@ -1567,6 +1597,9 @@
       confirmarEntrega(bloco);
     });
     unidadesIniciais = unidadesDaEdicao(form);
+    Array.prototype.forEach.call(form.elements, function (campo) {
+      if (unidadeDoCampo(campo) !== null && campo.type !== "hidden") valoresIniciais[chaveDoValor(campo)] = campo.value;
+    });
     atualizarEdicao();
   }
   document.addEventListener("DOMContentLoaded", iniciarEdicao);

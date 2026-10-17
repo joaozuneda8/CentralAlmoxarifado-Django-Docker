@@ -720,6 +720,10 @@ html:not(.js) [data-quantidade] { display: none; }
 .campo-alterado.entrega .entrega-caixa { border-color: var(--destaque); box-shadow: 0 0 0 1px var(--destaque); }
 .campo-alterado.carrinho-linha { box-shadow: inset 3px 0 0 var(--destaque); }
 .campo-dica-alterado { color: var(--destaque); font-weight: 600; }
+/* Nos dados da saída, a nota fica na linha do rótulo; no material, embaixo do nome: nenhuma das
+   duas empurra o campo. */
+.campo-rotulo > .campo-dica-alterado { margin-left: var(--esp-1); font-size: 0.857em; }
+.recibo-nota.campo-dica-alterado { color: var(--destaque); }
 .rodape-saida [data-contagem-alteracoes]:not(:empty) { margin-right: auto; align-self: center; }
 .nao-gravadas [data-copiar-resumo] { justify-self: start; }
 .rodape-saida [data-contagem-alteracoes]:empty { display: none; }

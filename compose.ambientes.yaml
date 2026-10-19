@@ -56,8 +56,8 @@ services:
 
   web:
     <<: *aplicacao
-    # O Apache chega por um IP interno do Docker que muda: o waitress confia em qualquer
-    # origem, o que só é seguro porque a porta publicada só é alcançável pelo Apache.
+    # O proxy HTTPS chega por um IP interno do Docker que muda: o waitress confia em qualquer
+    # origem, o que só é seguro porque a porta publicada só é alcançável pelo proxy (loopback).
     command:
       - python
       - -m

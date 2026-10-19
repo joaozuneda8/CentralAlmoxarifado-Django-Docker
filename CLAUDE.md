@@ -17,6 +17,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Com o Serena indisponível, use as ferramentas nativas e avise o usuário da limitação.
 - Instalação, limites e hooks: seção "Serena" mais abaixo.
 
+## Regra prioritária: Git e produção
+
+Fonte completa: `deploy/FLUXO_GIT.md` (branches, tags, imagem) e `deploy/AMBIENTES.md` (ambientes
+e `deploy/atualizar.ps1`). Resumo que vale para todo agente:
+
+- Trabalhe sempre numa branch `claude/<assunto>` criada a partir de `develop` atualizada
+  (`git switch develop && git pull --ff-only origin develop && git switch -c claude/<assunto>`),
+  com `git status` limpo antes. Alterações já existentes na árvore são preservadas, nunca
+  descartadas.
+- Commits e pushes só em `claude/*`. **Nunca** faça commit, push, merge, rebase, force push,
+  `reset --hard`, `clean -fd` nem troca de branch para apagar divergência em `main`, `develop` ou
+  numa tag, nem na instalação de produção (clone em `C:\docker\almoxarifado-prod`, HEAD destacado
+  numa tag, somente leitura).
+- Promoção só por PR: `claude/*` → `develop` → `main`. Squash é aceito nos PRs de `claude/*`; entre
+  `develop` e `main`, só merge commit. Correção urgente parte da tag implantada
+  (`claude/hotfix-<assunto>`), entra em `main` e depois volta para `develop`. Não abra o PR de
+  `develop` para `main` sem o pedido do usuário.
+- Produção é por tag `vMAJOR.MINOR.PATCH` em `main` e imagem aprovada (workflow **Imagem de
+  release**, referência `ghcr.io/...@sha256:...`), numa ação separada e explícita, nunca como efeito
+  de um push. Não crie nem mova tag, não dispare o workflow de imagem e não rode
+  `deploy/atualizar.ps1 -Aplicar` (nem `-AtivarOperacao`, `-ManutencaoConfirmada`) sem pedido
+  expresso do usuário; sem `-Aplicar` o script só planeja. Nenhum `docker compose` sobre a pasta
+  ou o projeto de produção por iniciativa própria.
+- O Git não leva banco, `.env*`, `.deploy-*`, `dados/`, perfis do navegador, logs nem backups.
+  Nunca os versione nem imprima senhas (não envie `docker compose config` ao chat).
+
 ## O projeto
 
 Reescrita em Django do Central Almoxarifado (hoje Google Apps Script + Google Sheets), sem
@@ -28,9 +54,11 @@ almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança
   `docs/superpowers/plans/`. Os subprojetos 1 (Fundação), 2 (Catálogo e importadores), 3
   (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) também: o
   código (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e a instalação no servidor, que já
-  roda em produção com dados reais (o roteiro foi `deploy/VIRADA.md`). A implantação é
-  em Docker Compose (`docs/superpowers/specs/2026-10-15-docker-design.md`), no lugar do
-  NSSM e do Agendador do Windows da spec principal. Do 4 ainda falta a
+  roda em produção com dados reais (o roteiro foi `deploy/VIRADA.md`, migração histórica do
+  Apps Script). A implantação é em Docker Compose
+  (`docs/superpowers/specs/2026-10-15-docker-design.md`), no lugar do NSSM e do Agendador do
+  Windows da spec principal; o ambiente confirmado é Windows 10 com Docker Desktop compartilhado
+  (`deploy/INSTALACAO.md`, `deploy/AMBIENTES.md`). Do 4 ainda falta a
   simulação contra o SCPI real (João roda `lancar_saidas --dry-run --limite 1`).
 - Referências fora deste repositório: o Apps Script atual (`../CentralAlmoxarifado`,
   com `Regras.gs`, `Catalogo.gs` e os testes em Node), o WMS-Almoxarifado
@@ -64,10 +92,11 @@ ensaio fiel: roda a gravação numa transação e a desfaz, com as travas e as r
 `backup_banco` faz o dump
 comprimido em `BACKUP_DIR` e apaga os de mais de 60 dias (a senha vai num arquivo de opções
 temporário, `--defaults-extra-file`, nunca nos argumentos nem no ambiente); `robos_em_andamento` sai com erro se há
-lançamento ou importação em andamento (o `deploy/atualizar.sh` o usa);
+lançamento ou importação em andamento (o `deploy/atualizar.ps1` o usa);
 `importar_depara --arquivo <xlsx> [--dry-run]` carrega os pares de/para da planilha MAPEAMENTO
 DE/PARA CONSOLIDADO (carga única). No servidor os comandos rodam no container
-(`docker compose exec web python manage.py ...`), não pelo `uv run`.
+(`docker compose ... exec web python manage.py ...`), não pelo `uv run`, sempre com o projeto e os
+arquivos do ambiente explícitos (`deploy/AMBIENTES.md`). Em produção, só a pedido do usuário.
 
 Os comandos `importar_cadastro`, `importar_estoque`, `importar_saidas_scpi` (`--desde`/`--ate`)
 e `atualizar_catalogo` (os três em sequência, num navegador só; com `--carga-inicial`, o cadastro
@@ -89,22 +118,23 @@ transações precisam se comportar como no servidor.
 - A área interna (login, painel, automações, curva ABC e saída avulsa) fica em
   `/painel/`, e o admin em `/admin/`; os formulários públicos ficam na raiz. Os nomes das rotas
   não mudam (as páginas Catálogo e Lançamentos SCPI foram apagadas, com suas rotas, quando viraram
-  Automações). O site sai atrás do Apache em `/almoxarifado` (`--url-prefix` do waitress), o que dá
-  `servidor/almoxarifado/` (formulários), `servidor/almoxarifado/painel/` e
-  `servidor/almoxarifado/admin/`; o login é `/painel/entrar/`. O prefixo vem de duas pontas que
-  precisam bater: o `--url-prefix=/almoxarifado` do waitress (que passa `SCRIPT_NAME` a cada
-  pedido) e o `PREFIXO_URL=/almoxarifado` do `.env`, que vira `FORCE_SCRIPT_NAME` e o `STATIC_URL`. O
-  `STATIC_URL` é lido na partida, antes de qualquer pedido: só com o `--url-prefix` os links
-  dos estáticos sairiam como `/static/...`, fora do `/almoxarifado`, e o Apache os recusaria.
-  Nenhum template tem caminho fixo (`tests/test_prefixo.py`). O guia de instalação é
-  `deploy/INSTALACAO.md`.
+  Automações). O login é `/painel/entrar/`. O site pode sair sob um prefixo (`PREFIXO_URL` do
+  `.env`, vazio na raiz; `/almoxarifado` era a proposta antiga com Apache, que não é a topologia
+  verificada hoje: o acesso atual é HTTP direto e não há Apache nem HTTPS confirmados). O prefixo
+  vem de duas pontas que precisam bater: o `--url-prefix=${PREFIXO_URL}` do waitress (que passa
+  `SCRIPT_NAME` a cada pedido) e o `PREFIXO_URL` do `.env`, que vira `FORCE_SCRIPT_NAME` e o
+  `STATIC_URL`. O `STATIC_URL` é lido na partida, antes de qualquer pedido: só com o
+  `--url-prefix` os links dos estáticos sairiam sem o prefixo e quebrariam. Nenhum template tem
+  caminho fixo (`tests/test_prefixo.py`). Guias: `deploy/INSTALACAO.md` e `deploy/AMBIENTES.md`.
 - A variável que liga o HTTPS se chama `USAR_HTTPS`, nunca `HTTPS`: o wsgiref do `runserver`
   copia `os.environ` para a requisição, e `HTTPS=1` faria tudo parecer https e quebraria o
-  CSRF. Atrás do Apache, o waitress precisa de
+  CSRF. Atrás de um proxy HTTPS, o waitress precisa de
   `--trusted-proxy=<proxy> --trusted-proxy-headers="x-forwarded-proto x-forwarded-for"`
-  (no compose, `<proxy>` é `*`: o Apache chega por um IP interno do Docker que muda)
-  junto com `PROXY_HTTPS=1`: sem o primeiro cabeçalho o redirecionamento para https entra em
-  laço; sem o segundo, todo pedido parece vir do Apache e divide um único limite por IP.
+  (no compose, `<proxy>` é `*`: o proxy chega por um IP interno do Docker que muda, e isso só é
+  seguro porque a porta publicada fica em loopback e só o proxy a alcança; nunca publique o
+  backend direto na rede) junto com `PROXY_HTTPS=1`: sem o primeiro cabeçalho o redirecionamento
+  para https entra em laço; sem o segundo, todo pedido parece vir do proxy e divide um único
+  limite por IP.
 - `contas.Usuario` é o `AUTH_USER_MODEL`: `AbstractUser` com o `username` rotulado
   "matrícula". O login (`/painel/entrar/`) e o login do admin usam formulários próprios
   (`contas/forms.py`) só para a recusa sair em português correto.
@@ -399,22 +429,29 @@ transações precisam se comportar como no servidor.
   canônico e os antigos; `ParametroReposicao` substitui prazo e cobertura por material), os
   pendentes de mapeamento (código com saída, sem par, oculto ou fora do cadastro) e a
   reconciliação dos totais. As divergências deliberadas da planilha estão na spec.
-- Implantação em Docker Compose (`compose.yaml`, `Dockerfile`; spec
-  `2026-10-15-docker-design.md`): uma imagem (Python 3.13, `.venv` do uv sem dev, Chromium do
-  Playwright, `mariadb-client`, supercronic, estáticos coletados no build, usuário `almox`
-  UID 1000 que só escreve em `/dados`) para os serviços `web` (waitress com
-  `--url-prefix=${PREFIXO_URL}` e `--trusted-proxy=*`, publicado em `${PORTA_PUBLICADA}`, que
-  só o Apache pode alcançar) e `agendador` (supercronic com `deploy/crontab`, que chama
-  `deploy/tarefa.sh`, saída em `dados/logs/agendador.log`); o `banco` é o MariaDB 11.4, sem
-  porta publicada. O compose força `DB_HOST`, `SCPI_HEADLESS=1`, `MYSQLDUMP=mariadb-dump` e as
+- Implantação em Docker Compose (`Dockerfile`; spec `2026-10-15-docker-design.md`): uma imagem
+  (Python 3.13, `.venv` do uv sem dev, Chromium do Playwright, `mariadb-client`, supercronic,
+  estáticos coletados no build, usuário `almox` UID 1000 que só escreve em `/dados`) para os
+  serviços `web` (waitress com `--url-prefix=${PREFIXO_URL}` e `--trusted-proxy=*`) e `agendador`
+  (supercronic com `deploy/crontab`, que chama `deploy/tarefa.sh`, saída em
+  `dados/logs/agendador.log`); o `banco` é o MariaDB 11.4, sem porta publicada. O `compose.yaml`
+  é **legado** (instalação atual, publicado em `${PORTA_PUBLICADA}`) e não se altera. Os ambientes
+  novos combinam `compose.ambientes.yaml` com um único overlay, `compose.desenvolvimento.yaml` ou
+  `compose.producao.yaml`, sem `compose.override.yaml` implícito, em projetos e volumes separados
+  (`almoxarifado` e `almoxarifado-prod`); a porta fica fixa em `127.0.0.1` e `PORTA_WEB` só
+  escolhe o número. O Compose força `DB_HOST`, `SCPI_HEADLESS=1`, `MYSQLDUMP=mariadb-dump` e as
   pastas (`/dados/logs`, `/dados/backups`, `/dados/perfil`) por cima do `.env`; `dados/` do
   host guarda logs, backups e os `.xlsx` da virada. Os robôs da página são filhos do waitress
   no container `web` (`disparo.py` abre sessão própria fora do Windows), então recriar o `web`
-  os mata: o `deploy/atualizar.sh` confere `robos_em_andamento` (por `docker compose run
-  --rm`, que funciona com o `web` parado) antes do `git pull` e antes do `up -d`, e tem o corpo
-  numa função porque o bash lê o script aos poucos. `deploy/*.sh`, `deploy/crontab`,
-  `Dockerfile` e `compose.yaml` são LF (`.gitattributes`). Guias em `deploy/INSTALACAO.md`
-  (André; Linux ou WSL2) e `deploy/VIRADA.md`.
+  os mata. Quem atualiza um ambiente é o `deploy/atualizar.ps1` (PowerShell 5.1+, com `-Ambiente`
+  explícito): **planeja por padrão**, só altera com `-Aplicar`, não faz `pull`, `fetch`, `checkout`,
+  `reset`, `down` nem `prune`, valida marcador `.deploy-ambiente`, checkout limpo, branch (dev) ou
+  tag destacada com imagem por digest (produção), faz backup antes de migrar e confere os robôs;
+  a produção existente ainda exige `-ManutencaoConfirmada`, e `-Aplicar` não pausa as gravações.
+  O `deploy/atualizar.sh` antigo está bloqueado (sai com erro); não o restaure nem o contorne. Os
+  testes do script estão em `deploy/tests/`. `deploy/*.sh`, `deploy/crontab`, `Dockerfile` e os
+  `compose*.yaml` são LF (`.gitattributes`). Guias: `deploy/INSTALACAO.md`, `deploy/AMBIENTES.md`,
+  `deploy/FLUXO_GIT.md` e `deploy/VIRADA.md` (migração histórica, já feita).
 - O log usa `ConcurrentRotatingFileHandler` porque o waitress e os comandos gravam no mesmo
   arquivo (no container também: `web` e `agendador` dividem `dados/logs`); no Windows o
   `RotatingFileHandler` não consegue girar um arquivo aberto por outro processo.

@@ -1,5 +1,10 @@
 # Migração e virada: do Apps Script para o Django
 
+> Registro do roteiro histórico do Apps Script. O sistema já tem dados reais.
+> Para a nova produção no mesmo Docker Desktop, seguir [AMBIENTES.md](AMBIENTES.md).
+> Não repetir importações destrutivas nem os comandos de atualização deste roteiro
+> na instalação em uso. O atualizador legado está bloqueado.
+
 Roteiro para o João (desenvolvedor) e o André (servidor). Cada passo diz quem faz. Marque as
 caixas à medida que terminar; a ordem importa. A spec (seção 8) explica o porquê de cada etapa.
 

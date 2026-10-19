@@ -1,0 +1,90 @@
+# Base dos novos ambientes. Use sempre atualizar.ps1, com overlay explicito.
+# compose.yaml permanece legado ate a virada; nunca combinar as duas bases.
+name: ${PROJETO_COMPOSE:?Selecione o ambiente pelo deploy/atualizar.ps1}
+
+# Comum a web e agendador: a mesma imagem, o .env e os caminhos dentro do container (vencem
+# o .env).
+x-aplicacao: &aplicacao
+  image: ${IMAGEM_APP:?Informe a imagem pelo deploy/atualizar.ps1}
+  labels:
+    br.saep.ambiente: ${AMBIENTE_DEPLOY:?Selecione o ambiente}
+    org.opencontainers.image.revision: ${REVISAO_APP:?Informe a revisao}
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DB_HOST: banco
+    DB_PORT: "3306"
+    SCPI_HEADLESS: "1"
+    MYSQLDUMP: mariadb-dump
+    LOG_DIR: /dados/logs
+    BACKUP_DIR: /dados/backups
+    SCPI_PERFIL_DIR: /dados/perfil
+    # O env_file passaria o valor vazio do .env por cima do ENV da imagem, e os robôs ficariam
+    # sem o Chromium.
+    PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+  # O init (tini) é o PID 1 e recolhe órfãos e zumbis; os robôs são filhos do waitress, que os
+  # recolhe pelo subprocess. O Chromium usa o /dev/shm.
+  init: true
+  shm_size: 1gb
+  depends_on:
+    banco:
+      condition: service_healthy
+
+services:
+  banco:
+    image: mariadb:11.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    # A senha do root fica num arquivo só do banco: o .env vai inteiro ao web, que fica exposto
+    # à internet.
+    env_file: .env.banco
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-almoxarifado}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - banco-dados:/var/lib/mysql
+    # Sem porta publicada: só os containers falam com o banco.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    <<: *aplicacao
+    # O Apache chega por um IP interno do Docker que muda: o waitress confia em qualquer
+    # origem, o que só é seguro porque a porta publicada só é alcançável pelo Apache.
+    command:
+      - python
+      - -m
+      - waitress
+      - --listen=0.0.0.0:8010
+      - --threads=8
+      - --url-prefix=${PREFIXO_URL:-}
+      - --trusted-proxy=*
+      - --trusted-proxy-headers=x-forwarded-proto x-forwarded-for
+      - config.wsgi:application
+    ports:
+      - "${PORTA_PUBLICADA:-127.0.0.1:8011}:8010"
+    volumes:
+      - ./dados/logs:/dados/logs
+      - perfil-navegador:/dados/perfil
+      - ./dados/backups:/dados/backups
+      - ./dados/importacao:/dados/importacao:ro
+
+  agendador:
+    <<: *aplicacao
+    profiles: [agendamento]
+    command: supercronic /app/deploy/crontab
+    volumes:
+      - ./dados/logs:/dados/logs
+      - perfil-navegador:/dados/perfil
+      - ./dados/backups:/dados/backups
+
+volumes:
+  banco-dados:
+  perfil-navegador:

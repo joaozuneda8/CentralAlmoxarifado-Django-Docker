@@ -39,40 +39,6 @@ def test_execucao_interrompida_nao_conta():
     call_command("robos_em_andamento", stdout=io.StringIO())
 
 
-def test_atualizar_para_no_primeiro_erro_e_segue_a_ordem():
-    texto = (DEPLOY / "atualizar.sh").read_text(encoding="utf-8")
-    assert "set -eu" in texto
-    assert "Atualização interrompida: corrija o erro acima e rode de novo." in texto
-    ordem = [
-        "run --rm web python manage.py robos_em_andamento",
-        "git pull --ff-only",
-        "docker compose build",
-        "run --rm web python manage.py migrate --noinput",
-        "run --rm web python manage.py check --deploy --fail-level WARNING",
-        "up -d",
-    ]
-    posicoes = [texto.index(trecho) for trecho in ordem]
-    assert posicoes == sorted(posicoes)
-    # Com "run --rm" (e não "exec"), a conferência funciona também com o web parado.
-    assert "compose exec" not in texto
-    verificacoes = [
-        i for i in range(len(texto)) if texto.startswith("manage.py robos_em_andamento", i)
-    ]
-    assert len(verificacoes) == 2
-    assert texto.index("check --deploy") < verificacoes[1] < texto.index("up -d")
-
-
-def test_atualizar_corpo_numa_funcao_chamada_no_fim():
-    # O git pull pode trocar o script durante a execução: o bash precisa já ter lido tudo.
-    texto = (DEPLOY / "atualizar.sh").read_text(encoding="utf-8")
-    linhas = [linha.strip() for linha in texto.splitlines()]
-    linhas = [linha for linha in linhas if linha and not linha.startswith("#")]
-    assert linhas[-1] in ('atualizar "$@"', "atualizar")
-    abre = next(i for i, linha in enumerate(linhas) if linha.startswith("atualizar()"))
-    comandos = [i for i, linha in enumerate(linhas) if linha.startswith(("docker ", "git "))]
-    assert comandos and all(abre < i < len(linhas) - 1 for i in comandos)
-
-
 def _linhas_crontab():
     texto = (DEPLOY / "crontab").read_text(encoding="utf-8")
     return [
@@ -133,80 +99,19 @@ def test_tarefa_repassa_o_codigo_de_saida(tmp_path):
     assert "=== " in log and "comando_que_nao_existe" in log
 
 
-def test_guias_nao_citam_mais_o_windows():
-    for nome in ("INSTALACAO.md", "VIRADA.md"):
-        texto = (DEPLOY / nome).read_text(encoding="utf-8")
-        for resto in (r".venv\Scripts", "nssm", "schtasks", ".bat", "C:\\"):
-            assert resto not in texto, (nome, resto)
-
-
-def test_instalacao_cobre_os_dois_servidores_e_o_firewall():
-    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
-    for trecho in (
-        "WSL2",
-        "DOCKER-USER",
-        "PORTA_PUBLICADA",
-        "chown -R 1000:1000",
-        "docker compose run --rm web python manage.py createsuperuser",
-        "bash deploy/atualizar.sh",
-    ):
-        assert trecho in guia, trecho
-
-
-def test_firewall_da_vm_nao_derruba_o_ufw():
-    # O iptables-persistent remove o ufw no Ubuntu e grava as cadeias do próprio Docker: a regra
-    # do DOCKER-USER é reaplicada por uma unidade do systemd depois do Docker.
-    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
-    assert "iptables-persistent" not in guia and "netfilter-persistent" not in guia
-    assert "After=docker.service" in guia
-
-
-def test_virada_cita_a_secao_certa_da_conferencia():
-    instalacao = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
-    virada = (DEPLOY / "VIRADA.md").read_text(encoding="utf-8")
-    assert "## 10. Conferência depois de instalar" in instalacao
-    assert "conferência da\n      seção 10," in virada
-
-
-def test_instalacao_wsl_pede_atualizar_virtualizacao_e_senha_da_tarefa():
-    guia = (DEPLOY / "INSTALACAO.md").read_text(encoding="utf-8")
-    for trecho in (
-        "wsl --update",
-        "wsl --version",
-        "virtualização aninhada",
-        "quando a senha dessa conta mudar",
-    ):
-        assert trecho in guia, trecho
-    assert guia.index("wsl --version") < guia.index("systemd=true")
-
-
-def test_atualizar_avisa_da_variavel_nova_do_exemplo_sem_parar(tmp_path):
-    bash = _bash()
-    (tmp_path / "deploy").mkdir()
-    shutil.copy(DEPLOY / "atualizar.sh", tmp_path / "deploy" / "atualizar.sh")
-    (tmp_path / ".env.example").write_text("A=\nNOVA=1\n# COMENTADA=\nB=x\n", encoding="utf-8")
-    (tmp_path / ".env").write_text("A=1\nB=2\n", encoding="utf-8")
-    (tmp_path / ".env.banco.example").write_text("SENHA=\n", encoding="utf-8")
-    (tmp_path / ".env.banco").write_text("SENHA=1\n", encoding="utf-8")
-    # git e docker viram funções exportadas que não fazem nada: só o aviso é o que se confere.
-    script = str(tmp_path / "deploy" / "atualizar.sh")
-    comando = f'git() {{ :; }}; docker() {{ :; }}; export -f git docker; bash "{script}"'
-    r = subprocess.run(
-        [bash, "-c", comando],
-        env=os.environ,
-        capture_output=True,
-        text=True,
-        timeout=120,
+def test_atualizador_legado_recusa_sem_executar_git_ou_docker(tmp_path):
+    # Mesmo numa pasta com dados reais, o caminho antigo deve falhar antes de agir.
+    marcador = tmp_path / "comando-executado"
+    ambiente = {**os.environ, "MARCADOR_DEPLOY": str(marcador)}
+    script = (DEPLOY / "atualizar.sh").as_posix()
+    comando = (
+        'git() { touch "$MARCADOR_DEPLOY"; }; '
+        'docker() { touch "$MARCADOR_DEPLOY"; }; '
+        f'export -f git docker; bash "{script}"'
     )
-    assert r.returncode == 0, r.stderr
-    assert "NOVA" in r.stderr and "falta no .env:" in r.stderr
-    assert "COMENTADA" not in r.stderr and "SENHA" not in r.stderr
-    (tmp_path / ".env").write_text("A=1\nB=2\nNOVA=3\n", encoding="utf-8")
-    r = subprocess.run(
-        [bash, "-c", comando],
-        env=os.environ,
-        capture_output=True,
-        text=True,
-        timeout=120,
+    resultado = subprocess.run(
+        [_bash(), "-c", comando], env=ambiente, capture_output=True, text=True, timeout=30
     )
-    assert "AVISO" not in r.stderr
+    assert resultado.returncode != 0
+    assert "bloqueado" in resultado.stderr
+    assert not marcador.exists()

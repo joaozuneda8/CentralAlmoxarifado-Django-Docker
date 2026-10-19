@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main, 'codex/**']
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  aplicacao:
+    name: Aplicacao
+    runs-on: ubuntu-latest
+    services:
+      banco:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-descartavel
+          MARIADB_ROOT_HOST: '%'
+          MARIADB_DATABASE: almoxarifado
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      SECRET_KEY: ci-descartavel-nao-usar-em-producao
+      DEBUG: '1'
+      USAR_HTTPS: '0'
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: almoxarifado
+      DB_USER: root
+      DB_PASSWORD: ci-root-descartavel
+      SAEP_USER: ''
+      SAEP_PASS: ''
+      TELEGRAM_TOKEN: ''
+      TELEGRAM_CHAT_ID: ''
+      LANCAMENTO_REAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.13'
+          python-version: '3.13'
+      - run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libmariadb-dev
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run python manage.py collectstatic --noinput
+      - run: uv run pytest
+      - run: uv run python manage.py makemigrations --check --dry-run
+      - name: Validar isolamento do Compose sem subir containers
+        shell: bash
+        run: bash deploy/tests/compose.sh
+
+  deploy-windows:
+    name: Deploy Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contratos no Windows PowerShell 5.1 (Docker simulado)
+        shell: powershell
+        run: ./deploy/tests/atualizar.Tests.ps1

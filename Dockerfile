@@ -18,9 +18,6 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Imagem final.
 FROM python:3.13-slim-bookworm
-ARG REVISAO_APP=nao-identificada
-LABEL org.opencontainers.image.source="https://github.com/joaozuneda8/CentralAlmoxarifado-Django-Docker" \
-      org.opencontainers.image.revision="${REVISAO_APP}"
 ENV PATH=/app/.venv/bin:$PATH \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     TZ=America/Sao_Paulo \
@@ -55,6 +52,11 @@ RUN SECRET_KEY=construcao DEBUG=0 LOG_DIR=/tmp/logs python manage.py collectstat
  && useradd --uid 1000 --create-home almox \
  && mkdir -p /dados/logs /dados/backups /dados/perfil /dados/importacao \
  && chown almox:almox /dados/logs /dados/backups /dados/perfil
+
+# O SHA muda a cada commit; so entra depois dos RUN para preservar o cache das instalacoes.
+ARG REVISAO_APP=nao-identificada
+LABEL org.opencontainers.image.source="https://github.com/joaozuneda8/CentralAlmoxarifado-Django-Docker" \
+      org.opencontainers.image.revision="${REVISAO_APP}"
 
 USER almox
 EXPOSE 8010

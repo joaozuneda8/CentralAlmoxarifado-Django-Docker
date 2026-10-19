@@ -69,7 +69,7 @@ services:
       - --trusted-proxy-headers=x-forwarded-proto x-forwarded-for
       - config.wsgi:application
     ports:
-      - "${PORTA_PUBLICADA:-127.0.0.1:8011}:8010"
+      - "127.0.0.1:${PORTA_WEB:-8011}:8010"
     volumes:
       - ./dados/logs:/dados/logs
       - perfil-navegador:/dados/perfil

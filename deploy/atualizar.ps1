@@ -87,7 +87,7 @@ if ($Ambiente -eq 'producao') {
 # Compose da precedencia ao ambiente do terminal sobre .env. Recusar em vez de
 # deixar senhas, portas ou projeto herdados selecionarem outro destino silenciosamente.
 $nomes = @('COMPOSE_FILE', 'COMPOSE_PROJECT_NAME', 'COMPOSE_PROFILES', 'DOCKER_HOST',
-    'DOCKER_CONTEXT', 'PROJETO_COMPOSE', 'IMAGEM_APP', 'REVISAO_APP', 'AMBIENTE_DEPLOY')
+    'DOCKER_CONTEXT', 'PROJETO_COMPOSE', 'IMAGEM_APP', 'REVISAO_APP', 'AMBIENTE_DEPLOY', 'PORTA_WEB')
 foreach ($arquivo in @('.env', '.env.banco')) {
     $caminho = Join-Path $raiz $arquivo
     if (-not (Test-Path -LiteralPath $caminho)) { throw "Falta $arquivo no clone dedicado." }
@@ -146,7 +146,6 @@ try {
     }
     if ($ativos -contains 'web') {
         Invoke-Compose exec -T web python manage.py robos_em_andamento | Out-Host
-        Invoke-Compose exec -T web python manage.py backup_banco | Out-Host
     }
     if ($Ambiente -eq 'producao') {
         Invoke-Compose pull web | Out-Host
@@ -163,6 +162,9 @@ try {
     # Checar robos nao e uma trava global; o script nunca para usuarios automaticamente.
     Invoke-Compose pull banco | Out-Host
     Invoke-Compose up -d --wait --wait-timeout 120 --no-build --pull never banco | Out-Host
+    # Container temporario: tambem protege banco existente quando web estiver parado.
+    # Qualquer falha no backup interrompe antes de check/migrate.
+    Invoke-Compose run --rm --no-deps web python manage.py backup_banco | Out-Host
     if ($Ambiente -eq 'producao') {
         Invoke-Compose run --rm --no-deps web python manage.py check --deploy --fail-level WARNING | Out-Host
     }

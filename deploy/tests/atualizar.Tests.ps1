@@ -2,6 +2,7 @@
 $ErrorActionPreference = 'Stop'
 $global:AlmoxTesteOrigem = Split-Path -Parent $PSScriptRoot
 $global:AlmoxTesteDestino = Join-Path ([IO.Path]::GetTempPath()) ('almox deploy ' + [guid]::NewGuid())
+$global:AlmoxTesteRemoto = $global:AlmoxTesteDestino + '-remoto.git'
 $global:AlmoxTesteChamadas = [Collections.Generic.List[string]]::new()
 $global:AlmoxTesteRevision = ''
 $global:AlmoxTesteServicos = @()
@@ -42,12 +43,12 @@ function Git-Teste {
 }
 
 function Executar {
-    param([string]$Ambiente = 'producao', [switch]$Aplicar, [switch]$AtivarOperacao,
+    param([string]$Ambiente = 'producao', [string]$Versao = 'v1.0.0', [switch]$Aplicar, [switch]$AtivarOperacao,
         [switch]$ManutencaoConfirmada)
     $global:AlmoxTesteChamadas.Clear()
     $parametros = @{ Ambiente = $Ambiente }
     if ($Ambiente -eq 'producao') {
-        $parametros.Versao = 'v1.0.0'
+        $parametros.Versao = $Versao
         $parametros.Imagem = $global:AlmoxTesteDigest
     }
     if ($Aplicar) { $parametros.Aplicar = $true }
@@ -85,11 +86,14 @@ try {
     Git-Teste commit -m inicial | Out-Null
     $global:AlmoxTesteRevision = (Git-Teste rev-parse HEAD).Trim()
     Git-Teste tag v1.0.0
-    # O proprio repositorio e um remoto somente de leitura para ls-remote.
-    Git-Teste remote add origin $global:AlmoxTesteDestino
+    Git-Teste tag -a v1.0.1 -m release
     Git-Teste update-ref refs/remotes/origin/main $global:AlmoxTesteRevision
     Git-Teste branch develop
     Git-Teste update-ref refs/remotes/origin/develop $global:AlmoxTesteRevision
+    # Remoto independente, local e descartavel: nao conecta ao GitHub.
+    & git clone --bare --quiet $global:AlmoxTesteDestino $global:AlmoxTesteRemoto
+    if ($LASTEXITCODE -ne 0) { throw 'Nao foi possivel criar remoto local de teste.' }
+    Git-Teste remote add origin $global:AlmoxTesteRemoto
 
     Recusa { Executar } 'destacado'
     Git-Teste checkout -q --detach v1.0.0
@@ -97,6 +101,13 @@ try {
     if ($global:AlmoxTesteChamadas | Where-Object { $_ -notmatch ' ps --status running --services$|config --format json$|^context show$' }) {
         throw 'Planejamento deve apenas consultar os servicos do projeto.'
     }
+    Git-Teste checkout -q --detach v1.0.1
+    Executar -Versao v1.0.1
+    Git-Teste commit --allow-empty -m divergencia | Out-Null
+    Git-Teste tag v9.0.0
+    Git-Teste push --quiet origin ($global:AlmoxTesteRevision + ':refs/tags/v9.0.0')
+    Recusa { Executar -Versao v9.0.0 -Aplicar } 'Tag ausente'
+    Git-Teste checkout -q --detach v1.0.0
     'desenvolvimento' | Set-Content (Join-Path $global:AlmoxTesteDestino '.deploy-ambiente')
     Recusa { Executar -Aplicar } 'marcador'
     'producao' | Set-Content (Join-Path $global:AlmoxTesteDestino '.deploy-ambiente')
@@ -118,13 +129,29 @@ try {
         throw 'Imagem divergente chegou a executar a aplicacao.'
     }
     $global:AlmoxTesteRevision = (Git-Teste rev-parse HEAD).Trim()
-    Executar -Aplicar
+    # Banco em uso, mas web parado para manutencao: ainda precisa de backup.
+    $global:AlmoxTesteServicos = @('banco')
+    Executar -Aplicar -ManutencaoConfirmada
+    $backup = @($global:AlmoxTesteChamadas | Where-Object { $_ -match 'run --rm --no-deps web python manage.py backup_banco$' })
+    $migrate = @($global:AlmoxTesteChamadas | Where-Object { $_ -match 'migrate --noinput$' })
+    if ($backup.Count -ne 1 -or $migrate.Count -ne 1 -or
+        $global:AlmoxTesteChamadas.IndexOf($backup[0]) -ge $global:AlmoxTesteChamadas.IndexOf($migrate[0])) {
+        throw 'Backup com web parado deve acontecer antes de migrate.'
+    }
     if (-not ($global:AlmoxTesteChamadas | Where-Object { $_ -match 'up -d --no-build --pull never web$' })) {
         throw 'Aplicacao nao subiu o web explicitamente.'
     }
     if ($global:AlmoxTesteChamadas | Where-Object { $_ -match 'up .*agendador' }) {
         throw 'Preparacao ativou agendador.'
     }
+    $global:AlmoxTesteFalhar = 'manage.py backup_banco'
+    try { Executar -Aplicar -ManutencaoConfirmada; throw 'Backup deveria falhar' } catch {
+        if ($_.Exception.Message -notlike '*Docker falhou*') { throw }
+    }
+    if ($global:AlmoxTesteChamadas | Where-Object { $_ -match 'check --deploy|migrate|up -d .*web' }) {
+        throw 'Falha no backup deveria impedir verificacoes, migrations e web.'
+    }
+    $global:AlmoxTesteServicos = @()
     $global:AlmoxTesteFalhar = 'check --deploy'
     try { Executar -Aplicar; throw 'Check deveria falhar' } catch {
         if ($_.Exception.Message -notlike '*Docker falhou*') { throw }
@@ -144,4 +171,5 @@ try {
 } finally {
     Remove-Item Env:COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue
     if (Test-Path $global:AlmoxTesteDestino) { Remove-Item $global:AlmoxTesteDestino -Recurse -Force }
+    if (Test-Path $global:AlmoxTesteRemoto) { Remove-Item $global:AlmoxTesteRemoto -Recurse -Force }
 }

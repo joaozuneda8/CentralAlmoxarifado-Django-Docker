@@ -37,8 +37,8 @@ contexto Docker `desktop-linux`, porta loopback e variáveis herdadas do termina
 Não imprime a configuração resolvida, pois ela contém senhas. Não usar
 `docker compose config` para enviar configuração completa ao chat.
 
-Somente com `-Aplicar` executa backup (se web já existe), pull/build, conferência
-da revisão da imagem, banco com espera de saúde, check de produção, migrations
+Somente com `-Aplicar` executa pull/build, conferência da revisão da imagem,
+banco com espera de saúde, backup por container temporário (mesmo com web parado), check de produção, migrations
 e subida dos serviços selecionados. Para produção já existente, exige também
 `-ManutencaoConfirmada`. Isso **não pausa as gravações**: a janela e o bloqueio
 de acesso/tarefas são coordenados separadamente. Checar robôs não impede que
@@ -73,7 +73,7 @@ Usar chaves/senhas novas, sem copiar `.env` de produção para desenvolvimento.
 | `CSRF_TRUSTED_ORIGINS` | Origem HTTPS real, com esquema |
 | `USAR_HTTPS`, `PROXY_HTTPS` | `1`, `1` |
 | `PREFIXO_URL` | Vazio se acesso na raiz; não copiar `/almoxarifado` sem decisão |
-| `PORTA_PUBLICADA` | `127.0.0.1:8011` após conferir disponibilidade |
+| `PORTA_WEB` | `8011` após conferir disponibilidade; somente o número, sem IP |
 | `DB_NAME`, `DB_USER` | `almoxarifado`, `almox` (banco isolado pelo volume/rede) |
 | `DB_PASSWORD` | Senha nova, diferente da instalação antiga |
 | `LANCAMENTO_REAL` | `0` |
@@ -84,6 +84,11 @@ Senhas contendo `$` devem usar aspas simples nos arquivos dotenv. Mudar os
 arquivos depois da criação do banco não altera automaticamente suas senhas.
 Criar `dados/logs`, `dados/backups`, `dados/importacao`. O container usa UID 1000;
 validar escrita pelos containers no Docker Desktop antes de considerar pronto.
+
+`PORTA_PUBLICADA` pertence apenas ao Compose legado, que não foi alterado para
+preservar a instalação atual. Nos novos ambientes, o Compose fixa `127.0.0.1`;
+`PORTA_WEB` escolhe somente o número da porta (desenvolvimento: `8012`). Um valor
+com IP é inválido, inclusive na execução direta do Compose.
 
 No clone novo, usando o digest do resumo do workflow (substituir os placeholders):
 

@@ -366,6 +366,27 @@ transações precisam se comportar como no servidor.
   arquivo (no container também: `web` e `agendador` dividem `dados/logs`); no Windows o
   `RotatingFileHandler` não consegue girar um arquivo aberto por outro processo.
 
+## Serena (exploração semântica do código)
+
+- O Serena 2.0 roda no host (`serena start-mcp-server --context=claude-code --project-from-cwd`,
+  registrado em escopo de usuário no Claude Code) com a interface REPL: duas ferramentas,
+  `initial_instructions` e `serena_repl`. Docker não é necessário. A configuração do projeto é
+  `.serena/project.yml`, versionada; o cache e o `project.local.yml` não. As memórias do projeto
+  ficam em `.serena/memories/`; os comandos e as regras daqui continuam valendo e vencem as delas.
+- Para entender o código, prefira o `lsp` do Serena (`get_symbols_overview`, `find_symbol`,
+  `find_referencing_symbols`) a ler arquivos inteiros; para o que não é símbolo Python (templates,
+  `{% url %}`, `reverse`, `apps.get_model`, campos dos formulários HTMX), use `fs.search_for_pattern`
+  ou o grep. Os números de linha do Serena começam em 0.
+- O Pyright lê a `.venv` pelo `[tool.pyright]` do `pyproject.toml`, mas sem `django-stubs` ele
+  aponta falsos erros em código Django correto (`objects` em modelos, `transaction.atomic` em
+  `with`): não corrija o código por causa deles. A verdade sobre o código são `pytest` e `ruff`.
+  Depois de mudar o `[tool.pyright]`, reinicie o servidor do Serena (`/mcp`, reconectar).
+- Os hooks do projeto (`.claude/settings.json`: `serena-hooks` `activate`, `remind` e `cleanup`)
+  lembram de usar o Serena. O `auto-approve` fica de fora de propósito: o `serena_repl` executa
+  código Python, inclusive shell, e não deve ser aprovado sozinho no modo `auto`.
+- O Serena não muda nenhuma regra deste arquivo: migrations, `servicos.py` como único lugar que
+  grava pedidos, transações e as travas do SCPI seguem como descrito acima.
+
 ## Convenções
 
 - Nomes de código, textos de interface, mensagens e commits em português (pt-BR).

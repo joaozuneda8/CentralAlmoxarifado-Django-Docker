@@ -1,0 +1,8 @@
+# A base nao tem build: producao consome somente a imagem aprovada por digest.
+services:
+  web:
+    environment:
+      DEBUG: "0"
+  agendador:
+    environment:
+      DEBUG: "0"

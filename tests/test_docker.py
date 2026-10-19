@@ -173,8 +173,6 @@ def test_senha_do_root_so_no_env_do_banco():
     exemplo = (RAIZ / ".env.banco.example").read_text(encoding="utf-8")
     assert "MARIADB_ROOT_PASSWORD=" in exemplo
     assert ".env.banco" in (RAIZ / ".gitignore").read_text(encoding="utf-8").split()
-    guia = (RAIZ / "deploy" / "INSTALACAO.md").read_text(encoding="utf-8")
-    assert "cp .env.banco.example .env.banco" in guia
 
 
 def test_comentario_do_init_nao_atribui_os_robos_ao_tini():

@@ -18,6 +18,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Imagem final.
 FROM python:3.13-slim-bookworm
+ARG REVISAO_APP=nao-identificada
+LABEL org.opencontainers.image.source="https://github.com/joaozuneda8/CentralAlmoxarifado-Django-Docker" \
+      org.opencontainers.image.revision="${REVISAO_APP}"
 ENV PATH=/app/.venv/bin:$PATH \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     TZ=America/Sao_Paulo \

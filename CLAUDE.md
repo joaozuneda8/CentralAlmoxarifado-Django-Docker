@@ -20,16 +20,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Regra prioritária: Git e produção
 
 Fonte completa: `deploy/FLUXO_GIT.md` (branches, tags, imagem) e `deploy/AMBIENTES.md` (ambientes
-e `deploy/atualizar.ps1`). Resumo que vale para todo agente:
+e `deploy/atualizar.ps1`). Resumo que vale para todo agente que trabalha aqui (Claude Code usa
+`claude/*`; o Codex, `codex/*`; as demais regras são iguais):
 
 - Trabalhe sempre numa branch `claude/<assunto>` criada a partir de `develop` atualizada
   (`git switch develop && git pull --ff-only origin develop && git switch -c claude/<assunto>`),
   com `git status` limpo antes. Alterações já existentes na árvore são preservadas, nunca
   descartadas.
-- Commits e pushes só em `claude/*`. **Nunca** faça commit, push, merge, rebase, force push,
-  `reset --hard`, `clean -fd` nem troca de branch para apagar divergência em `main`, `develop` ou
-  numa tag, nem na instalação de produção (clone em `C:\docker\almoxarifado-prod`, HEAD destacado
-  numa tag, somente leitura).
+- Commits e pushes só na sua branch de trabalho (`claude/*`). **Nunca** faça commit, push, merge
+  local, rebase, force push, `reset --hard`, `clean -fd` nem troca de branch para apagar
+  divergência em `main`, `develop` ou numa tag, nem na instalação de produção (clone em
+  `C:\docker\almoxarifado-prod`, HEAD destacado numa tag, somente leitura). Essas branches só
+  mudam pelo merge de um PR, e o merge é do usuário ou por ele autorizado; o agente não o faz por
+  conta própria. Trazer `develop` para a sua branch (merge ou rebase dela) é permitido.
 - Promoção só por PR: `claude/*` → `develop` → `main`. Squash é aceito nos PRs de `claude/*`; entre
   `develop` e `main`, só merge commit. Correção urgente parte da tag implantada
   (`claude/hotfix-<assunto>`), entra em `main` e depois volta para `develop`. Não abra o PR de
@@ -40,8 +43,9 @@ e `deploy/atualizar.ps1`). Resumo que vale para todo agente:
   `deploy/atualizar.ps1 -Aplicar` (nem `-AtivarOperacao`, `-ManutencaoConfirmada`) sem pedido
   expresso do usuário; sem `-Aplicar` o script só planeja. Nenhum `docker compose` sobre a pasta
   ou o projeto de produção por iniciativa própria.
-- O Git não leva banco, `.env*`, `.deploy-*`, `dados/`, perfis do navegador, logs nem backups.
-  Nunca os versione nem imprima senhas (não envie `docker compose config` ao chat).
+- O Git não leva banco, `.env`, `.env.banco`, `.deploy-*`, `dados/`, perfis do navegador, logs nem
+  backups. Nunca os versione (os arquivos de exemplo sem segredos, `.env.example` e
+  `.env.banco.example`, são versionados e devem ser mantidos) nem imprima senhas (não envie `docker compose config` ao chat).
 
 ## O projeto
 

@@ -32,6 +32,12 @@
   transition: border-color var(--transicao), box-shadow var(--transicao);
 }
 .campo-entrada::placeholder { color: var(--texto-suave); }
+/* iOS Safari: input date tem largura intrínseca própria e estoura o container sem isto. */
+input[type="date"].campo-entrada {
+  -webkit-appearance: none; appearance: none;
+  box-sizing: border-box; display: block; min-width: 0; max-width: 100%;
+}
+input[type="date"].campo-entrada::-webkit-date-and-time-value { text-align: left; min-width: 0; }
 .campo-entrada:hover { border-color: var(--texto-suave); }
 .campo-entrada:focus { outline: none; border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-superficie); }
 textarea.campo-entrada { min-height: 96px; resize: vertical; }

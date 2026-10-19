@@ -368,24 +368,40 @@ transações precisam se comportar como no servidor.
 
 ## Serena (exploração semântica do código)
 
-- O Serena 2.0 roda no host (`serena start-mcp-server --context=claude-code --project-from-cwd`,
-  registrado em escopo de usuário no Claude Code) com a interface REPL: duas ferramentas,
-  `initial_instructions` e `serena_repl`. Docker não é necessário. A configuração do projeto é
-  `.serena/project.yml`, versionada; o cache e o `project.local.yml` não. As memórias do projeto
-  ficam em `.serena/memories/`; os comandos e as regras daqui continuam valendo e vencem as delas.
-- Para entender o código, prefira o `lsp` do Serena (`get_symbols_overview`, `find_symbol`,
-  `find_referencing_symbols`) a ler arquivos inteiros; para o que não é símbolo Python (templates,
-  `{% url %}`, `reverse`, `apps.get_model`, campos dos formulários HTMX), use `fs.search_for_pattern`
-  ou o grep. Os números de linha do Serena começam em 0.
-- O Pyright lê a `.venv` pelo `[tool.pyright]` do `pyproject.toml`, mas sem `django-stubs` ele
-  aponta falsos erros em código Django correto (`objects` em modelos, `transaction.atomic` em
-  `with`): não corrija o código por causa deles. A verdade sobre o código são `pytest` e `ruff`.
-  Depois de mudar o `[tool.pyright]`, reinicie o servidor do Serena (`/mcp`, reconectar).
-- Os hooks do projeto (`.claude/settings.json`: `serena-hooks` `activate`, `remind` e `cleanup`)
-  lembram de usar o Serena. O `auto-approve` fica de fora de propósito: o `serena_repl` executa
-  código Python, inclusive shell, e não deve ser aprovado sozinho no modo `auto`.
-- O Serena não muda nenhuma regra deste arquivo: migrations, `servicos.py` como único lugar que
-  grava pedidos, transações e as travas do SCPI seguem como descrito acima.
+- Pré-requisitos, uma vez por máquina (o Serena roda no host, sem Docker): `uv tool install -p 3.13
+  serena-agent`, `serena init` e `serena setup claude-code` (ou `claude mcp add --scope user serena --
+  serena start-mcp-server --context claude-code --project-from-cwd`). O diretório dos executáveis do
+  uv (`uv tool update-shell`) precisa estar no `PATH` de quem abre o Claude Code, porque os hooks
+  chamam o `serena-hooks`. Confira com `claude mcp list` (o `serena` aparece conectado). Sem o
+  executável, os hooks só dão erro sem bloquear nada (o `.claude/setup-nuvem.sh` não o instala).
+- A interface é o REPL: duas ferramentas, `initial_instructions` (chame uma vez por sessão; devolve
+  o `session_id`) e `serena_repl`. Com `--project-from-cwd` o projeto já nasce ativo: o aviso do
+  hook de início de sessão, que fala em `activate_project`, não se aplica. A configuração do
+  projeto é `.serena/project.yml`, versionada; o cache e o `project.local.yml` não. As memórias
+  (`.serena/memories/`) só apontam o essencial: este arquivo vence.
+- Para entender ou mudar código Python, comece pelo `s.lsp` (`get_symbols_overview`, `find_symbol`)
+  em vez de ler arquivos inteiros. Antes de alterar ou renomear um símbolo usado em mais de um
+  lugar (função de `servicos.py`, modelo, regra), veja `find_referencing_symbols`; para renomear,
+  `lsp.rename_symbol`. As linhas do Serena começam em 0.
+- Para o que o LSP não enxerga (templates, `{% url %}`, `reverse`, `apps.get_model`, campos dos
+  formulários HTMX, JS e CSS), use `s.fs.search_for_pattern` ou o grep.
+- Com o Serena indisponível (MCP desconectado, Pyright fora do ar), siga com Read, Grep e Edit e
+  avise o usuário; nada aqui depende dele.
+- O Serena não valida nada. A verdade sobre o código são `pytest`, `ruff` e
+  `makemigrations --check`. O Pyright lê a `.venv` pelo `[tool.pyright]` do `pyproject.toml`, mas
+  sem `django-stubs` aponta falsos erros em código Django correto (`objects` em modelos,
+  `transaction.atomic` em `with`): não corrija o código por causa deles. Depois de mudar o
+  `[tool.pyright]`, reinicie o servidor do Serena (`/mcp`, reconectar).
+- O `serena_repl` executa Python e shell (`s.shell`): as restrições de operações reais seguem
+  valendo por ali, como descrito acima (`lancar_saidas` sem `--dry-run`, importadores do SCPI,
+  `migrate` no banco real, `LANCAMENTO_REAL`). Migrations, `servicos.py` como único lugar que grava
+  pedidos e as travas do SCPI não mudam.
+- Os hooks (`.claude/settings.json`: `serena-hooks` `activate`, `remind` e `cleanup`) são
+  lembretes: o `remind` nega uma vez, a cada 2 minutos, uma sequência de 3 buscas, 3 leituras de
+  código ou 4 das duas (inclusive `cat`, `sed` e `grep` pelo Bash), e a chamada seguinte passa. Uma
+  chamada do `serena_repl` zera a contagem, mesmo que leia arquivos por dentro: o hook não vigia o
+  REPL. O `auto-approve` fica de fora de propósito: o `serena_repl` executa código e não deve ser
+  aprovado sozinho no modo `auto`.
 
 ## Convenções
 

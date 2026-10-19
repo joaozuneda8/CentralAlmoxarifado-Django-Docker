@@ -1,19 +1,29 @@
 /*
- * Dropdown — o painel de opções dos selects e dos campos com lista (`datalist`), no mesmo
- * estilo do painel de resultados da busca de materiais. Carregado com `defer` no <head>.
+ * Dropdown — a base de todo painel que abre embaixo de um campo, no estilo do painel de
+ * resultados da busca de materiais. Carregado com `defer` no <head>.
  *
  * Melhoria progressiva: o <select> ou <input list> original continua na página e é ele quem
  * guarda o valor, dispara `change` e vai no envio do formulário (HTMX e testes não mudam). O
  * script só o esconde e desenha o gatilho e o painel. Sem JavaScript, valem os nativos.
  *
- * - select.campo-entrada: gatilho (botão) + painel com as opções (grupos viram cabeçalhos);
- *   com mais de LIMITE_BUSCA opções, o painel ganha uma busca.
- * - input.campo-entrada[list]: o próprio campo filtra o painel enquanto se digita; o texto
- *   continua livre (quem valida é o servidor).
+ * A BASE (este arquivo + `.painel-flutuante` e `.dropdown-*` em componentes.css) concentra a casca do
+ * painel, abrir e fechar (animados), a navegação por teclado, o ARIA, a posição e o fechamento por
+ * clique ou foco fora. Os tipos só dizem como montar o controle e quais linhas desenhar:
  *
+ * - select.campo-entrada: seleção simples. Gatilho (botão) + painel com as opções (grupos viram
+ *   cabeçalhos). Não há caixa de busca: digitar pula para a opção que começa com o que se digitou
+ *   (as letras se acumulam por LIMITE_DIGITACAO ms).
+ * - input.campo-entrada[list]: campo com lista. O próprio campo filtra o painel enquanto se digita;
+ *   o texto continua livre (quem valida é o servidor).
+ * - select.campo-entrada[data-dropdown-digitavel]: select digitável. O controle é um campo de texto como o
+ *   do campo com lista (filtra a lista enquanto se digita), mas só vale uma opção dela: o <select> guarda
+ *   o valor e o que foi digitado e não escolhido volta ao escolhido ao sair (placa e centro de custo).
  * - select.campo-entrada[data-dropdown-arvore]: cada <optgroup> vira uma pasta (a primeira opção
  *   dele, de valor igual ao rótulo do grupo, é a pasta; as demais, os filhos, ligados por ├─ └─),
- *   fechada até se clicar na seta ou apertar →; escolher a pasta escolhe o grupo inteiro. Sem busca.
+ *   fechada até se clicar na seta ou apertar →; escolher a pasta escolhe o grupo inteiro.
+ *
+ * Fora dos dropdowns, a busca de materiais (pedidos.js) usa a mesma casca (`.painel-flutuante`) e o
+ * mesmo abrir e fechar animado, por `window.Dropdown.abrirPainel` e `fecharPainel`.
  *
  * Teclado: ↓ ↑ Home End Enter Esc, e digitar abre a lista; na árvore, → abre a pasta (ou entra
  * nela) e ← fecha (ou volta à pasta). Papéis ARIA de listbox/combobox, e tree na árvore.
@@ -21,7 +31,7 @@
 (function () {
   "use strict";
 
-  var LIMITE_BUSCA = 8;
+  var LIMITE_DIGITACAO = 800;
   var contador = 0;
   var aberto = null;
 
@@ -34,7 +44,6 @@
   }
   var SETA = icone('<path d="m6 9 6 6 6-6"/>');
   var CHECK = icone('<path d="M20 6 9 17l-5-5"/>');
-  var LUPA = icone('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>');
 
   function norm(texto) {
     return String(texto || "")
@@ -55,6 +64,53 @@
     if (r && !r.id) r.id = campo.id + "-rotulo";
     return r;
   }
+
+  function textoDoRotulo(rotuloEl) {
+    return rotuloEl ? rotuloEl.textContent.replace(/\s*\*\s*$/, "").trim() : "Opções";
+  }
+
+  // ---- abrir e fechar o painel (a casca `.painel-flutuante`) -----------------------------------
+  // Comum a todo painel: o `aberto` o mostra, o `fechando` toca a saída e o `aberto` só sai no fim
+  // dela. Sem animação (reduzir movimento) ou com a aba em segundo plano, fecha na hora.
+
+  function painelAberto(p) {
+    return p.classList.contains("aberto") && !p.classList.contains("fechando");
+  }
+
+  // Devolve "novo" (abriu agora), "reaberto" (estava saindo: fica aberto, sem repetir a entrada) ou
+  // "ja" (já estava aberto).
+  function abrirPainel(p) {
+    if (p.classList.contains("fechando")) {
+      p.classList.remove("fechando");
+      p.removeEventListener("animationend", p._fimFechamento);
+      return "reaberto";
+    }
+    if (p.classList.contains("aberto")) return "ja";
+    p.classList.add("aberto");
+    return "novo";
+  }
+
+  // `aoFechar` roda quando o painel some de vez. Devolve false se não havia o que fechar.
+  function fecharPainel(p, aoFechar) {
+    if (!painelAberto(p)) return false;
+    var fim = function (e) {
+      if (e && e.target !== p) return; // animação de algo dentro do painel
+      p.removeEventListener("animationend", fim);
+      if (!p.classList.contains("fechando")) return;
+      p.classList.remove("fechando", "aberto");
+      if (aoFechar) aoFechar();
+    };
+    p._fimFechamento = fim;
+    p.addEventListener("animationend", fim);
+    p.classList.add("fechando");
+    if (getComputedStyle(p).animationName === "none") fim();
+    else setTimeout(fim, 250); // reserva: em segundo plano a animação não roda
+    return true;
+  }
+
+  window.Dropdown = { abrirPainel: abrirPainel, fecharPainel: fecharPainel, painelAberto: painelAberto };
+
+  // ---- fontes das opções ------------------------------------------------------------------------
 
   function opcoesDoSelect(select) {
     var lista = [];
@@ -93,49 +149,26 @@
     return arvore;
   }
 
-  // ---- painel -----------------------------------------------------------------------------
+  // ---- painel (comum aos tipos) ------------------------------------------------------------------
 
   function montarPainel(d, rotulo) {
     var id = "dropdown-" + ++contador;
     d.id = id;
-    d.painel = criar("div", "dropdown-painel");
-    d.painel.hidden = true;
+    d.painel = criar("div", "painel-flutuante dropdown-painel");
 
-    var topo = criar("div", "dropdown-topo");
-    topo.appendChild(criar("p", "rotulo-secao", rotulo));
-    d.contagem = criar("p", "texto-secundario texto-pequeno");
-    topo.appendChild(d.contagem);
-    var cabecalho = criar("div", "dropdown-cabecalho");
-    cabecalho.appendChild(topo);
-
-    if (d.buscavel) {
-      var area = criar("div", "campo-busca");
-      area.innerHTML = LUPA;
-      d.busca = criar("input", "campo-entrada");
-      d.busca.type = "search"; // sem `name`: o HTMX e o formulário não o levam no envio
-      d.busca.autocomplete = "off";
-      d.busca.placeholder = "Buscar…";
-      d.busca.setAttribute("role", "combobox");
-      d.busca.setAttribute("aria-label", "Buscar em " + rotulo);
-      d.busca.setAttribute("aria-controls", id + "-lista");
-      d.busca.setAttribute("aria-expanded", "true");
-      area.appendChild(d.busca);
-      cabecalho.appendChild(area);
-    }
-    d.painel.appendChild(cabecalho);
-
+    // Sem legenda (rótulo e contagem): o painel é só a lista; o rótulo vai no `aria-label` dela.
     d.lista = criar("ul", "dropdown-lista");
     d.lista.id = id + "-lista";
     d.lista.setAttribute("role", d.arvore ? "tree" : "listbox");
     if (d.arvore) d.lista.classList.add("dropdown-arvore");
     d.lista.setAttribute("aria-label", rotulo);
-    if (!d.busca && d.tipo === "select") d.lista.tabIndex = -1;
+    if (d.tipo === "select") d.lista.tabIndex = -1;
     d.painel.appendChild(d.lista);
     d.raiz.appendChild(d.painel);
 
-    // O foco fica onde está (o campo ou a busca); só a busca precisa receber o clique.
+    // O foco fica onde está (o campo ou a lista): clicar no painel não o tira de lá.
     d.painel.addEventListener("mousedown", function (e) {
-      if (!e.target.closest("input")) e.preventDefault();
+      e.preventDefault();
     });
     d.lista.addEventListener("click", function (e) {
       var seta = e.target.closest("[data-alternar]");
@@ -149,13 +182,21 @@
     });
   }
 
+  // Quem recebe o foco e o `aria-activedescendant`: o campo de texto visível (campo com lista e select
+  // digitável, onde o <select> escondido só guarda o valor) ou a lista.
   function teclado(d) {
-    return d.busca || (d.tipo === "combo" ? d.campo : d.lista);
+    return d.tipo === "combo" ? d.controle : d.lista;
   }
 
   function selecionada(d, o) {
-    if (d.tipo === "select") return o.valor === d.campo.value;
+    if (d.tipo === "select" || d.digitavel) return o.valor === d.campo.value;
     return d.campo.value !== "" && norm(o.valor) === norm(d.campo.value);
+  }
+
+  function linhaCheck(li) {
+    var check = criar("span", "dropdown-check");
+    check.innerHTML = CHECK;
+    li.appendChild(check);
   }
 
   function renderizar(d) {
@@ -185,9 +226,7 @@
       li.setAttribute("aria-selected", marcada ? "true" : "false");
       if (marcada && escolhida < 0) escolhida = i;
       li.appendChild(criar("span", "dropdown-texto", o.texto));
-      var check = criar("span", "dropdown-check");
-      check.innerHTML = CHECK;
-      li.appendChild(check);
+      linhaCheck(li);
       d.lista.appendChild(li);
     });
     if (!d.visiveis.length) {
@@ -195,12 +234,8 @@
       vazio.setAttribute("role", "presentation");
       d.lista.appendChild(vazio);
     }
-    var total = d.opcoes.length;
-    d.contagem.textContent =
-      d.visiveis.length === total
-        ? total + (total === 1 ? " opção" : " opções")
-        : d.visiveis.length + " de " + total;
-    ativar(d, escolhida >= 0 ? escolhida : d.tipo === "select" && d.visiveis.length ? 0 : -1, true);
+    var escolheOPrimeiro = (d.tipo === "select" || d.digitavel) && d.visiveis.length;
+    ativar(d, escolhida >= 0 ? escolhida : escolheOPrimeiro ? 0 : -1, true);
   }
 
   function renderizarArvore(d) {
@@ -241,9 +276,7 @@
         li.appendChild(criar("span", "dropdown-qtd dropdown-qtd-vazia"));
       }
       li.appendChild(criar("span", "dropdown-texto", o.texto));
-      var check = criar("span", "dropdown-check");
-      check.innerHTML = CHECK;
-      li.appendChild(check);
+      linhaCheck(li);
       if (n) {
         li.setAttribute("aria-expanded", o.aberto ? "true" : "false");
         var seta = criar("span", "dropdown-alternar");
@@ -259,8 +292,6 @@
       }
       d.lista.appendChild(li);
     });
-    var n = d.arvore.grupos.length;
-    d.contagem.textContent = n + (n === 1 ? " grupo" : " grupos");
     ativar(d, escolhida >= 0 ? escolhida : 0, true);
   }
 
@@ -311,9 +342,8 @@
         });
       });
     }
-    if (d.busca) d.busca.value = d.termo;
     renderizar(d);
-    d.painel.hidden = false;
+    abrirPainel(d.painel);
     // Coluna perto da borda direita: o painel (mais largo que ela) abre para a esquerda.
     d.painel.style.left = "";
     d.painel.style.right = "";
@@ -324,36 +354,67 @@
     d.raiz.setAttribute("data-aberto", "");
     d.controle.setAttribute("aria-expanded", "true");
     aberto = d;
-    if (d.tipo === "select") (d.busca || d.lista).focus({ preventScroll: true });
+    if (d.tipo === "select") d.lista.focus({ preventScroll: true });
     var li = d.lista.querySelector("[data-ativa]");
     if (li) li.scrollIntoView({ block: "nearest" });
   }
 
   function fechar(d, devolverFoco) {
-    d.painel.hidden = true;
+    fecharPainel(d.painel);
+    if (d.digitavel) atualizarGatilho(d); // o que foi digitado e não escolhido não vale: volta ao escolhido
     d.raiz.removeAttribute("data-aberto");
     d.controle.setAttribute("aria-expanded", "false");
     if (aberto === d) aberto = null;
-    if (devolverFoco) d.controle.focus();
+    // Gatilho escondido (o filtro de grupo abre direto do <summary> do <details>): o painel pertence ao
+    // <details>, que fecha junto (senão ficaria aberto, com a seta para cima e nada embaixo), e o foco
+    // volta ao resumo.
+    var detalhes = d.controle.offsetParent === null ? d.raiz.closest("details") : null;
+    if (detalhes) detalhes.open = false;
+    if (!devolverFoco) return;
+    var alvo = detalhes ? detalhes.querySelector(":scope > summary") : d.controle;
+    if (alvo) alvo.focus();
   }
 
   function escolher(d, i) {
     var o = d.visiveis[i];
     if (!o) return;
-    if (d.tipo === "select") {
-      d.campo.value = o.valor;
-      atualizarGatilho(d);
-    } else {
-      d.campo.value = o.valor;
-    }
+    d.campo.value = o.valor;
+    if (d.tipo === "select" || d.digitavel) atualizarGatilho(d);
     d.campo.dispatchEvent(new Event("change", { bubbles: true }));
     fechar(d, d.tipo === "select");
   }
 
+  // Mostra no controle o que o <select> guarda: o texto no gatilho (botão) ou, no select digitável, no campo
+  // (vazio quando a opção é a sem valor: aí aparece o `placeholder`, que é o rótulo dela).
   function atualizarGatilho(d) {
     var o = d.campo.options[d.campo.selectedIndex];
+    if (d.digitavel) {
+      d.controle.value = o && d.campo.value !== "" ? o.textContent.trim() : "";
+      return;
+    }
     d.texto.textContent = o ? o.textContent.trim() : "";
     d.controle.classList.toggle("dropdown-vazio", d.campo.value === "");
+  }
+
+  // Seleção simples sem busca: digitar pula para a primeira opção que começa com o que se digitou.
+  // As letras se acumulam até LIMITE_DIGITACAO ms de pausa; uma letra só, repetida, anda pelas opções.
+  function pularPara(d, tecla) {
+    clearTimeout(d.pausa);
+    d.digitado = (d.digitado || "") + norm(tecla);
+    d.pausa = setTimeout(function () {
+      d.digitado = "";
+    }, LIMITE_DIGITACAO);
+    // A mesma letra repetida ("aa", "aaa") conta como uma letra só e anda pelas opções a partir da ativa,
+    // como no <select> nativo (o acumulado volta a ela: "a", "a", "b" busca "ab"); letras diferentes
+    // buscam o prefixo inteiro, desde o começo.
+    if (/^(.)\1+$/.test(d.digitado)) d.digitado = d.digitado.charAt(0);
+    var busca = d.digitado;
+    var n = d.visiveis.length;
+    var inicio = busca.length === 1 ? d.ativo + 1 : 0;
+    for (var k = 0; k < n; k++) {
+      var i = (inicio + k) % n;
+      if (norm(d.visiveis[i].texto).indexOf(busca) === 0) return ativar(d, i, true);
+    }
   }
 
   function aoTeclar(d, e) {
@@ -366,9 +427,13 @@
       } else if (d.tipo === "select" && (k === "Enter" || k === " ")) {
         e.preventDefault();
         abrir(d, "");
+      } else if (d.digitavel && k === "Enter") {
+        e.preventDefault(); // não envia o formulário: abre a lista
+        abrir(d, "");
       } else if (d.tipo === "select" && imprimivel) {
         e.preventDefault();
-        abrir(d, d.buscavel ? k : "");
+        abrir(d, "");
+        pularPara(d, k);
       }
       return;
     }
@@ -396,11 +461,11 @@
     } else if ((k === "Home" || k === "End") && e.target === d.lista) {
       e.preventDefault();
       ativar(d, k === "Home" ? 0 : d.visiveis.length - 1, true);
-    } else if (k === "Enter" || (k === " " && e.target === d.lista)) {
+    } else if (k === "Enter" || (k === " " && e.target === d.lista && !d.digitado)) {
       if (d.ativo >= 0) {
         e.preventDefault();
         escolher(d, d.ativo);
-      } else if (d.tipo === "select") {
+      } else if (d.tipo === "select" || d.digitavel) {
         e.preventDefault();
       } else {
         fechar(d, false);
@@ -412,27 +477,113 @@
       fechar(d, true);
     } else if (k === "Tab") {
       fechar(d, false);
-    } else if (d.tipo === "select" && !d.busca && imprimivel) {
-      // Sem busca, digitar pula para a primeira opção que começa com a letra.
-      var letra = norm(k);
-      for (var i = 0; i < d.visiveis.length; i++) {
-        if (norm(d.visiveis[i].texto).indexOf(letra) === 0) {
-          ativar(d, i, true);
-          break;
-        }
-      }
+    } else if (d.tipo === "select" && imprimivel) {
+      e.preventDefault();
+      pularPara(d, k);
     }
   }
 
-  // ---- select -------------------------------------------------------------------------------
+  // ---- tipos: só montam o controle; o resto é a base ----------------------------------------------
+
+  // Liga ao dropdown o que todo tipo tem: painel, teclado e a trava `data-travado`.
+  function finalizar(d, rotulo) {
+    montarPainel(d, rotulo);
+    d.controle.setAttribute("aria-controls", d.lista.id);
+    d.controle.addEventListener("keydown", function (e) {
+      aoTeclar(d, e);
+    });
+    d.lista.addEventListener("keydown", function (e) {
+      aoTeclar(d, e);
+    });
+    d.campo.setAttribute("data-dropdown-pronto", "");
+    // `data-travado` no <select> trava só o dropdown: o <select> segue habilitado, para o valor
+    // ir no envio (campo `disabled` não vai).
+    if (d.campo.tagName !== "SELECT") return;
+    function sincronizarTrava() {
+      var travado = d.campo.hasAttribute("data-travado");
+      d.controle.disabled = travado;
+      if (travado && aberto === d) fechar(d, false);
+    }
+    new MutationObserver(sincronizarTrava).observe(d.campo, {
+      attributes: true,
+      attributeFilter: ["data-travado"],
+    });
+    sincronizarTrava();
+  }
+
+  // Campo de texto que abre a lista e a filtra enquanto se digita: o do campo com lista e o do select
+  // digitável (o mesmo comportamento; muda só o que o campo guarda).
+  function ligarCampoDeTexto(d) {
+    var input = d.controle;
+    input.addEventListener("focus", function () {
+      if (aberto !== d) abrir(d, "");
+      if (d.digitavel) input.select(); // digitar já troca o escolhido
+    });
+    input.addEventListener("click", function () {
+      if (aberto !== d) abrir(d, "");
+    });
+    input.addEventListener("input", function () {
+      if (aberto === d) {
+        d.termo = input.value;
+        renderizar(d);
+      } else {
+        abrir(d, input.value);
+      }
+    });
+  }
+
+  // Select digitável (`data-dropdown-digitavel`): o controle é um campo de texto como o do campo com
+  // lista, mas só vale uma opção da lista (o <select> guarda o valor): o que foi digitado e não
+  // escolhido volta ao escolhido ao sair.
+  function montarDigitavel(select) {
+    var rotuloEl = rotuloDe(select);
+    var d = { tipo: "combo", digitavel: true, campo: select, opcoes: opcoesDoSelect(select), abertos: {} };
+
+    d.raiz = criar("div", "dropdown");
+    select.parentNode.insertBefore(d.raiz, select);
+    d.raiz.appendChild(select);
+    select.classList.add("visually-hidden");
+    select.tabIndex = -1;
+    select.setAttribute("aria-hidden", "true");
+
+    var input = criar("input", select.className.replace("visually-hidden", "").trim() + " dropdown-combo");
+    input.type = "text";
+    input.id = select.id ? select.id + "-gatilho" : "dropdown-gatilho-" + ++contador;
+    input.autocomplete = "off";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-haspopup", "listbox");
+    input.setAttribute("aria-expanded", "false");
+    if (rotuloEl) input.setAttribute("aria-labelledby", rotuloEl.id);
+    var vazia = d.opcoes.filter(function (o) {
+      return o.valor === "";
+    })[0];
+    if (vazia) input.placeholder = vazia.texto;
+    d.controle = input;
+    d.raiz.insertBefore(input, select);
+    var seta = criar("span", "dropdown-seta dropdown-seta-campo");
+    seta.innerHTML = SETA;
+    d.raiz.appendChild(seta);
+
+    finalizar(d, textoDoRotulo(rotuloEl));
+    atualizarGatilho(d);
+    ligarCampoDeTexto(d);
+    // O rótulo (<label for>) e o foco programático chegam ao <select>: passam para o campo.
+    select.addEventListener("focus", function () {
+      input.focus();
+    });
+    // Alteração de fora (outro script troca o valor e dispara `change`).
+    select.addEventListener("change", function () {
+      atualizarGatilho(d);
+    });
+  }
 
   function montarSelect(select) {
+    if (select.hasAttribute("data-dropdown-digitavel")) return montarDigitavel(select);
     var rotuloEl = rotuloDe(select);
-    var rotulo = rotuloEl ? rotuloEl.textContent.replace(/\s*\*\s*$/, "").trim() : "Opções";
     var d = { tipo: "select", campo: select, opcoes: opcoesDoSelect(select) };
     d.arvore = select.hasAttribute("data-dropdown-arvore") ? arvoreDoSelect(select) : null;
     d.abertos = {};
-    d.buscavel = !d.arvore && d.opcoes.length > LIMITE_BUSCA;
 
     d.raiz = criar("div", "dropdown");
     select.parentNode.insertBefore(d.raiz, select);
@@ -454,30 +605,13 @@
     d.controle.appendChild(seta);
     d.raiz.insertBefore(d.controle, select);
 
-    montarPainel(d, rotulo);
-    d.controle.setAttribute("aria-controls", d.lista.id);
+    finalizar(d, textoDoRotulo(rotuloEl));
     atualizarGatilho(d);
 
     d.controle.addEventListener("click", function () {
       if (aberto === d) fechar(d, true);
       else abrir(d, "");
     });
-    d.controle.addEventListener("keydown", function (e) {
-      aoTeclar(d, e);
-    });
-    d.lista.addEventListener("keydown", function (e) {
-      aoTeclar(d, e);
-    });
-    if (d.busca) {
-      d.busca.addEventListener("keydown", function (e) {
-        aoTeclar(d, e);
-      });
-      d.busca.addEventListener("input", function () {
-        d.termo = d.busca.value;
-        renderizar(d);
-        if (d.visiveis.length) ativar(d, 0, true);
-      });
-    }
     // O rótulo (<label for>) e o foco programático chegam ao <select>: passam para o gatilho.
     select.addEventListener("focus", function () {
       d.controle.focus();
@@ -486,32 +620,15 @@
     select.addEventListener("change", function () {
       atualizarGatilho(d);
     });
-    // `data-travado` no <select> trava só o dropdown: o <select> segue habilitado, para o valor
-    // ir no envio (campo `disabled` não vai).
-    function sincronizarTrava() {
-      var travado = select.hasAttribute("data-travado");
-      d.controle.disabled = travado;
-      if (travado && aberto === d) fechar(d, false);
-    }
-    new MutationObserver(sincronizarTrava).observe(select, {
-      attributes: true,
-      attributeFilter: ["data-travado"],
-    });
-    sincronizarTrava();
-    select.setAttribute("data-dropdown-pronto", "");
   }
-
-  // ---- campo com lista (datalist) -----------------------------------------------------------
 
   function montarCombo(input) {
     var datalist = document.getElementById(input.getAttribute("list"));
     if (!datalist) return;
-    var rotuloEl = rotuloDe(input);
-    var rotulo = rotuloEl ? rotuloEl.textContent.replace(/\s*\*\s*$/, "").trim() : "Opções";
     var opcoes = Array.prototype.map.call(datalist.options, function (o) {
       return { valor: o.value, texto: o.value, grupo: "" };
     });
-    var d = { tipo: "combo", campo: input, controle: input, opcoes: opcoes, buscavel: false };
+    var d = { tipo: "combo", campo: input, controle: input, opcoes: opcoes };
 
     input.removeAttribute("list"); // some o dropdown nativo do navegador
     d.raiz = criar("div", "dropdown");
@@ -526,30 +643,11 @@
     seta.innerHTML = SETA;
     d.raiz.appendChild(seta);
 
-    montarPainel(d, rotulo);
-    input.setAttribute("aria-controls", d.lista.id);
-
-    input.addEventListener("focus", function () {
-      if (aberto !== d) abrir(d, "");
-    });
-    input.addEventListener("click", function () {
-      if (aberto !== d) abrir(d, "");
-    });
-    input.addEventListener("input", function () {
-      if (aberto === d) {
-        d.termo = input.value;
-        renderizar(d);
-      } else {
-        abrir(d, input.value);
-      }
-    });
-    input.addEventListener("keydown", function (e) {
-      aoTeclar(d, e);
-    });
-    input.setAttribute("data-dropdown-pronto", "");
+    finalizar(d, textoDoRotulo(rotuloDe(input)));
+    ligarCampoDeTexto(d);
   }
 
-  // ---- início e fechamento ------------------------------------------------------------------
+  // ---- início e fechamento ------------------------------------------------------------------------
 
   function iniciar(raiz) {
     if (aberto && !document.contains(aberto.raiz)) aberto = null;
@@ -564,10 +662,29 @@
     iniciar(document);
   });
 
+  // Painel que brota do <summary> de um <details> (o filtro de grupo): tocar no próprio resumo não conta
+  // como "fora" (senão o painel e o <details> fecham no toque e o clique os abriria de novo): quem fecha
+  // é o clique do resumo, e o `toggle` abaixo fecha o painel junto.
+  function noResumoDoPainel(d, alvo) {
+    var detalhes = d.raiz.closest("details");
+    var resumo = alvo.closest && alvo.closest("summary");
+    return !!(detalhes && resumo && resumo.parentNode === detalhes);
+  }
+
   document.addEventListener("pointerdown", function (e) {
-    if (aberto && !aberto.raiz.contains(e.target)) fechar(aberto, false);
+    if (aberto && !aberto.raiz.contains(e.target) && !noResumoDoPainel(aberto, e.target)) fechar(aberto, false);
   });
   document.addEventListener("focusin", function (e) {
-    if (aberto && !aberto.raiz.contains(e.target)) fechar(aberto, false);
+    if (aberto && !aberto.raiz.contains(e.target) && !noResumoDoPainel(aberto, e.target)) fechar(aberto, false);
   });
+  // `toggle` não sobe pela árvore: escuta na captura. Fechar o <details> do painel fecha o painel.
+  document.addEventListener(
+    "toggle",
+    function (e) {
+      if (aberto && e.target.tagName === "DETAILS" && !e.target.open && e.target.contains(aberto.raiz)) {
+        fechar(aberto, false);
+      }
+    },
+    true
+  );
 })();

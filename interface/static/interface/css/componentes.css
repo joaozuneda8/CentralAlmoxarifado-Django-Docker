@@ -32,6 +32,12 @@
   transition: border-color var(--transicao), box-shadow var(--transicao);
 }
 .campo-entrada::placeholder { color: var(--texto-suave); }
+/* iOS Safari: input date tem largura intrínseca própria e estoura o container sem isto. */
+input[type="date"].campo-entrada {
+  -webkit-appearance: none; appearance: none;
+  box-sizing: border-box; display: block; min-width: 0; max-width: 100%;
+}
+input[type="date"].campo-entrada::-webkit-date-and-time-value { text-align: left; min-width: 0; }
 .campo-entrada:hover { border-color: var(--texto-suave); }
 .campo-entrada:focus { outline: none; border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-superficie); }
 textarea.campo-entrada { min-height: 96px; resize: vertical; }
@@ -129,20 +135,33 @@ textarea.campo-linha:focus { height: 84px; }
 .dropdown[data-aberto] > .campo-entrada { border-color: var(--destaque); box-shadow: 0 0 0 3px var(--destaque-superficie); }
 /* block: sem a folga de linha de um inline-block, o wrapper tem a altura do campo e a seta fica no centro. */
 .dropdown-combo { display: block; padding-right: 44px; }
+/* Select digitável travado (o centro de custo, enquanto há placa): como o gatilho travado. */
+.dropdown-combo:disabled { background: var(--superficie); color: var(--texto-secundario); cursor: not-allowed; }
+.dropdown-combo:disabled ~ .dropdown-seta { opacity: 0.4; }
 .dropdown-seta-campo { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .dropdown[data-aberto] .dropdown-seta-campo { transform: translateY(-50%) rotate(180deg); }
+
+/* Painel flutuante: a casca única de todo painel que abre embaixo de um campo, a base do dropdown.js.
+   Os painéis dos dropdowns (.dropdown-painel) e o de resultados da busca de materiais (.busca-painel)
+   a usam; mudar aqui muda todos. Aparência: cartão com borda e sombra, sem legenda. Abrir e
+   fechar: o `aberto` mostra o painel com a entrada animada, o `fechando` toca a saída (dropdown.js,
+   `Dropdown.abrirPainel` e `fecharPainel`, que tiram os dois no fim). Só existe com JavaScript. */
+.painel-flutuante {
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
+  box-shadow: var(--sombra-elevada);
+}
+.js .painel-flutuante:not(.aberto) { display: none; }
+.js .painel-flutuante.aberto { animation: painel-surge 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.js .painel-flutuante.fechando { animation: painel-some 0.12s ease-in forwards; pointer-events: none; }
+@keyframes painel-surge { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes painel-some { to { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .js .painel-flutuante.aberto, .js .painel-flutuante.fechando { animation: none; } }
 
 .dropdown-painel {
   position: absolute; left: 0; top: 100%; z-index: 20; margin-top: var(--esp-1);
   min-width: max(100%, 17rem); max-width: min(30rem, calc(100vw - 2 * var(--esp-2)));
-  flex-direction: column; max-height: min(60vh, 22rem); overflow: hidden;
-  background: var(--fundo); border: 1px solid var(--borda); border-radius: var(--raio-cartao);
-  box-shadow: var(--sombra-elevada);
+  display: flex; flex-direction: column; max-height: min(60vh, 22rem); overflow: hidden;
 }
-.dropdown-painel:not([hidden]) { display: flex; }
-.dropdown-cabecalho { display: grid; gap: var(--esp-1); padding: 10px var(--esp-2); border-bottom: 1px solid var(--borda); background: var(--fundo); }
-.dropdown-topo p { white-space: nowrap; }
-.dropdown-topo { display: flex; align-items: baseline; justify-content: space-between; gap: var(--esp-meio) var(--esp-2); }
 .dropdown-lista { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; outline: none; }
 .dropdown-grupo { padding: 10px var(--esp-2) 6px; background: var(--superficie); border-bottom: 1px solid var(--borda); }
 .dropdown-opcao {
@@ -381,7 +400,8 @@ html:not(.js) .filtros-alternar { display: none; }
 .passo { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--esp-1) var(--esp-3); }
 .passo-numero { font-family: var(--fonte-titulo); font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: var(--texto-suave); }
 .passo-cabecalho { display: grid; gap: var(--esp-meio); align-content: start; }
-.passo-corpo { grid-column: 2; display: grid; gap: var(--esp-2); }
+/* Coluna `minmax(0, 1fr)`: a implícita seria `auto`, que cresce até o mínimo do conteúdo e alarga o passo. */
+.passo-corpo { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--esp-2); }
 @media (max-width: 640px) { .passo { grid-template-columns: minmax(0, 1fr); } .passo-corpo { grid-column: 1; } }
 /* No tablet, na área interna (saída avulsa), o número fica ao lado do título e o corpo usa a
    largura toda do cartão, sem a coluna de 64px só para o número. */
@@ -416,8 +436,8 @@ html:not(.js) .filtros-alternar { display: none; }
 }
 .quantidade-campo:focus { outline: none; box-shadow: inset 0 0 0 2px var(--destaque); }
 
-/* Resultados da busca: rótulo próprio, para não se confundir com "Seu pedido". */
-.resultados-cabecalho { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--esp-meio) var(--esp-2); margin-bottom: var(--esp-1); }
+/* Resultados da busca sem nenhum material: a frase fica no painel, sem legenda em cima. */
+.resultados-vazio { margin: 0; padding: 14px var(--esp-2); }
 
 /* Carrinho ("Seu pedido"). Sem JavaScript, ou com espaço para a coluna ao lado dos passos
    (pedidos.css): cartão azul na página. Sem esse espaço (menos de 960px; celular, tablet, ou tela

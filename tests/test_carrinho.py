@@ -233,10 +233,10 @@ def test_carrinho_tem_barra_e_gaveta(client):
 def test_resultados_marcaveis_pelo_codigo(client):
     montar_cenario()
     r = client.get(reverse("pedidos:materiais", args=["ab"]), {"q": "fita"})
-    assert '<p class="rotulo-secao">Resultados da busca</p>' in r.text
+    assert "Resultados da busca" not in r.text  # o painel não tem legenda
     assert 'data-codigo="016.005.010"' in r.text
-    # O "no pedido" vai no botão ("Alterar (3)"), sem selo nem linha reservada para ele, também
-    # na saída avulsa.
+    # O "no pedido" vai no selo `data-selo-pedido` (escondido; o pedidos.js o mostra), não num
+    # atributo da linha, também na saída avulsa.
     assert "data-no-pedido" not in r.text
     client.force_login(get_user_model().objects.create_user(username="12345", password="x"))
     avulsa = client.get(reverse("pedidos:avulsa_materiais"), {"q": "item"}).text
@@ -328,7 +328,8 @@ def test_gaveta_segue_a_largura_da_area_dos_passos_e_nao_a_da_janela():
     pedidos = open(finders.find("pedidos/css/pedidos.css"), encoding="utf-8").read()
     js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
     assert "@container (min-width: 960px)" in pedidos and "LARGURA_LADO_A_LADO = 960" in js
-    assert "ResizeObserver" in js and "matchMedia" not in js
+    # Só o ponteiro de toque da busca usa matchMedia, nunca a largura.
+    assert "ResizeObserver" in js and 'matchMedia("(max-width' not in js
 
 
 @pytest.mark.django_db
@@ -499,15 +500,22 @@ def test_pedidos_js_avisa_o_adicionado():
 
 @pytest.mark.django_db
 def test_resultado_publico_adiciona_em_dois_passos(client):
-    # Com JavaScript, cada resultado mostra só "Adicionar"; ele abre a quantidade, que se
-    # confirma. Sem JavaScript, a quantidade e o botão (que diz "Adicionar") ficam à vista.
+    # Com JavaScript, tocar na linha do material (o botão `material-abrir`, dentro dos dados) abre a
+    # quantidade, que se confirma; o selo "no pedido" fica ao lado da informação. Sem JavaScript, a
+    # quantidade e o botão (que diz "Adicionar") ficam à vista.
     montar_cenario()
     r = client.get(reverse("pedidos:materiais", args=["ab"]), {"q": "fita"}).text
-    acao = r[r.index('<div class="material-acao" data-adicionar>') :]
-    acao = acao[: acao.index("</li>")]
-    abrir = acao[acao.index("<button") : acao.index("</button>")]
+    item = r[r.index('<li class="material"') :]
+    item = item[: item.index("</li>")]
+    dados = item[: item.index('<div class="material-acao"')]
+    abrir = dados[dados.index('<button type="button" class="material-abrir"') :]
+    abrir = abrir[: abrir.index("</button>")]
     assert "data-adicionar-abrir" in abrir and 'aria-expanded="false"' in abrir
     assert 'aria-controls="qtd-area-1"' in abrir and ">Adicionar" in abrir
+    assert "data-selo-pedido" in dados and "hidden" in dados[dados.index("data-selo-pedido") :]
+    assert 'class="material-mais" aria-hidden="true"' in dados
+    acao = item[item.index('<div class="material-acao" data-adicionar>') :]
+    assert "data-adicionar-abrir" not in acao  # o botão não está mais na linha da ação
     area = acao[acao.index('<div class="material-qtd" id="qtd-area-1">') :]
     assert '<div class="quantidade">' in area
     confirmar = area[area.index("data-adicionar-confirmar") :]
@@ -528,6 +536,19 @@ def test_resultado_da_avulsa_tambem_adiciona_em_dois_passos(client):
     assert '<span class="mono">' in r
 
 
+def test_painel_de_resultados_fica_no_fluxo_com_cinco_linhas_em_qualquer_tela():
+    # O painel não flutua (absoluto): fica no fluxo, o cartão do passo cresce com ele e a altura é a
+    # do cabeçalho e de 5 linhas, a mesma no computador, no tablet e no celular.
+    js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
+    assert "var LINHAS_VISIVEIS = 5;" in js and "function alturaDoPainel" in js
+    assert 'trazerAoTopo(document.querySelector(".busca-principal"))' in js
+    assert "estreito" not in js and "posicionarPainel" not in js and "caberNaTela" not in js
+    css = open(finders.find("pedidos/css/pedidos.css"), encoding="utf-8").read()
+    regra = css[css.index(".js .busca-painel {") :]
+    regra = regra[: regra.index("}")]
+    assert "position: relative" in regra and "absolute" not in regra and "vh" not in regra
+
+
 def test_pedidos_js_abre_confirma_e_cancela_a_quantidade():
     js = open(finders.find("pedidos/js/pedidos.js"), encoding="utf-8").read()
     for gancho in (
@@ -537,25 +558,28 @@ def test_pedidos_js_abre_confirma_e_cancela_a_quantidade():
     ):
         assert gancho in js
     assert '"Confirmar"' in js and '"Atualizar"' in js and '"Escape"' in js
-    assert '"Alterar ("' in js  # quantidade no pedido no próprio botão
+    assert '" no pedido"' in js  # selo "N no pedido" ao lado da informação
 
 
 @pytest.mark.django_db
 def test_quantidade_do_pedido_altera_em_dois_passos_no_formulario_publico(client):
-    # Fechada, a linha mostra a quantidade como texto, com "Alterar"; ele abre o − / + com
-    # "Confirmar" e ✕. Sem JavaScript, o − / + fica à vista e vai com o envio do formulário.
+    # No mesmo desenho do resultado da busca: a linha inteira é o botão (`material-abrir`) que
+    # abre o − / + com "Confirmar" e ✕, o lápis só indica que clica e o "Remover" fica embaixo.
+    # Sem JavaScript, o − / + fica à vista e vai com o envio do formulário.
     montar_cenario()
     r = client.post(
         reverse("pedidos:carrinho", args=["ab"]),
         {"adicionar": "016.005.010", "qtd-016.005.010": "3"},
     ).text
     linha = r[r.index('<li class="carrinho-linha') : r.index("</li>")]
-    acoes = linha[linha.index("data-alterar>") :]
-    assert '<span class="carrinho-qtd-texto"><strong>3</strong> UN</span>' in acoes
-    abrir = acoes[acoes.index("data-alterar-abrir") :]
+    abrir = linha[linha.index("data-alterar-abrir") :]
     abrir = abrir[: abrir.index("</button>")]
+    assert 'class="material-abrir"' in linha and "Alterar a quantidade de" in abrir
     assert 'aria-expanded="false"' in abrir and 'aria-controls="carrinho-qtd-area-1"' in abrir
-    assert ">Alterar" in abrir
+    assert '<span class="material-mais" aria-hidden="true">' in linha  # o lápis
+    acoes = linha[linha.index("data-alterar>") :]
+    assert "data-alterar-abrir" not in acoes  # o botão da linha está fora da ação
+    assert '<span class="carrinho-qtd-texto"><strong>3</strong> UN</span>' in acoes
     area = acoes[acoes.index('id="carrinho-qtd-area-1"') :]
     assert 'name="item_qtd"' in area and "data-alterar-confirmar" in area
     cancelar = area[area.index("data-alterar-cancelar") :]

@@ -11,9 +11,9 @@ almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança
 - Spec (fonte de verdade): `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md`.
   A seção 9 divide o trabalho em 5 subprojetos, cada um com plano próprio em
   `docs/superpowers/plans/`. Os subprojetos 1 (Fundação), 2 (Catálogo e importadores), 3
-  (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) tem o código
-  feito (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e falta a execução: instalar no
-  servidor e fazer a migração e a virada, pelo roteiro `deploy/VIRADA.md`. A implantação é
+  (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) também: o
+  código (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e a instalação no servidor, que já
+  roda em produção com dados reais (o roteiro foi `deploy/VIRADA.md`). A implantação é
   em Docker Compose (`docs/superpowers/specs/2026-10-15-docker-design.md`), no lugar do
   NSSM e do Agendador do Windows da spec principal. Do 4 ainda falta a
   simulação contra o SCPI real (João roda `lancar_saidas --dry-run --limite 1`).
@@ -99,7 +99,11 @@ transações precisam se comportar como no servidor.
   `componentes.css` e `layouts.css`, ícones Lucide em `_icone.html`, fontes `.woff2` locais
   (Geist, DM Sans, Geist Mono), HTMX 4.0.0 vendorizado, parciais e template tags. Só tema
   claro; o `shell.js` só cuida do menu móvel. O `dropdown.js` troca todo `select.campo-entrada` e
-  `input.campo-entrada[list]` por um painel no estilo do de resultados da busca de materiais; o
+  `input.campo-entrada[list]` por um painel no estilo do de resultados da busca de materiais, sem
+  caixa de busca (no `select`, digitar pula para a opção que começa com o texto); é a base de todo
+  painel flutuante: a casca (`.painel-flutuante`, em `componentes.css`) e o abrir e fechar animados
+  (`window.Dropdown.abrirPainel`/`fecharPainel`) também servem ao painel de resultados da busca de
+  materiais (`pedidos.js`), e os tipos (select, campo com lista, select digitável, árvore) só montam o controle; o
   elemento original fica escondido e continua guardando o valor e disparando `change` (script
   que troca o valor de um `select` precisa disparar `change`). O `abas.js` (`[data-abas]`, `?aba=` na URL) dá as abas em pasta: a ativa se funde ao primeiro cartão
   do painel. O `filtros.js` recolhe o painel de
@@ -139,13 +143,28 @@ transações precisam se comportar como no servidor.
   ao digitar) e o destino do último pedido registrado (gravado pela tela de sucesso,
   `data-lembrar-*`), preenche só campos vazios e pede confirmação (`beforeunload`) para
   sair com material no pedido. Nos formulários públicos e na saída avulsa, adicionar tem dois passos
-  (`[data-adicionar]` em `_resultados.html`): "Adicionar" abre a quantidade, que se confirma (o
-  `hx-post` de sempre) ou, com o material já no pedido ("Alterar (N)"), "Atualizar" troca a linha
-  do pedido; sem JavaScript a quantidade fica à vista, e o painel do atendimento (`um_passo`)
-  adiciona ou troca direto. A quantidade de cada
-  linha do pedido segue o mesmo padrão (`[data-alterar]` em `_carrinho.html`): texto com "Alterar",
-  e o campo só manda o `alterar` no "Confirmar" (`hx-trigger="confirmar-quantidade"`), também na
-  saída avulsa.
+  (`[data-adicionar]` em `_resultados.html`): tocar na linha do material (o `material-abrir`, um botão
+  transparente esticado sobre a linha; o "+" só indica que clica) abre a quantidade, que se confirma
+  (o `hx-post` de sempre) ou, com o material já no pedido (selo azul claro "N no pedido" ao lado da
+  informação, `data-selo-pedido`), "Atualizar" troca a linha do pedido; tocar de novo na linha aberta a
+  fecha. Aberta, a linha mostra a quantidade à esquerda e o "Confirmar" no canto inferior direito, com o
+  ✕ vermelho no superior direito; as outras linhas recuam (opacidade 0,6) mas seguem clicáveis. A
+  informação do material quebra por dentro e o selo desce para a linha de baixo quando a unidade é
+  longa (limpeza). Sem JavaScript a quantidade fica à vista, e o painel do atendimento (`um_passo`)
+  adiciona ou troca direto, com botão. A coluna do `.passo-corpo` é `minmax(0, 1fr)`, para a busca não
+  alargar com o conteúdo. O painel de resultados fica no fluxo da página, em qualquer tela (nunca
+  absoluto: o cartão do passo cresce com ele, sem painel pendurado para fora); ao abrir, o pedidos.js
+  rola o campo ao topo (`trazerAoTopo`, descontando a barra do topo no celular) e dá ao painel a altura
+  do cabeçalho e de 5 linhas (`alturaDoPainel`, `LINHAS_VISIVEIS`, `--busca-limite`), a mesma no
+  computador, no tablet e no celular, medida de novo quando os resultados ou a largura mudam; o resto
+  rola dentro do painel. Há duas buscas de materiais: a pública (formulários) não mostra código nem
+  grupo; a do almoxarifado (saída avulsa e atendimento) mostra. A linha do pedido
+  (`_carrinho.html`) tem o mesmo desenho do resultado da busca, na coluna do desktop, no tablet e na
+  gaveta do celular: a linha inteira abre a quantidade (`material-abrir`, `data-alterar-abrir`; o lápis
+  só indica que clica), com a quantidade e o "Remover" embaixo; aberta, o − / + fica à esquerda, o
+  "Confirmar" à direita (no lugar do "Remover") e o ✕ vermelho em cima, com a barra azul à esquerda e as
+  outras linhas recuadas, mas clicáveis. O campo só manda o `alterar` no "Confirmar"
+  (`hx-trigger="confirmar-quantidade"`), também na saída avulsa.
 - Área do almoxarifado (`views/almoxarifado.py`): painel com filtros em SQL
   (`consultas.py`, que repete `regras.situacao_*` como `Exists`; um teste confere que
   concordam), detalhe com o atendimento, saída avulsa e recibos (`_recibo.html`, que nunca
@@ -173,6 +192,25 @@ transações precisam se comportar como no servidor.
   de "Adicionado pelo almoxarifado" e nunca mostra quem acrescentou. Três travas contra linha de
   saída com quantidade ≤ 0: `servicos._gravar_linhas`, `scpi/requisicoes.py` (lote vira `ERRO`) e
   a `CheckConstraint` `qtd > 0` da `LinhaSaida`.
+- Edição do atendimento (spec `2026-10-17-edicao-pedido-design.md`): até o robô lançar o lote, o
+  "Editar atendimento" ("Editar saída" na avulsa) do detalhe abre `pedidos:editar`
+  (`/painel/pedidos/<n>/editar/`), o formulário do atendimento (ou o da saída avulsa) preenchido
+  com o que está gravado (`editando`). Edita só o que o atendimento grava (dados da saída,
+  quantidades entregues, trocas e acréscimos); o que veio do funcionário (cabeçalho, materiais e
+  quantidades pedidas) nunca muda. `regras.edicao_permitida` (puro) diz pelas linhas do lote se
+  edita (`PENDENTE`, `NAO_LANCAR`, `ERRO` sem número), se está suspensa (`EM_LANCAMENTO`,
+  `VERIFICAR`) ou bloqueada (lançada ou com número). `servicos.editar_atendimento` e
+  `editar_saida_avulsa` travam o pedido e as linhas, conferem a `Pedido.versao` (concorrência
+  otimista: outra pessoa salvou antes é recusa `versao`; o reenvio igual é sucesso), recusam o lote
+  que entrou em lançamento (`lancamento`), validam como o atendimento, gravam a `AlteracaoPedido`
+  (diferenças de `regras.diferencas_atendimento`, só na tela, nunca no recibo), devolvem o recibo a
+  "não impresso" e **apagam e recriam as `LinhaSaida`**: com IDs novos, o robô que leu o lote antes
+  da edição o pula no `_travar`; nunca atualize as linhas no lugar. `ERRO` volta a `PENDENTE`. O
+  "Saiu na impressora" leva a versão (`versao-<atendimento>`) e não marca a versão nova. No modo de
+  edição o `pedidos.js` abre as quantidades confirmadas, destaca o campo alterado, conta as
+  alterações e pede confirmação para sair; com o robô rodando, a faixa (`_edicao_faixa.html`,
+  `div#edicao-faixa` pelo `HX-Target`) se recarrega a cada 5 s e, se o lote travar, tira o
+  "Salvar".
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,
   `CentroCusto` e `Opcao` são mantidos à mão no admin. A placa do `CentroCusto` é normalizada
@@ -416,7 +454,5 @@ transações precisam se comportar como no servidor.
   por screenshot. Onde discordarem, valem o DESIGN.md e o que já está no código. Não refazer o
   questionário inicial da `clean-design` (o projeto já o respondeu) nem gerar ou gravar um
   design system novo das skills sem pedido.
-- Enquanto não houver dados reais (até a importação das planilhas no servidor, no passo 3 de
-  `deploy/VIRADA.md`), mudança de modelo regenera a migration existente do app e o banco local é
-  recriado (`migrate <app> zero` + `migrate`). Não crie migrations de conversão de dados.
-  Depois dessa importação, mudança de modelo ganha **migration nova**, nunca regenerada.
+- O servidor está em produção com dados reais: mudança de modelo ganha **migration nova**,
+  nunca regenerada (nem `migrate <app> zero`).

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edição do pedido · Abordagem A</title>
+<style>
+  :root { --tinta:#1f2328; --suave:#6a737d; --linha:#c9ced4; --fundo:#f6f7f8; --cartao:#fff;
+          --azul:#2f6fdb; --ambar:#b7791f; --ambar-f:#fff7e6; --verm:#c53030; --verm-f:#fff0f0;
+          --verde:#2f855a; --verde-f:#eefaf2; --cinza-f:#eef0f2; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; color:var(--tinta); background:var(--fundo); }
+  header.doc { padding:24px 16px 8px; max-width:1180px; margin:auto; }
+  header.doc h1 { margin:0 0 4px; font-size:20px; }
+  header.doc p { margin:0; color:var(--suave); max-width:80ch; }
+  nav.indice { max-width:1180px; margin:8px auto 0; padding:0 16px; display:flex; flex-wrap:wrap; gap:6px; }
+  nav.indice a { font-size:12px; padding:4px 8px; border:1px solid var(--linha); border-radius:999px; color:var(--tinta); text-decoration:none; background:#fff; }
+  section.estado { max-width:1180px; margin:28px auto; padding:0 16px; }
+  .estado-rotulo { display:flex; gap:8px; align-items:baseline; margin-bottom:8px; }
+  .estado-rotulo b { font-size:16px; }
+  .estado-rotulo span { color:var(--suave); }
+  .tela { display:grid; grid-template-columns:180px minmax(0,1fr); border:2px solid var(--tinta); border-radius:8px; overflow:hidden; background:var(--cartao); }
+  .lateral { background:var(--cinza-f); border-right:1px dashed var(--linha); padding:12px; font-size:12px; color:var(--suave); }
+  .lateral div { padding:6px 8px; border-radius:4px; }
+  .lateral .ativo { background:#fff; color:var(--tinta); font-weight:600; }
+  .conteudo { padding:16px; display:grid; gap:12px; min-width:0; }
+  .topo { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; }
+  .voltar { font-size:12px; color:var(--suave); }
+  h2 { margin:0; font-size:18px; }
+  .acoes { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn { border:1.5px solid var(--tinta); background:#fff; border-radius:6px; padding:6px 12px; font:inherit; font-size:13px; }
+  .btn.prim { background:var(--tinta); color:#fff; }
+  .btn.fantasma { border-style:dashed; color:var(--suave); }
+  .btn.perigo { border-color:var(--verm); color:var(--verm); }
+  .btn[aria-disabled=true] { opacity:.45; border-style:dashed; }
+  .regiao { border:1px dashed var(--linha); border-radius:6px; padding:12px; position:relative; }
+  .regiao > .nome { position:absolute; top:-9px; left:8px; background:#fff; padding:0 4px; font-size:11px; color:var(--suave); text-transform:uppercase; letter-spacing:.04em; }
+  .grade { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px 16px; }
+  dt { font-size:11px; color:var(--suave); } dd { margin:0; }
+  .mono { font-family:ui-monospace, monospace; }
+  .selo { display:inline-flex; gap:4px; align-items:center; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid currentColor; white-space:nowrap; }
+  .selo.verde { color:var(--verde); background:var(--verde-f); }
+  .selo.ambar { color:var(--ambar); background:var(--ambar-f); }
+  .selo.verm { color:var(--verm); background:var(--verm-f); }
+  .selo.cinza { color:var(--suave); background:var(--cinza-f); }
+  .aviso { border-left:4px solid; padding:10px 12px; border-radius:4px; display:grid; gap:4px; }
+  .aviso.ambar { border-color:var(--ambar); background:var(--ambar-f); }
+  .aviso.verm { border-color:var(--verm); background:var(--verm-f); }
+  .aviso.cinza { border-color:var(--suave); background:var(--cinza-f); }
+  .aviso.azul { border-color:var(--azul); background:#eef4ff; }
+  .aviso p { margin:0; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--cinza-f); font-size:13px; }
+  th { font-size:11px; color:var(--suave); font-weight:600; }
+  .campo { display:grid; gap:2px; }
+  .campo label { font-size:11px; color:var(--suave); }
+  .entrada { border:1.5px solid var(--linha); border-radius:4px; padding:5px 8px; background:#fff; min-height:30px; }
+  .entrada.mudou { border-color:var(--azul); background:#eef4ff; }
+  .qtd { width:72px; }
+  .antes { font-size:11px; color:var(--suave); text-decoration:line-through; }
+  .barra-salvar { position:sticky; bottom:0; display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; border-top:2px solid var(--tinta); padding:10px 12px; background:#fff; margin:0 -16px -16px; }
+  .duas { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:12px; }
+  .nota { font-size:12px; color:var(--suave); border:1px dotted var(--suave); padding:6px 8px; border-radius:4px; background:#fffef5; }
+  .nota::before { content:"✎ anotação do esboço: "; font-weight:600; }
+  ul.diff { margin:0; padding-left:16px; font-size:13px; }
+  .modo-faixa { background:#eef4ff; border:1.5px solid var(--azul); border-radius:6px; padding:8px 12px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; align-items:center; }
+  @media (max-width:760px) { .tela { grid-template-columns:1fr; } .lateral { display:none; } .duas { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header class="doc">
+  <h1>Abordagem A: modo de edição explícito na página de detalhe</h1>
+  <p>Esboço de baixa fidelidade. A página de detalhe continua sendo o lugar do pedido; "Editar" troca o recibo pelo
+  mesmo formulário do atendimento, já preenchido. As caixas tracejadas são regiões; as notas amarelas explicam a decisão.
+  Os textos são provisórios.</p>
+</header>
+<nav class="indice">
+  <a href="#a1">A1 · Editável (leitura)</a>
+  <a href="#a2">A2 · Modo de edição</a>
+  <a href="#a3">A3 · Editável com aviso</a>
+  <a href="#a4">A4 · Conflito no salvar</a>
+  <a href="#a5">A5 · Bloqueio temporário</a>
+  <a href="#a6">A6 · Bloqueado (lançado)</a>
+</nav>
+
+<!-- A1 -->
+<section class="estado" id="a1">
+  <div class="estado-rotulo"><b>A1 · Editável, em leitura</b><span>atendido, linhas pendentes, robô ainda não lançou</span></div>
+  <div class="tela">
+    <aside class="lateral"><div>Painel</div><div class="ativo">Pedidos</div><div>Saída avulsa</div><div>Automações</div><div>Curva ABC</div></aside>
+    <div class="conteudo">
+      <span class="voltar">← Voltar ao painel</span>
+      <div class="topo">
+        <h2>Detalhes do pedido</h2>
+        <div class="acoes">
+          <button class="btn">✎ Editar pedido</button>
+          <button class="btn prim">🖨 Imprimir recibo</button>
+        </div>
+      </div>
+      <div class="aviso cinza"><p><span class="selo verde">✎ Editável</span>&nbsp; Pode ser editado até o robô lançar no SCPI. Depois disso, fica bloqueado.</p></div>
+      <div class="nota">"Editar" fica <em>secundário</em>; imprimir continua o primário. O selo diz o estado em texto e ícone, nunca só pela cor, e já avisa quando a janela fecha.</div>
+      <div class="regiao"><span class="nome">recibo · cabeçalho</span>
+        <div class="grade">
+          <div><dt>Nº</dt><dd class="mono">P-000412</dd></div>
+          <div><dt>Solicitante</dt><dd>Maria da Silva</dd></div>
+          <div><dt>Destino</dt><dd>Oficina Central</dd></div>
+          <div><dt>Requisição SCPI</dt><dd>Aguardando o robô</dd></div>
+          <div><dt>Situação</dt><dd><span class="selo verde">Atendido</span></dd></div>
+        </div>
+      </div>
+      <div class="regiao"><span class="nome">saída</span>
+        <div class="grade">
+          <div><dt>Data efetiva</dt><dd>16/10/2026</dd></div>
+          <div><dt>Recebedor</dt><dd>João Pereira</dd></div>
+          <div><dt>Centro de custo</dt><dd>Manutenção de frota</dd></div>
+          <div><dt>Tipo de saída</dt><dd>Consumo</dd></div>
+          <div><dt>Placa</dt><dd class="mono">ABC1D23</dd></div>
+        </div>
+      </div>
+      <div class="regiao"><span class="nome">materiais</span>
+        <table><thead><tr><th>Material</th><th>Pedido</th><th>Entregue</th></tr></thead>
+          <tbody><tr><td><span class="mono">001.002.003</span> Luva nitrílica</td><td>10 PAR</td><td>10 PAR</td></tr>
+          <tr><td><span class="mono">004.005.006</span> Fita isolante</td><td>5 UN</td><td>3 UN</td></tr></tbody></table>
+      </div>
+      <div class="regiao"><span class="nome">histórico de alterações (recolhido)</span>
+        <p style="margin:0">▸ Nenhuma alteração depois do atendimento.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- A2 -->
+<section class="estado" id="a2">
+  <div class="estado-rotulo"><b>A2 · Modo de edição</b><span>mesma URL com <code>/editar/</code>; o formulário é o do atendimento</span></div>
+  <div class="tela">
+    <aside class="lateral"><div>Painel</div><div class="ativo">Pedidos</div><div>Saída avulsa</div><div>Automações</div><div>Curva ABC</div></aside>
+    <div class="conteudo">
+      <span class="voltar">← Voltar ao pedido (descarta as alterações)</span>
+      <div class="modo-faixa">
+        <span><b>Editando P-000412</b> · nada é gravado até você salvar</span>
+        <span class="selo verde">✎ Editável até o lançamento</span>
+      </div>
+      <div class="duas">
+        <div style="display:grid; gap:12px; min-width:0">
+          <div class="regiao"><span class="nome">dados do pedido</span>
+            <div class="grade">
+              <div class="campo"><label>Solicitante</label><div class="entrada">Maria da Silva</div></div>
+              <div class="campo"><label>Destino</label><div class="entrada mudou">Oficina Norte</div><span class="antes">Oficina Central</span></div>
+              <div class="campo"><label>Observação</label><div class="entrada">—</div></div>
+            </div>
+          </div>
+          <div class="regiao"><span class="nome">saída (o mesmo bloco do atendimento)</span>
+            <div class="grade">
+              <div class="campo"><label>Data efetiva *</label><div class="entrada">16/10/2026</div></div>
+              <div class="campo"><label>Recebedor *</label><div class="entrada">João Pereira</div></div>
+              <div class="campo"><label>Centro de custo *</label><div class="entrada">Manutenção de frota ▾</div></div>
+              <div class="campo"><label>Tipo de saída *</label><div class="entrada">Consumo ▾</div></div>
+              <div class="campo"><label>Placa</label><div class="entrada mono">ABC1D23 ▾</div></div>
+              <div class="campo"><label>&nbsp;</label><div>☐ Não lançar no SCPI</div></div>
+            </div>
+          </div>
+          <div class="regiao"><span class="nome">materiais (trocar, acrescentar, mudar entregue)</span>
+            <table><thead><tr><th>Material</th><th>Pedido</th><th>Entregue</th><th></th></tr></thead>
+              <tbody>
+                <tr><td><span class="mono">001.002.003</span> Luva nitrílica</td><td>10 PAR</td><td><div class="entrada qtd">10</div></td><td>⇄ Trocar</td></tr>
+                <tr><td><span class="mono">004.005.006</span> Fita isolante</td><td>5 UN</td><td><div class="entrada qtd mudou">5</div><span class="antes">3</span></td><td>⇄ Trocar</td></tr>
+              </tbody></table>
+            <p style="margin:8px 0 0"><button class="btn fantasma">＋ Acrescentar material</button></p>
+          </div>
+        </div>
+        <div class="regiao"><span class="nome">resumo das alterações</span>
+          <ul class="diff">
+            <li>Destino: Oficina Central → <b>Oficina Norte</b></li>
+            <li>Fita isolante: entregue 3 → <b>5 UN</b></li>
+          </ul>
+          <div class="nota" style="margin-top:8px">Painel ao lado no desktop e acima da barra no celular. É o "review before commit" do Shopify: quem aprova vê o que muda antes de gravar.</div>
+        </div>
+      </div>
+      <div class="barra-salvar">
+        <span style="font-size:12px;color:var(--suave)">2 alterações · as linhas do SCPI são refeitas ao salvar</span>
+        <div class="acoes"><button class="btn">Descartar</button><button class="btn prim">✓ Salvar alterações</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="nota" style="margin-top:8px">Salvar é uma transação só: confere que nada mudou desde que a página abriu (pelo robô ou por outra pessoa), regrava pedido, atendimento e linhas de saída. Não há autosave campo a campo: cada gravação parcial abriria uma janela para o robô lançar um pedido pela metade.</div>
+</section>
+
+<!-- A3 -->
+<section class="estado" id="a3">
+  <div class="estado-rotulo"><b>A3 · Editável com aviso</b><span>três casos; o aviso aparece na leitura e repete no modo de edição</span></div>
+  <div class="tela">
+    <aside class="lateral"><div>Painel</div><div class="ativo">Pedidos</div></aside>
+    <div class="conteudo">
+      <div class="topo"><h2>Detalhes do pedido</h2><div class="acoes"><button class="btn">✎ Editar pedido</button><button class="btn prim">🖨 Imprimir recibo</button></div></div>
+      <div class="aviso ambar"><p><b>⚠ O recibo já foi impresso (16/10 14:02).</b> Se você mudar materiais, quantidades ou o recebedor, o papel assinado deixa de valer: o pedido volta para os recibos pendentes e precisa ser impresso de novo.</p></div>
+      <div class="aviso verm"><p><b>⚠ O robô recusou este lote:</b> "Centro de custo inexistente no SCPI." Corrija e salve. O lote volta para a fila do próximo lançamento.</p></div>
+      <div class="aviso azul"><p><b>ⓘ Um lançamento no SCPI está em andamento agora.</b> Se o robô chegar a este pedido antes de você salvar, suas alterações serão recusadas e o pedido fica bloqueado. <span style="color:var(--suave)">(some quando o robô termina)</span></p></div>
+      <div class="nota">"Editável com aviso" não é um estado salvo no banco. É um aviso calculado a partir de recibo impresso, lote com ERRO ou execução em andamento. Cada aviso diz a consequência e o que fazer.</div>
+    </div>
+  </div>
+</section>
+
+<!-- A4 -->
+<section class="estado" id="a4">
+  <div class="estado-rotulo"><b>A4 · Conflito no instante do lançamento</b><span>o robô travou o lote enquanto a pessoa editava</span></div>
+  <div class="tela">
+    <aside class="lateral"><div>Painel</div><div class="ativo">Pedidos</div></aside>
+    <div class="conteudo">
+      <div class="modo-faixa" style="border-color:var(--verm); background:var(--verm-f)">
+        <span><b>Editando P-000412</b></span><span class="selo verm">🔒 Entrou em lançamento</span>
+      </div>
+      <div class="aviso verm" role="alert">
+        <p><b>Suas alterações não foram gravadas.</b> Às 10:02 o robô começou a lançar este pedido no SCPI (execução #57), depois que você abriu a edição. Daqui em diante o pedido não pode mais ser editado.</p>
+        <p>O que você tinha mudado continua aqui embaixo, só para consulta. Se ainda for preciso, ajuste no SCPI depois que a requisição sair.</p>
+      </div>
+      <div class="regiao"><span class="nome">alterações não gravadas (somente leitura)</span>
+        <ul class="diff"><li>Destino: Oficina Central → Oficina Norte</li><li>Fita isolante: entregue 3 → 5 UN</li></ul>
+        <p style="margin:8px 0 0"><button class="btn">⧉ Copiar resumo</button></p>
+      </div>
+      <div class="barra-salvar"><span></span><div class="acoes"><button class="btn prim">Ver o pedido</button></div></div>
+      <div class="nota">O formulário vira leitura e o "Salvar" sai de cena. O resumo das alterações perdidas continua visível: nunca se perde em silêncio o que a pessoa digitou. Se o robô estiver rodando, o modo de edição também pergunta a situação a cada poucos segundos e mostra esta faixa antes do clique em Salvar.</div>
+    </div>
+  </div>
+</section>
+
+<!-- A5 -->
+<section class="estado" id="a5">
+  <div class="estado-rotulo"><b>A5 · Bloqueio temporário</b><span>EM_LANCAMENTO ou VERIFICAR: ainda não se sabe se entrou no SCPI</span></div>
+  <div class="tela">
+    <aside class="lateral"><div>Painel</div><div class="ativo">Pedidos</div></aside>
+    <div class="conteudo">
+      <div class="topo"><h2>Detalhes do pedido</h2><div class="acoes"><button class="btn" aria-disabled="true" title="Bloqueado enquanto o resultado no SCPI não for conferido">🔒 Editar pedido</button><button class="btn prim">🖨 Imprimir recibo</button></div></div>
+      <div class="aviso ambar"><p><span class="selo ambar">⏳ Verificar no SCPI</span>&nbsp; Edição suspensa: o robô não confirmou se a requisição foi gravada. Se, na conferência, o lote for liberado para relançar, a edição volta a ficar disponível.</p>
+        <p><a href="#">Resolver em Automações →</a></p></div>
+      <div class="nota">O botão continua no mesmo lugar, desabilitado e com cadeado e o motivo. É o mesmo padrão do "Lançar no SCPI" bloqueado em Automações. Esconder o botão faria a pessoa procurar por ele.</div>
+    </div>
+  </div>
+</section>
+
+<!-- A6 -->
+<section class="estado" id="a6">
+  <div class="estado-rotulo"><b>A6 · Bloqueado definitivo</b><span>lançado (ou parcialmente lançado) no SCPI</span></div>
+  <div class="tela">
+    <aside class="lateral"><div>Painel</div><div class="ativo">Pedidos</div></aside>
+    <div class="conteudo">
+      <div class="topo"><h2>Detalhes do pedido</h2><div class="acoes"><button class="btn" aria-disabled="true">🔒 Editar pedido</button><button class="btn prim">🖨 Imprimir recibo</button></div></div>
+      <div class="aviso cinza"><p><span class="selo cinza">🔒 Lançado no SCPI</span>&nbsp; Requisição <span class="mono">004213/26</span>, lançada em 16/10/2026 às 15:40. O pedido não pode mais ser editado aqui; correções são feitas no SCPI.</p></div>
+      <div class="regiao"><span class="nome">recibo (igual ao A1, sem campos)</span><p style="margin:0;color:var(--suave)">…</p></div>
+      <div class="regiao"><span class="nome">histórico de alterações</span>
+        <ul class="diff">
+          <li>16/10 11:20 · <b>Ana Souza</b> mudou o destino (Oficina Central → Oficina Norte) e a fita isolante (3 → 5 UN). Recibo voltou a pendente.</li>
+          <li>16/10 09:05 · Atendido por <b>João Pereira</b>.</li>
+        </ul>
+      </div>
+      <div class="nota">Depois do lançamento, nada de "Editar". Também não há "Solicitar alteração", porque o caminho de correção está no SCPI (premissa a confirmar). O histórico mostra quem mudou o quê antes do lançamento. Ele fica só na tela e nunca no recibo impresso.</div>
+    </div>
+  </div>
+</section>
+</body>
+</html>

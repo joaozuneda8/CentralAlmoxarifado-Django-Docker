@@ -37,7 +37,7 @@ o centro (pedidos.js).
     </div>
     <div class="campo">
       <label class="campo-rotulo" for="placa">Veículo (placa)</label>
-      <select id="placa" class="campo-entrada mono" name="placa">
+      <select id="placa" class="campo-entrada mono" name="placa" data-dropdown-digitavel>
         <option value="">Sem veículo</option>
         {% for placa, descricao in placas %}<option value="{{ placa }}" data-centro="{{ descricao }}"{% if campos.placa == placa %} selected{% endif %}>{{ placa }} — {{ descricao }}</option>{% endfor %}
       </select>
@@ -47,7 +47,7 @@ o centro (pedidos.js).
         <label class="campo-rotulo" for="centro_custo">Centro de custo *</label>
         <span id="centro_custo-dica" class="campo-nota" hidden>{% include "interface/_icone.html" with nome="cadeado" %}definido pela placa</span>
       </div>
-      <select id="centro_custo" class="campo-entrada" name="centro_custo">
+      <select id="centro_custo" class="campo-entrada" name="centro_custo" data-dropdown-digitavel>
         <option value="">Selecione…</option>
         {% for descricao, codigo in centros %}<option value="{{ descricao }}"{% if campos.centro_custo == descricao %} selected{% endif %}>{{ descricao }} — {{ codigo }}</option>{% endfor %}
       </select>

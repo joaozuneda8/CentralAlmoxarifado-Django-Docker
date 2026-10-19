@@ -1,0 +1,7 @@
+{% comment %}As alterações de um salvar recusado, para consulta (e cópia, pelo pedidos.js).{% endcomment %}{% if nao_gravadas %}
+<div class="pilha nao-gravadas">
+  <p class="rotulo-secao">Alterações não gravadas</p>
+  <ul data-resumo-alteracoes>{% for frase in nao_gravadas %}<li>{{ frase }}</li>{% endfor %}</ul>
+  <button type="button" class="botao-suave" data-copiar-resumo hidden>{% include "interface/_icone.html" with nome="recibo" %}<span>Copiar resumo</span></button>
+</div>
+{% endif %}

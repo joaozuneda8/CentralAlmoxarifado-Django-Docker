@@ -12,6 +12,7 @@ urlpatterns = [
     path("painel/", almoxarifado.painel, name="painel"),
     path("painel/pedidos/<str:numero>/", almoxarifado.detalhe, name="detalhe"),
     path("painel/pedidos/<str:numero>/atender/", almoxarifado.atender, name="atender"),
+    path("painel/pedidos/<str:numero>/editar/", almoxarifado.editar, name="editar"),
     path(
         "painel/pedidos/<str:numero>/materiais/",
         almoxarifado.atendimento_materiais,

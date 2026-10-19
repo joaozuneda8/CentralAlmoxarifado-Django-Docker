@@ -1,0 +1,10 @@
+{% comment %}
+Até quando o atendimento se edita, no topo do detalhe (fora da impressão): o que acontece ao salvar
+quando pode editar, ou por que não pode.
+{% endcomment %}{% if edicao.permitida %}
+<div class="aviso {% if lote_com_erro %}aviso-atencao{% else %}aviso-info{% endif %} nao-imprimir" role="note">{% include "interface/_icone.html" with nome=lote_com_erro|yesno:"alerta,info" %}<p>Pode ser editado até o robô lançar no SCPI.{% if a.recibo_impresso_em %} Salvar alterações devolve o recibo para impressão.{% endif %}{% if lote_com_erro %} Corrija e salve: o lote volta para a fila do próximo lançamento.{% endif %}</p></div>
+{% elif edicao.chave == "suspensa" %}
+<div class="aviso aviso-atencao nao-imprimir" role="note">{% include "interface/_icone.html" with nome="cadeado" %}<p>{{ edicao.motivo }}</p></div>
+{% elif edicao.chave == "bloqueada" %}
+<div class="aviso aviso-info nao-imprimir" role="note">{% include "interface/_icone.html" with nome="cadeado" %}<p>{{ edicao.motivo }}</p></div>
+{% endif %}

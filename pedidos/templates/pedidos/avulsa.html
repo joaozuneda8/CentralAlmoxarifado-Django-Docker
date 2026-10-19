@@ -1,19 +1,21 @@
 {% extends "interface/base_almoxarifado.html" %}
 {% load static %}
-{% block title %}Saída avulsa — Central Almoxarifado{% endblock %}
+{% block title %}{% if editando %}{{ pedido.numero }}{% else %}Saída avulsa{% endif %} — Central Almoxarifado{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'pedidos/css/pedidos.css' %}">{% endblock %}
 {% block extra_head %}<script src="{% static 'pedidos/js/pedidos.js' %}" defer></script>{% endblock %}
 {% block rotulo %}Origem: avulsa{% endblock %}
-{% block heading %}Saída avulsa{% endblock %}
-{% block sub %}Saída registrada direto pelo almoxarifado, sem pedido anterior. Cada material vira uma linha de saída, lançada depois no SCPI pelo robô.{% endblock %}
+{% block voltar %}{% if editando %}<a class="link-voltar" href="{% url 'pedidos:detalhe' pedido.numero %}">{% include "interface/_icone.html" with nome="seta-esquerda" %}Voltar à saída (descarta as alterações)</a>{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block heading %}{% if editando %}Editar saída{% else %}Saída avulsa{% endif %}{% endblock %}
+{% block sub %}{% if not editando %}Saída registrada direto pelo almoxarifado, sem pedido anterior. Cada material vira uma linha de saída, lançada depois no SCPI pelo robô.{% endif %}{% endblock %}
 
 {% block page %}
 {% if indisponivel %}
 <div class="aviso aviso-atencao" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<p>O cadastro de materiais não está disponível. Veja a página Catálogo.</p></div>
 {% else %}
-<form method="post" action="{% url 'pedidos:avulsa' %}" class="pilha-larga">
+{% if editando %}{% include "pedidos/_edicao_faixa.html" %}{% endif %}
+<form method="post" action="{% if editando %}{% url 'pedidos:editar' pedido.numero %}{% else %}{% url 'pedidos:avulsa' %}{% endif %}" class="pilha-larga"{% if editando %} data-editando{% endif %}>
   {% csrf_token %}
-  <input type="hidden" name="envio_id" value="{{ envio_id }}">
+  {% if editando %}<input type="hidden" name="versao" value="{{ versao }}">{% else %}<input type="hidden" name="envio_id" value="{{ envio_id }}">{% endif %}
 
   {% if mensagem %}
   <div class="aviso aviso-erro" role="alert">{% include "interface/_icone.html" with nome="alerta" %}<div><p>{{ mensagem }}</p>{% if erros %}<ul>{% for erro in erros %}<li>{{ erro.texto }}</li>{% endfor %}</ul>{% endif %}</div></div>
@@ -34,12 +36,12 @@
     <div class="passo-corpo">{% include "pedidos/_materiais.html" %}</div>
   </section>
   </div>
-  {% include "pedidos/_resumo_pedido.html" with rotulo="Registrar saída" rotulo_novo="Já conferi as saídas — registrar como nova saída" icone="saida" %}
+  {% if editando %}{% include "pedidos/_resumo_pedido.html" with rotulo="Salvar alterações" rotulo_novo="Salvar alterações" icone="check" %}{% else %}{% include "pedidos/_resumo_pedido.html" with rotulo="Registrar saída" rotulo_novo="Já conferi as saídas — registrar como nova saída" icone="saida" %}{% endif %}
   </div>
   </div>
 
   <div class="acoes acoes-final">
-    {% include "pedidos/_enviar.html" with rotulo="Registrar saída" rotulo_novo="Já conferi as saídas — registrar como nova saída" icone="saida" %}
+    {% if editando %}<a class="botao botao-secundario" href="{% url 'pedidos:detalhe' pedido.numero %}" data-descartar-edicao>Descartar</a>{% include "pedidos/_enviar.html" with rotulo="Salvar alterações" rotulo_novo="Salvar alterações" icone="check" %}{% else %}{% include "pedidos/_enviar.html" with rotulo="Registrar saída" rotulo_novo="Já conferi as saídas — registrar como nova saída" icone="saida" %}{% endif %}
   </div>
 </form>
 {% endif %}

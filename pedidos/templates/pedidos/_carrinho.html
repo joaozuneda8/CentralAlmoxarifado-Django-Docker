@@ -32,15 +32,18 @@ formulário (o rótulo do caso divergente vem de lá). Igual nos formulários p�
       {% for linha in carrinho.linhas %}
       <li class="carrinho-linha{% if linha.codigo in codigos_erro %} carrinho-linha-erro{% endif %}" data-codigo="{{ linha.codigo }}" data-qtd="{{ linha.texto }}{% if linha.item.unidade %} {{ linha.item.unidade }}{% endif %}">
         <input type="hidden" name="item_codigo" value="{{ linha.codigo }}">
-        <span class="material-dados"><strong>{{ linha.item.nome|default:linha.codigo }}</strong>{% if not fluxo.publico %}<span class="mono texto-secundario texto-pequeno">{{ linha.codigo }}</span>{% endif %}{% if linha.codigo in codigos_erro %}<span><span class="selo selo-erro">Corrigir</span></span>{% endif %}</span>
         {% comment %}
-        A quantidade aparece como texto, com "Alterar", que abre o − / + com "Confirmar" e o botão de
-        fechar (pedidos.js); o campo só manda a alteração no "Confirmar" (evento
-        `confirmar-quantidade`). Sem JavaScript, só o campo fica à vista (sem o − / +) e vai com o envio.
+        Mesmo desenho do resultado da busca (_resultados.html): a linha inteira é o botão que abre a
+        quantidade (`material-abrir`, esticado sobre a linha; o lápis só indica que clica) e o
+        "Remover" fica embaixo, à direita; aberta, a quantidade fica à esquerda, o "Confirmar" toma o
+        lugar do "Remover" e o botão de fechar vai para o canto de cima (pedidos.js). O campo só manda a alteração
+        no "Confirmar" (evento `confirmar-quantidade`). Sem JavaScript, só o campo fica à vista (sem o
+        − / +) e vai com o envio.
         {% endcomment %}
+        <button type="button" class="material-abrir" data-alterar-abrir aria-expanded="false" aria-controls="carrinho-qtd-area-{{ forloop.counter }}" aria-label="Alterar a quantidade de {{ linha.item.nome|default:linha.codigo }}">Alterar</button>
+        <span class="material-dados"><span class="material-titulo"><strong>{{ linha.item.nome|default:linha.codigo }}</strong></span>{% if not fluxo.publico %}<span class="mono texto-secundario texto-pequeno">{{ linha.codigo }}</span>{% endif %}{% if linha.codigo in codigos_erro %}<span><span class="selo selo-erro">Corrigir</span></span>{% endif %}<span class="material-mais" aria-hidden="true">{% include "interface/_icone.html" with nome="lapis" %}</span></span>
         <span class="linha carrinho-acoes" data-alterar>
           <span class="carrinho-qtd-texto"><strong>{{ linha.texto }}</strong>{% if linha.item.unidade %} {{ linha.item.unidade }}{% endif %}</span>
-          <button type="button" class="botao botao-secundario carrinho-alterar" data-alterar-abrir aria-expanded="false" aria-controls="carrinho-qtd-area-{{ forloop.counter }}" aria-label="Alterar a quantidade de {{ linha.item.nome|default:linha.codigo }}">Alterar</button>
           <span class="carrinho-qtd-area" id="carrinho-qtd-area-{{ forloop.counter }}">
             <label class="visually-hidden" for="carrinho-qtd-{{ forloop.counter }}">Quantidade de {{ linha.item.nome|default:linha.codigo }}{% if linha.item.unidade %} ({{ linha.item.unidade }}){% endif %}</label>
             <span class="quantidade">
@@ -62,7 +65,7 @@ formulário (o rótulo do caso divergente vem de lá). Igual nos formulários p�
     <p class="texto-secundario">Nenhum material adicionado ainda.</p>
     {% endif %}
     <div class="carrinho-acoes-gaveta carrinho-so-gaveta">
-      {% if carrinho.linhas %}<button type="button" class="botao botao-primario botao-bloco" data-carrinho-enviar>{% include "interface/_icone.html" with nome=fluxo.icone_enviar %}<span data-carrinho-enviar-rotulo>{{ fluxo.rotulo_enviar }}</span></button>{% endif %}
+      {% if carrinho.linhas %}<button type="button" class="botao botao-primario botao-bloco" data-carrinho-enviar>{% if editando %}{% include "interface/_icone.html" with nome="check" %}<span data-carrinho-enviar-rotulo>Salvar alterações</span>{% else %}{% include "interface/_icone.html" with nome=fluxo.icone_enviar %}<span data-carrinho-enviar-rotulo>{{ fluxo.rotulo_enviar }}</span>{% endif %}</button>{% endif %}
       <button type="button" class="botao {% if carrinho.linhas %}botao-secundario{% else %}botao-primario{% endif %} botao-bloco" data-carrinho-continuar>Adicionar mais materiais</button>
     </div>
   </dialog>

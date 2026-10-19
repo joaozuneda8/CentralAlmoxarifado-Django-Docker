@@ -135,7 +135,10 @@ def test_centro_de_custo_tem_dica_para_quando_a_placa_o_define(client, usuario):
     client.force_login(usuario)
     r = client.get(reverse("pedidos:avulsa"))
     assert '<span id="centro_custo-dica" class="campo-nota" hidden>' in r.text
-    assert '<select id="centro_custo" class="campo-entrada" name="centro_custo">' in r.text
+    centro = '<select id="centro_custo" class="campo-entrada" name="centro_custo"'
+    assert centro + " data-dropdown-digitavel>" in r.text
+    # A placa também é um select digitável (campo de texto como o do recebedor, que filtra a lista).
+    assert 'name="placa" data-dropdown-digitavel>' in r.text
 
 
 def test_pagina_com_erro_mantem_o_carrinho(client, usuario):

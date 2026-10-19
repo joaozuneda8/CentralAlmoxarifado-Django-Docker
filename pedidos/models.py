@@ -36,6 +36,9 @@ class Pedido(models.Model):
     )
     # Endereço de origem do envio público: base dos limites contra abuso.
     ip = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+    # Soma 1 a cada edição salva do atendimento: o formulário de edição a leva, e o salvar
+    # recusa quando outra pessoa gravou antes (concorrência otimista).
+    versao = models.PositiveIntegerField("versão", default=0)
 
     class Meta:
         ordering = ["-criado_em"]
@@ -180,6 +183,30 @@ class Atendimento(models.Model):
 
     def __str__(self):
         return f"Atendimento de {self.pedido.numero}"
+
+
+class AlteracaoPedido(models.Model):
+    """Uma edição salva do atendimento (ou da saída avulsa): quem, quando e o que mudou. Só a
+    tela do pedido mostra; o recibo, nunca."""
+
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name="alteracoes")
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="alteracoes_pedido"
+    )
+    em = models.DateTimeField(default=timezone.now)
+    versao = models.PositiveIntegerField("versão gravada")
+    # `regras.diferencas_atendimento`: só textos, para caber no JSON.
+    diferencas = models.JSONField("diferenças", default=list)
+    # Situação e mensagem das linhas de saída substituídas pela edição.
+    scpi_antes = models.JSONField("linhas de saída antes", default=list)
+
+    class Meta:
+        ordering = ["-em"]
+        verbose_name = "alteração do pedido"
+        verbose_name_plural = "alterações dos pedidos"
+
+    def __str__(self):
+        return f"{self.pedido.numero} v{self.versao}"
 
 
 class LinhaSaida(models.Model):

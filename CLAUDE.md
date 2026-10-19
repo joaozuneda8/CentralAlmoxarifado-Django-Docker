@@ -426,7 +426,9 @@ transações precisam se comportar como no servidor.
   serena start-mcp-server --context claude-code --project-from-cwd`). O diretório dos executáveis do
   uv (`uv tool update-shell`) precisa estar no `PATH` de quem abre o Claude Code, porque os hooks
   chamam o `serena-hooks`. Confira com `claude mcp list` (o `serena` aparece conectado). Sem o
-  executável, os hooks só dão erro sem bloquear nada (o `.claude/setup-nuvem.sh` não o instala).
+  executável, os hooks (que checam `command -v serena-hooks` antes de chamá-lo) saem calados, sem
+  erro e sem decidir nada. Isso não instala o Serena nem disponibiliza o servidor MCP: na nuvem, o
+  `.claude/setup-nuvem.sh` não os instala e a sessão segue só com as ferramentas nativas.
 - O projeto usa a interface `tools` (`agent_interface: tools` em `.serena/project.yml`, versionado;
   o cache e o `project.local.yml` não): cada operação é uma ferramenta MCP, `mcp__serena__<nome>`. A
   preferência global do Serena continua REPL, e a do projeto a vence quando o projeto é ativado na

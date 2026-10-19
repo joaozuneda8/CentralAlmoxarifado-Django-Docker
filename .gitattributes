@@ -6,3 +6,7 @@ deploy/*.sh text eol=lf
 deploy/crontab text eol=lf
 Dockerfile text eol=lf
 compose.yaml text eol=lf
+compose.*.yaml text eol=lf
+# PowerShell 5.1: scripts usam texto ASCII para nao depender de BOM UTF-8.
+deploy/*.ps1 text eol=lf
+deploy/tests/*.ps1 text eol=lf

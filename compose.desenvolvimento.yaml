@@ -1,0 +1,20 @@
+# Sobrepoe a base explicitamente. Mesmo com .env copiado de producao, nao usa integracoes.
+services:
+  web:
+    build:
+      context: .
+      args:
+        REVISAO_APP: ${REVISAO_APP:?Informe a revisao}
+    environment: &desenvolvimento
+      DEBUG: "1"
+      USAR_HTTPS: "0"
+      PROXY_HTTPS: "0"
+      LANCAMENTO_REAL: "0"
+      SAEP_USER: ""
+      SAEP_PASS: ""
+      TELEGRAM_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
+  agendador:
+    environment: *desenvolvimento
+    # Nunca iniciado pelo atualizador de desenvolvimento.
+    profiles: [agendamento-manual-dev]

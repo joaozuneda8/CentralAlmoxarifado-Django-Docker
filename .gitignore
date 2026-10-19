@@ -1,5 +1,10 @@
 .env
 .env.banco
+.env.*
+!.env.example
+!.env.banco.example
+.deploy-ambiente
+.deploy-*.json
 .venv/
 __pycache__/
 *.pyc

@@ -81,13 +81,23 @@ Pré-requisitos: Python 3.13, [uv](https://docs.astral.sh/uv/) e um MySQL 8 ou M
 
 ## Implantação
 
-O sistema roda em Docker Compose (`compose.yaml`), atrás do Apache em `/almoxarifado`: o
-`banco` (MariaDB), o `web` (waitress, que também dispara os robôs da página) e o `agendador`
-(supercronic com `deploy/crontab`: importações e backup). No servidor, os comandos rodam no
-container: `docker compose exec web python manage.py <comando>`.
+**Ambiente confirmado:** Windows 10 Pro com Docker Desktop compartilhado. A produção
+atual tem dados reais; não reiniciar Windows, WSL ou Docker. A separação da nova
+produção está em [deploy/AMBIENTES.md](deploy/AMBIENTES.md), e o fluxo de branches,
+PRs e imagens versionadas em [deploy/FLUXO_GIT.md](deploy/FLUXO_GIT.md).
+O `compose.yaml` abaixo é legado; o `deploy/atualizar.sh` foi bloqueado para evitar
+atualizações no ambiente errado. Os novos ambientes usam Compose e PowerShell
+com alvo explícito, sem deploy automático ao fazer push.
 
-- [deploy/INSTALACAO.md](deploy/INSTALACAO.md): instalação (Linux ou WSL2), `.env` de produção,
-  Apache, agendador, backup e atualização (`bash deploy/atualizar.sh`). Guia para o André.
+O sistema usa Docker Compose: `banco` (MariaDB), `web` (waitress e robôs da página)
+e `agendador` (supercronic com `deploy/crontab`: importações e backup). O acesso atual
+é HTTP em `45.172.240.231:8010`; Apache e HTTPS não foram confirmados. Apache em
+`/almoxarifado` era a proposta anterior, não a topologia atual verificada.
+Os comandos de manutenção devem selecionar explicitamente o projeto e os arquivos
+do ambiente, conforme `deploy/AMBIENTES.md`.
+
+- [deploy/INSTALACAO.md](deploy/INSTALACAO.md): ambiente Windows confirmado,
+  preparação da produção nova e restrições da máquina. Guia para o André.
 - [deploy/VIRADA.md](deploy/VIRADA.md): roteiro da migração do Apps Script e da virada.
 
 Três coisas a saber:

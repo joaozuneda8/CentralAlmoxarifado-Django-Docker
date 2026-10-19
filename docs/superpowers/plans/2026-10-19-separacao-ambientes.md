@@ -32,8 +32,8 @@ Revisão: colisão de projeto/volumes/imagens; resolução de caminhos em pastas
 variáveis herdadas do terminal; checks de tag desatualizados; migrations sem rollback automático.
 
 Verificação local: 1292 testes aprovados, 1 ignorado (flags Windows); Ruff e migrations
-sem diferenças; contratos PowerShell 7.6.7 e Compose 2.30.3 aprovados. CI Windows 5.1
-a conferir no PR. Revisão independente sem achados materiais; barreira adicional
+sem diferenças; contratos PowerShell 7.6.7 e Compose 2.30.3 aprovados. CI Windows 5.1 e MariaDB no GitHub aprovadas na primeira rodada do PR.
+Actions atualizadas e fixadas pelos SHAs dos releases oficiais após aviso de Node 20. Revisão independente sem achados materiais; barreira adicional
 para agendador ativo coberta por teste de recusa observado falhar antes da correção.
 GitHub: develop criada de bf2d0a6; main/develop protegidas com PR e checks;
 ruleset de tags v* ativo. Nenhuma imagem publicada e nenhum deploy executado.

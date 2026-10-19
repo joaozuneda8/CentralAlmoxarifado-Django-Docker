@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [{ "type": "command", "command": "if command -v serena-hooks >/dev/null 2>&1; then exec serena-hooks remind --client=claude-code; fi" }]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [{ "type": "command", "command": "if command -v serena-hooks >/dev/null 2>&1; then exec serena-hooks activate --client=claude-code; fi" }]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [{ "type": "command", "command": "if command -v serena-hooks >/dev/null 2>&1; then exec serena-hooks cleanup --client=claude-code; fi" }]
+      }
+    ]
+  }
+}

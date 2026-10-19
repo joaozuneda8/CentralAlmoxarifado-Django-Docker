@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Regra prioritária: código Python com o Serena
+
+- Para investigar ou alterar código Python, use primeiro a análise semântica do Serena, antes de
+  uma sequência de buscas ou leituras de arquivos: `find_symbol` ou `get_symbols_overview` para
+  localizar implementações, e `find_referencing_symbols` para ver quem depende de um símbolo e o
+  impacto de uma mudança.
+- Se as ferramentas `mcp__serena__*` não estiverem na lista, descubra-as com o `ToolSearch`
+  (`select:mcp__serena__get_symbols_overview,mcp__serena__find_symbol,` e
+  `mcp__serena__find_referencing_symbols`) antes de concluir que o Serena está indisponível.
+- Read, Grep e Bash são o complemento: templates, `{% url %}`, referências dinâmicas, JS, CSS,
+  configurações e o que o LSP não cobre. Tarefa sem código Python (documentação, template,
+  estilo) não precisa do Serena.
+- Com o Serena indisponível, use as ferramentas nativas e avise o usuário da limitação.
+- Instalação, limites e hooks: seção "Serena" mais abaixo.
+
 ## O projeto
 
 Reescrita em Django do Central Almoxarifado (hoje Google Apps Script + Google Sheets), sem
@@ -403,6 +418,53 @@ transações precisam se comportar como no servidor.
 - O log usa `ConcurrentRotatingFileHandler` porque o waitress e os comandos gravam no mesmo
   arquivo (no container também: `web` e `agendador` dividem `dados/logs`); no Windows o
   `RotatingFileHandler` não consegue girar um arquivo aberto por outro processo.
+
+## Serena (exploração semântica do código)
+
+- Pré-requisitos, uma vez por máquina (o Serena roda no host, sem Docker): `uv tool install -p 3.13
+  serena-agent`, `serena init` e `serena setup claude-code` (ou `claude mcp add --scope user serena --
+  serena start-mcp-server --context claude-code --project-from-cwd`). O diretório dos executáveis do
+  uv (`uv tool update-shell`) precisa estar no `PATH` de quem abre o Claude Code, porque os hooks
+  chamam o `serena-hooks`. Confira com `claude mcp list` (o `serena` aparece conectado). Sem o
+  executável, os hooks (que checam `command -v serena-hooks` antes de chamá-lo) saem calados, sem
+  erro e sem decidir nada. Isso não instala o Serena nem disponibiliza o servidor MCP: na nuvem, o
+  `.claude/setup-nuvem.sh` não os instala e a sessão segue só com as ferramentas nativas.
+- O projeto usa a interface `tools` (`agent_interface: tools` em `.serena/project.yml`, versionado;
+  o cache e o `project.local.yml` não): cada operação é uma ferramenta MCP, `mcp__serena__<nome>`. A
+  preferência global do Serena continua REPL, e a do projeto a vence quando o projeto é ativado na
+  partida do servidor, como faz o `--project-from-cwd`. A interface é escolhida nessa partida: depois
+  de mudar o `project.yml`, reinicie o servidor (`/mcp`, reconectar) ou abra uma sessão nova. O
+  projeto já nasce ativo, então o aviso do hook de início de sessão, que fala em `activate_project`,
+  não se aplica; chame `initial_instructions` uma vez por sessão. As memórias
+  (`.serena/memories/`) só apontam o essencial: este arquivo vence.
+- Leitura: `get_symbols_overview`, `find_symbol` e `find_referencing_symbols` foram verificadas no
+  modo Plan; `find_implementations`, `find_declaration` e `get_diagnostics_for_file` existem, mas
+  não foram verificadas. As linhas do Serena começam em 0. O contexto `claude-code` não expõe busca
+  por padrão, leitura de arquivo nem shell: para isso, Grep, Read e Bash.
+- O LSP não enxerga `reverse`, `apps.get_model`, filtros do ORM escritos em texto (`status__in`,
+  `atendimento__linhas`), campos dos formulários HTMX, templates, JS e CSS: depois de achar o
+  símbolo, confira esses pontos com grep.
+- Edição: a interface também expõe ferramentas de edição (`replace_symbol_body`,
+  `insert_after_symbol`, `insert_before_symbol`, `replace_content`, `rename_symbol`,
+  `safe_delete_symbol` e as de memória). Fora do modo Plan, renomeie com `rename_symbol` depois de
+  ver as referências. O modo Plan é só para leitura e planejamento: nenhuma edição, do Serena ou
+  nativa (o que o Plan faz com as ferramentas de edição do Serena não foi testado).
+- O Serena não valida nada. A verdade sobre o código são `pytest`, `ruff`, `makemigrations --check`
+  e as verificações do Django. O Pyright lê a `.venv` pelo `[tool.pyright]` do `pyproject.toml`, mas
+  sem `django-stubs` aponta falsos erros em código Django correto (`objects` em modelos,
+  `transaction.atomic` em `with`): não corrija o código por causa deles. Depois de mudar o
+  `[tool.pyright]`, reinicie o servidor do Serena (`/mcp`, reconectar).
+- As restrições de operações reais valem por qualquer caminho: `lancar_saidas` sem `--dry-run`,
+  importadores do SCPI, `migrate` no banco real e `LANCAMENTO_REAL`; comando potencialmente
+  destrutivo, só com autorização. Migrations, `servicos.py` como único lugar que grava pedidos e as
+  travas do SCPI não mudam.
+- Os hooks (`.claude/settings.json`: `serena-hooks` `activate`, `remind` e `cleanup`) são
+  lembretes: o `remind` nega uma vez, a cada 2 minutos, uma sequência de 3 buscas, 3 leituras de
+  código ou 4 das duas (inclusive `cat`, `sed` e `grep` pelo Bash), e a chamada seguinte passa;
+  negar uma chamada não garante que o agente passe a usar o Serena. As ferramentas simbólicas do
+  Serena zeram a contagem; `get_diagnostics_for_file`, `read_memory`, `write_memory` e `onboarding`
+  não. O `auto-approve` fica de fora de propósito: ele aprovaria sozinho, no modo `auto`, as
+  ferramentas de edição.
 
 ## Convenções
 

@@ -5,6 +5,10 @@ language: "pt-BR"
 reviews:
   profile: "chill"
   poem: false
+  auto_review:
+    # Os PRs de trabalho têm a develop como base; a main (padrão) já é revisada.
+    base_branches:
+      - "develop"
   path_filters:
     # Planos e specs são registro do processo; o DESIGN.md é cópia do WMS-Almoxarifado.
     - "!docs/superpowers/**"

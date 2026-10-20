@@ -182,7 +182,7 @@ class ItemValido:
 class Validacao:
     erros: list[Erro] = field(default_factory=list)
     validos: list[ItemValido] = field(default_factory=list)
-    estoque_atual: dict[str, int] = field(default_factory=dict)
+    estoque_atual: dict[str, int | Decimal] = field(default_factory=dict)
 
 
 def somar_por_codigo(itens: Iterable[ItemEnviado], conv: Callable[[object], Any]) -> Soma:
@@ -288,9 +288,23 @@ def validar_pedido_limpeza(envio: EnvioPedido, catalogo, centros) -> Validacao:
                     f"O material {codigo} está com cadastro duplicado. Avise o almoxarifado.",
                 )
             )
+        elif m.estoque <= 0:
+            v.erros.append(Erro(codigo, f"{m.nome} ({codigo}) está sem estoque."))
+            v.estoque_atual[codigo] = 0
+        elif s.soma[codigo] > m.estoque:
+            pedido = _com_unidade(qtd_br(s.soma[codigo]), m.unidade)
+            estoque = _com_unidade(qtd_br(m.estoque), m.unidade)
+            v.erros.append(
+                Erro(codigo, f"{m.nome} ({codigo}): pedido {pedido}, estoque atual {estoque}.")
+            )
+            v.estoque_atual[codigo] = m.estoque
         else:
             v.validos.append(ItemValido(m, s.soma[codigo]))
     return v
+
+
+def _com_unidade(numero: str, unidade: str) -> str:
+    return f"{numero} {unidade}" if unidade else numero
 
 
 def validar_pedido_ab(envio: EnvioPedido, catalogo, centros) -> Validacao:

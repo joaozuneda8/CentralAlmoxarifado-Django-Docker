@@ -88,12 +88,18 @@ def catalogo_limpeza() -> list[ItemCatalogo]:
     ]
 
 
+def saldo_importado() -> bool:
+    """Se o saldo de estoque já foi importado do SCPI alguma vez (sem isso, todo material
+    apareceria sem estoque)."""
+    return Material.objects.filter(estoque_em__isnull=False).exists()
+
+
 def catalogo_ab(hoje: date | None = None) -> CatalogoAB | None:
     """Itens do formulário AB, ou None se o saldo de estoque nunca foi importado.
 
     Um item por código canônico, na ordem das ocorrências consolidadas no período da curva ABC,
     com o saldo do canônico (é nele que a saída será lançada)."""
-    if not Material.objects.filter(estoque_em__isnull=False).exists():
+    if not saldo_importado():
         return None
     hoje = hoje or timezone.localdate()
     linhas, _ = consolidado(periodo(hoje, ConfiguracaoCurva.atual().janela_meses))

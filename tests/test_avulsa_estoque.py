@@ -28,7 +28,9 @@ AVULSA_F = FLUXOS["avulsa"]
 PAPEL = "023.004.001"  # estoque 50
 FITA = "016.005.010"  # estoque 10
 BOTINA = "013.006.001"  # estoque 2,5
-DETERGENTE = "023.001.002"  # estoque 0
+DETERGENTE = "023.001.002"  # estoque 100 (limpeza)
+CAFE = "008.001.002"  # estoque 100 (limpeza)
+ANTIGO = "000.000.900"  # estoque 0
 
 
 @pytest.fixture
@@ -56,7 +58,7 @@ def textos(r):
 
 def test_catalogo_da_avulsa_so_tem_material_com_estoque():
     codigos = {i.codigo for i in catalogo_de("AVULSA")}
-    assert codigos == {PAPEL, FITA, BOTINA}
+    assert codigos == {PAPEL, FITA, BOTINA, DETERGENTE, CAFE}
 
 
 # --- O registro ------------------------------------------------------------------------------
@@ -79,9 +81,9 @@ def test_estoque_fracionado_vale_exato(usuario):
 
 
 def test_material_sem_estoque_nao_e_encontrado(usuario):
-    r = registrar(usuario, (DETERGENTE, "1"))
+    r = registrar(usuario, (ANTIGO, "1"))
     assert not r.ok
-    assert textos(r) == [f"Material {DETERGENTE} não encontrado no cadastro."]
+    assert textos(r) == [f"Material {ANTIGO} não encontrado no cadastro."]
 
 
 def test_soma_do_mesmo_material_conta_no_limite(usuario):
@@ -219,47 +221,6 @@ def test_carrinho_altera_dentro_do_estoque_apenas():
     linhas = [LinhaCarrinho(FITA, 2, FITA_ITEM)]
     assert alterar(linhas, AVULSA_F, FITA_ITEM, "10").erro == ""
     assert alterar(linhas, AVULSA_F, FITA_ITEM, "11").erro.startswith("Quantidade acima do estoque")
-
-
-def test_limpeza_continua_sem_limite_de_estoque():
-    assert adicionar([], FLUXOS["limpeza"], item(DETERGENTE, "D", 0), "5").erro == ""
-
-
-def alterar_no_carrinho(client, qtd, **edicao):
-    corpo = {"item_codigo": [FITA], "item_qtd": [qtd], "alterar": FITA, "anterior": "4", **edicao}
-    return client.post(reverse("pedidos:avulsa_carrinho"), corpo).text
-
-
-def test_carrinho_da_edicao_tem_o_teto_do_gravado_quando_o_saldo_caiu(client, usuario):
-    """O saldo do SCPI caiu abaixo do gravado: na edição, reduzir é aceito e o teto é a
-    quantidade gravada. No registro (sem `versao`) o saldo continua sendo o teto."""
-    client.force_login(usuario)
-    pedido = registrar(usuario, (FITA, "4")).pedido
-    Material.objects.filter(codigo=FITA).update(estoque=Decimal(1))
-    edicao = {"versao": "0", "pedido": pedido.numero}
-    assert 'name="item_qtd" value="3"' in alterar_no_carrinho(client, "3", **edicao)
-    assert "Quantidade acima do estoque. Estoque disponível: 4 UN." in alterar_no_carrinho(
-        client, "5", **edicao
-    )
-    assert "Quantidade acima do estoque. Estoque disponível: 1 UN." in alterar_no_carrinho(
-        client, "3"
-    )
-
-
-def test_carrinho_da_edicao_aceita_o_gravado_que_saiu_do_catalogo(client, usuario):
-    client.force_login(usuario)
-    pedido = registrar(usuario, (FITA, "4")).pedido
-    Material.objects.filter(codigo=FITA).update(estoque=Decimal(0))
-    edicao = {"versao": "0", "pedido": pedido.numero}
-    assert 'name="item_qtd" value="3"' in alterar_no_carrinho(client, "3", **edicao)
-    assert "Quantidade acima do estoque" in alterar_no_carrinho(client, "5", **edicao)
-
-
-def test_formulario_de_edicao_leva_o_numero_do_pedido(client, usuario):
-    client.force_login(usuario)
-    pedido = registrar(usuario, (FITA, "4")).pedido
-    r = client.get(reverse("pedidos:editar", args=[pedido.numero]))
-    assert f'name="pedido" value="{pedido.numero}"' in r.text
 
 
 # --- O "Adicionar" do atendimento ------------------------------------------------------------

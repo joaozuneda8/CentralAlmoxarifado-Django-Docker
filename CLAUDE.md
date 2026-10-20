@@ -183,7 +183,11 @@ transações precisam se comportar como no servidor.
   `htmx-config` do `base.html` impede que respostas 4xx/5xx apaguem a página. Busca de
   materiais e carrinho (`fluxos.py`, `carrinho.py`, `views/materiais.py`) são comuns a limpeza,
   AB e saída avulsa: o carrinho vive em campos escondidos e o servidor não guarda estado. A busca
-  lista primeiro o que pode ser pedido e os bloqueados no fim, antes do corte de 50. Para o
+  lista primeiro o que pode ser pedido e os bloqueados no fim, antes do corte de 50. Os três formulários limitam pelo saldo do cadastro
+  (`Fluxo.limita_estoque`, `carrinho.limite`): o AB pela parte inteira, a limpeza e a avulsa pelo saldo
+  exato, decimal; material com saldo 0 aparece bloqueado ("Sem estoque") e o envio o recusa
+  (`regras.validar_pedido_limpeza` e `validar_pedido_ab`). Limpeza e AB ficam indisponíveis enquanto o
+  saldo nunca foi importado (`catalogos.saldo_importado`), senão todo material apareceria sem estoque. Para o
   funcionário, os formulários se chamam "Limpeza, copa e escritório" e "Ferramentas, peças e
   materiais" (`Fluxo.titulo`); o nome interno (painel, Telegram, `Pedido.Origem`) continua
   "Materiais AB". `regras.Erro` tem `campo` (`solicitante`, `destino`, `obs`) nos erros de um campo:

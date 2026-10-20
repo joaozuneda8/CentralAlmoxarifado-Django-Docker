@@ -48,7 +48,9 @@ CATALOGO_AB = [
 ]
 
 CATALOGO_LIMPEZA = [
-    material("023.001.002", Decimal(0), nome="DETERGENTE", categoria="Limpeza"),
+    material("023.001.002", Decimal(10), nome="DETERGENTE", categoria="Limpeza"),
+    material("023.002.002", Decimal("2.5"), nome="CAFÉ", categoria="Copa/cozinha"),
+    material("023.003.003", Decimal(0), nome="SACO", categoria="Limpeza"),
     material("023.009.009", Decimal(0), nome="SABÃO", duplicado=True),
 ]
 CENTROS = [
@@ -148,6 +150,39 @@ def test_limpeza_aceita_decimal_br_e_recusa_ponto():
     assert textos(ruim) == [
         "Quantidade inválida para DETERGENTE (use vírgula para decimais, ex.: 1,5)."
     ]
+
+
+def test_limpeza_aceita_ate_o_estoque_exato_inclusive_fracionado():
+    ok = validar_pedido_limpeza(
+        limpeza(("023.001.002", "10"), ("023.002.002", "2,5")), CATALOGO_LIMPEZA, CENTROS
+    )
+    assert not ok.erros and len(ok.validos) == 2
+
+
+def test_limpeza_nega_acima_do_estoque_e_sem_estoque():
+    r = validar_pedido_limpeza(
+        limpeza(("023.001.002", "11"), ("023.002.002", "2,6"), ("023.003.003", "1")),
+        CATALOGO_LIMPEZA,
+        CENTROS,
+    )
+    assert textos(r) == [
+        "DETERGENTE (023.001.002): pedido 11 UN, estoque atual 10 UN.",
+        "CAFÉ (023.002.002): pedido 2,6 UN, estoque atual 2,5 UN.",
+        "SACO (023.003.003) está sem estoque.",
+    ]
+    assert r.estoque_atual == {
+        "023.001.002": Decimal(10),
+        "023.002.002": Decimal("2.5"),
+        "023.003.003": 0,
+    }
+    assert not r.validos
+
+
+def test_limpeza_soma_o_mesmo_material_no_limite():
+    r = validar_pedido_limpeza(
+        limpeza(("023.001.002", "6"), ("023.001.002", "5")), CATALOGO_LIMPEZA, CENTROS
+    )
+    assert textos(r) == ["DETERGENTE (023.001.002): pedido 11 UN, estoque atual 10 UN."]
 
 
 def test_destino_tem_de_ser_um_centro_de_custo_nos_dois_formularios():

@@ -18,8 +18,9 @@ from pedidos.regras import AVULSA, LIMPEZA, DadosSaida, EnvioPedido, ItemEnviado
 
 MATERIAIS = [
     # código, nome, grupo, estoque, oculto
-    ("023.001.002", "DETERGENTE NEUTRO", "LIMPEZA", "0", False),
-    ("008.001.002", "CAFÉ 500 G", "GÊNEROS", "0", False),
+    # Os itens de limpeza têm saldo: o formulário público nega pedido acima do estoque.
+    ("023.001.002", "DETERGENTE NEUTRO", "LIMPEZA", "100", False),
+    ("008.001.002", "CAFÉ 500 G", "GÊNEROS", "100", False),
     ("023.004.001", "PAPEL HIGIÊNICO", "LIMPEZA", "50", False),
     ("016.005.010", "FITA VEDA ROSCA", "REDES DE ÁGUA", "10", False),
     ("013.006.001", "BOTINA", "EPI", "2.5", False),

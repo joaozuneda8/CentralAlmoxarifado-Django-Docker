@@ -101,6 +101,22 @@ try {
     if ($global:AlmoxTesteChamadas | Where-Object { $_ -notmatch ' ps --status running --services$|config --format json$|^context show$' }) {
         throw 'Planejamento deve apenas consultar os servicos do projeto.'
     }
+    # Compose no Windows pode emitir uma linha vazia quando nao ha servicos.
+    foreach ($saidaVazia in @('', " `t")) {
+        $global:AlmoxTesteServicos = @($saidaVazia)
+        Executar -Aplicar
+        if (-not ($global:AlmoxTesteChamadas | Where-Object { $_ -match 'up -d --no-build --pull never web$' })) {
+            throw 'Primeira instalacao com saida vazia deve subir o web sem exigir manutencao.'
+        }
+        if ($global:AlmoxTesteChamadas | Where-Object { $_ -match 'up .*agendador' }) {
+            throw 'Primeira instalacao nao pode ativar agendador.'
+        }
+    }
+    $global:AlmoxTesteServicos = @('', 'banco', '')
+    Recusa { Executar -Aplicar } 'manutencao'
+    $global:AlmoxTesteServicos = @('', 'agendador', '')
+    Recusa { Executar -Aplicar -ManutencaoConfirmada } 'Agendador ativo'
+    $global:AlmoxTesteServicos = @()
     Git-Teste checkout -q --detach v1.0.1
     Executar -Versao v1.0.1
     Git-Teste commit --allow-empty -m divergencia | Out-Null

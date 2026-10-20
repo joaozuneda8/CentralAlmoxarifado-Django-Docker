@@ -17,6 +17,7 @@ from pedidos.servicos import catalogo_de, centros, confirmar_atendimento, regist
 from scpi.requisicoes import selecionar
 from tests.cenario import (
     criar_pedido,
+    dar_saldo,
     envio_ab,
     envio_limpeza,
     montar_cenario,
@@ -38,6 +39,8 @@ def usuario():
 @pytest.fixture
 def pedido():
     montar_cenario()
+    # A saída avulsa só lista material com saldo: os do pedido e o primeiro livre vêm zerados.
+    dar_saldo("023.001.002", "008.001.002", "013.006.001")
     return registrar(LIMPEZA, envio_limpeza()).pedido
 
 

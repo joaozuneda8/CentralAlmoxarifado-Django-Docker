@@ -75,6 +75,24 @@ def motivo_bloqueio(fluxo, item: ItemCatalogo) -> str:
     return ""
 
 
+def limite(fluxo, item: ItemCatalogo) -> Decimal | int | None:
+    """O mais que se pode pôr no pedido: a parte inteira do estoque nos fluxos com estoque, o
+    saldo exato na saída avulsa, nada nos demais."""
+    if fluxo.com_estoque:
+        return item.disponivel
+    if fluxo.limita_estoque:
+        return item.estoque
+    return None
+
+
+def acima_do_estoque(fluxo, item: ItemCatalogo, q) -> str:
+    """O erro de quantidade acima do limite, "" se cabe (ou se o fluxo não limita)."""
+    teto = limite(fluxo, item)
+    if teto is None or q <= teto:
+        return ""
+    return f"Quantidade acima do estoque. Estoque disponível: {_fq(fluxo, teto, item)}."
+
+
 def quantidade(fluxo, texto_qtd):
     """A quantidade digitada, ou o erro que a recusa (mesmos textos para adicionar e alterar,
     também no material acrescentado pelo almoxarifado no atendimento)."""
@@ -102,13 +120,11 @@ def adicionar(linhas, fluxo, item: ItemCatalogo | None, texto_qtd: str) -> Carri
         return Carrinho(linhas, erro=erro)
 
     ja = next((linha.quantidade for linha in linhas if linha.codigo == item.codigo), 0)
-    if fluxo.com_estoque and ja + q > item.disponivel:
-        cabe = item.disponivel - ja
+    teto = limite(fluxo, item)
+    if teto is not None and ja + q > teto:
+        cabe = teto - ja
         if not ja:
-            erro = (
-                "Quantidade acima do estoque. Estoque disponível: "
-                f"{_fq(fluxo, item.disponivel, item)}."
-            )
+            erro = acima_do_estoque(fluxo, item, q)
         elif cabe > 0:
             erro = (
                 f"Já há {_fq(fluxo, ja, item)} no pedido; é possível acrescentar no máximo "
@@ -149,14 +165,8 @@ def alterar(linhas, fluxo, item: ItemCatalogo | None, texto_qtd: str) -> Carrinh
     q, erro = quantidade(fluxo, texto_qtd)
     if erro:
         return Carrinho(linhas, erro=erro)
-    if fluxo.com_estoque and q > item.disponivel:
-        return Carrinho(
-            linhas,
-            erro=(
-                "Quantidade acima do estoque. Estoque disponível: "
-                f"{_fq(fluxo, item.disponivel, item)}."
-            ),
-        )
+    if erro := acima_do_estoque(fluxo, item, q):
+        return Carrinho(linhas, erro=erro)
     return Carrinho(
         [
             LinhaCarrinho(linha.codigo, q, item) if linha.codigo == item.codigo else linha

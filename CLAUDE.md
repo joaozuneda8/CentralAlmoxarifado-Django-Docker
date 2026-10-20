@@ -233,7 +233,12 @@ transações precisam se comportar como no servidor.
   No atendimento, o almoxarifado troca um material pedido por outro ou acrescenta um
   (`ItemPedido.origem` `PEDIDO` ou `ALMOXARIFADO`; o acrescentado tem `qtd_pedida` nula,
   `adicionado_por` e, na troca, `no_lugar_de`, e o trocado fica com 0 sem deixar o pedido parcial),
-  do catálogo da saída avulsa, sem limite de estoque. A busca (`atendimento_materiais`) e o
+  do catálogo da saída avulsa (só material não oculto e com saldo > 0, `catalogos.materiais_avulsa`),
+  com a quantidade limitada ao saldo exato do cadastro, decimal, não à parte inteira do AB
+  (`ItemSaida.estoque` em `regras.validar_saida`, e `Fluxo.limita_estoque` + `carrinho.limite` na
+  resposta imediata do carrinho e do "Adicionar"). Na edição (`servicos._limites_de_estoque`) o teto
+  de quem já está gravado é o maior entre o saldo e a quantidade gravada: o SCPI pode ter abatido o
+  saldo, ou o material ter saído do catálogo, e a edição não o recusa, só não deixa subir. A busca (`atendimento_materiais`) e o
   "Adicionar" (`atendimento_adicionar`, que devolve a linha `_adicionado.html` ou a recusa para
   `#adicionar-erro`) não gravam nada: as linhas vivem em campos escondidos do formulário do
   atendimento (`adicionado`, `no-lugar-de-<codigo>`) e só o envio grava. O `pedidos.js` abre o

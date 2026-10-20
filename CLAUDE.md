@@ -39,7 +39,10 @@ e `deploy/atualizar.ps1`). Resumo que vale para todo agente que trabalha aqui (C
   nos PRs dessas branches de trabalho; entre `develop` e `main`, só merge commit. Hotfix é uma
   exceção ao fluxo normal: parte da tag implantada (`claude/hotfix-<assunto>` ou
   `codex/hotfix-<assunto>`, conforme o agente), entra em `main` por PR e depois é sincronizado
-  por PR de `main` para `develop`, com merge commit. Não abra o PR de
+  por uma branch intermediária criada de `origin/develop`, que recebe merge de
+  `origin/main` e abre PR para `develop`, com merge commit (sem squash/rebase).
+  Não abrir PR com origem diretamente em `main` para essa sincronização nem usar
+  “Update branch” nele: isso traria desenvolvimento para `main`. Não abra o PR de
   `develop` para `main` sem o pedido do usuário.
 - Produção é por tag `vMAJOR.MINOR.PATCH` em `main` e imagem aprovada (workflow **Imagem de
   release**, referência `ghcr.io/...@sha256:...`), numa ação separada e explícita, nunca como efeito

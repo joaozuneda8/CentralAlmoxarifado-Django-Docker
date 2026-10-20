@@ -1,20 +1,24 @@
 """Formulário de limpeza: nega pedido acima do estoque e material sem estoque."""
 
+import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from catalogo.models import Material
 from pedidos.carrinho import LinhaCarrinho, adicionar, alterar
 from pedidos.fluxos import FLUXOS
 from pedidos.models import Pedido
-from pedidos.regras import LIMPEZA
-from pedidos.servicos import catalogo_de
-from tests.cenario import envio_limpeza, itens, montar_cenario, registrar
+from pedidos.regras import LIMPEZA, EnvioSaida
+from pedidos.servicos import catalogo_de, registrar_saida_avulsa
+from tests.cenario import envio_limpeza, itens, montar_cenario, registrar, saida
 from tests.test_carrinho import item
 
 pytestmark = pytest.mark.django_db
+HOJE = date(2026, 10, 9)
 LIMPEZA_F = FLUXOS["limpeza"]
 DETERGENTE = "023.001.002"  # saldo 100 no cenário
 CAFE = "008.001.002"  # saldo 100 no cenário
@@ -118,3 +122,23 @@ def test_endpoint_do_carrinho_recusa_acima_do_saldo(client):
     assert f'name="item_codigo" value="{DETERGENTE}"' not in ruim
     bom = client.post(url, {"adicionar": DETERGENTE, f"qtd-{DETERGENTE}": "3"}).text
     assert f'name="item_codigo" value="{DETERGENTE}"' in bom
+
+
+def test_endpoint_publico_ignora_versao_e_pedido_da_edicao(client):
+    """O teto do gravado vale só na edição da saída avulsa: o endpoint público da limpeza não
+    exige login, e `versao` e `pedido` vêm do navegador. Com o número de uma saída avulsa alheia,
+    não podem levantar o limite nem revelar a quantidade gravada nela."""
+    usuario = get_user_model().objects.create_user(username="12345", password="x")
+    envio = EnvioSaida(saida(), itens((DETERGENTE, "50")))
+    avulsa = registrar_saida_avulsa(uuid.uuid4(), envio, usuario=usuario, hoje=HOJE).pedido
+    saldo(DETERGENTE, 3)
+    corpo = {
+        "item_codigo": [DETERGENTE],
+        "item_qtd": ["10"],
+        "alterar": DETERGENTE,
+        "anterior": "1",
+        "versao": "0",
+        "pedido": avulsa.numero,
+    }
+    r = client.post(reverse("pedidos:carrinho", args=["limpeza"]), corpo).text
+    assert "Quantidade acima do estoque. Estoque disponível: 3 UN." in r

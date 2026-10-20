@@ -132,7 +132,9 @@ try {
     foreach ($porta in $config.services.web.ports) {
         if ($porta.host_ip -ne '127.0.0.1') { throw 'A porta precisa estar restrita a 127.0.0.1.' }
     }
-    $ativos = @(Invoke-Compose ps --status running --services)
+    # Uma linha vazia do Compose nao representa um servico em execucao.
+    $ativos = @(Invoke-Compose ps --status running --services |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($Aplicar -and $Ambiente -eq 'producao' -and $ativos.Count -and -not $ManutencaoConfirmada) {
         throw 'Producao existente exige janela de manutencao e -ManutencaoConfirmada.'
     }

@@ -49,6 +49,14 @@ em `develop`. Não usar squash/rebase na promoção entre as branches permanente
 preservar a ancestralidade com merge commit e sincronizar `main` → `develop`
 após a promoção. Squash pode ser usado nos PRs das branches de trabalho.
 
+Para sincronizar com os checks estritos, criar `codex/sync-<assunto>` ou
+`claude/sync-<assunto>` a partir de `origin/develop`, fazer merge de `origin/main`
+nessa branch e abrir PR dela para `develop`, com merge commit. Isso preserva a
+ancestralidade e mantém a origem do PR atualizada com a base. Não usar um PR com
+origem diretamente em `main` nem clicar em “Update branch” nesse caso: o botão
+traria as alterações ainda em desenvolvimento para `main`. Não usar squash ou
+rebase no PR de sincronização.
+
 ## Release e imagem
 
 Após a CI passar em `main`, num clone de trabalho limpo e atualizado:

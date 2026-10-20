@@ -70,14 +70,15 @@ def motivo_bloqueio(fluxo, item: ItemCatalogo) -> str:
     """Por que o material não pode ser pedido ("" se pode)."""
     if item.duplicado:
         return "Cadastro duplicado — avise o almoxarifado"
-    if fluxo.com_estoque and item.disponivel <= 0:
+    teto = limite(fluxo, item)
+    if teto is not None and teto <= 0:
         return "Sem estoque"
     return ""
 
 
 def limite(fluxo, item: ItemCatalogo) -> Decimal | int | None:
-    """O mais que se pode pôr no pedido: a parte inteira do estoque nos fluxos com estoque, o
-    saldo exato na saída avulsa, nada nos demais."""
+    """O mais que se pode pôr no pedido: a parte inteira do estoque no AB, o saldo exato (decimal)
+    na limpeza e na saída avulsa."""
     if fluxo.com_estoque:
         return item.disponivel
     if fluxo.limita_estoque:

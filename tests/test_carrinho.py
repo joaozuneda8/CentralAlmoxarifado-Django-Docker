@@ -32,7 +32,7 @@ def item(codigo, nome="X", disponivel=0, **extra):
     return ItemCatalogo(**campos)
 
 
-DETERGENTE = item("023.001.002", "DETERGENTE", categoria="Limpeza")
+DETERGENTE = item("023.001.002", "DETERGENTE", 100, categoria="Limpeza")
 
 
 def item_ab(codigo, disponivel):
@@ -93,11 +93,11 @@ def test_bloqueados_nao_entram():
 
 def test_maximo_de_itens(settings):
     settings.PEDIDOS_MAX_ITENS = 2
-    linhas = [LinhaCarrinho(str(n), Decimal(1), item(str(n))) for n in range(2)]
-    assert adicionar(linhas, LIMPEZA_F, item("9"), "1").erro == (
+    linhas = [LinhaCarrinho(str(n), Decimal(1), item(str(n), disponivel=10)) for n in range(2)]
+    assert adicionar(linhas, LIMPEZA_F, item("9", disponivel=10), "1").erro == (
         "O pedido pode ter no máximo 2 materiais."
     )
-    assert adicionar(linhas, LIMPEZA_F, item("0"), "1").erro == ""
+    assert adicionar(linhas, LIMPEZA_F, item("0", disponivel=10), "1").erro == ""
 
 
 def test_remover():
@@ -443,9 +443,9 @@ def test_buscar_poe_os_que_podem_ser_pedidos_primeiro():
         item("4", "LUVA D", 2),
     ]
     assert [i.codigo for i in buscar(AB_F, catalogo, "luva", "")[0]] == ["2", "4", "1", "3"]
-    # Na limpeza não há estoque: só o cadastro duplicado bloqueia.
+    # Na limpeza também bloqueiam o cadastro duplicado e o saldo zerado.
     catalogo[1] = item("2", "LUVA B", 5, duplicado=True)
-    assert [i.codigo for i in buscar(LIMPEZA_F, catalogo, "luva", "")[0]] == ["1", "3", "4", "2"]
+    assert [i.codigo for i in buscar(LIMPEZA_F, catalogo, "luva", "")[0]] == ["4", "1", "2", "3"]
 
 
 def test_buscar_ordena_antes_de_cortar_em_50():

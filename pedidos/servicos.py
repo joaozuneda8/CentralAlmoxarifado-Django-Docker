@@ -17,7 +17,13 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from catalogo.catalogos import ItemCatalogo, catalogo_ab, catalogo_avulsa, catalogo_limpeza
+from catalogo.catalogos import (
+    ItemCatalogo,
+    catalogo_ab,
+    catalogo_avulsa,
+    catalogo_limpeza,
+    saldo_importado,
+)
 from catalogo.models import CentroCusto, Opcao
 from pedidos.models import (
     TRAVA_LANCAMENTO,
@@ -80,7 +86,7 @@ class Resposta:
     ok: bool
     mensagem: str = ""
     erros: list[Erro] = field(default_factory=list)
-    estoque_atual: dict[str, int] = field(default_factory=dict)
+    estoque_atual: dict[str, int | Decimal] = field(default_factory=dict)
     numero: str = ""
     reenvio: bool = False
     divergente: bool = False
@@ -112,9 +118,10 @@ def proximo_numero(sequencia: Sequencia, origem: str) -> str:
 
 
 def catalogo_de(origem: str) -> list[ItemCatalogo] | None:
-    """Catálogo do formulário, ou None quando ele está indisponível."""
+    """Catálogo do formulário, ou None quando ele está indisponível (a limpeza e o AB limitam
+    pelo saldo, então ficam indisponíveis enquanto ele nunca foi importado)."""
     if origem == LIMPEZA:
-        return catalogo_limpeza() or None
+        return (catalogo_limpeza() if saldo_importado() else None) or None
     if origem == AB:
         ab = catalogo_ab()
         return ab.itens if ab is not None else None

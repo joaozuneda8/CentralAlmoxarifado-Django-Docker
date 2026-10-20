@@ -55,6 +55,7 @@ FLUXOS: dict[str, Fluxo] = {
         inteiro=False,
         com_estoque=False,
         publico=True,
+        limita_estoque=True,
     ),
     "ab": Fluxo(
         "ab",

@@ -225,23 +225,41 @@ def test_limpeza_continua_sem_limite_de_estoque():
     assert adicionar([], FLUXOS["limpeza"], item(DETERGENTE, "D", 0), "5").erro == ""
 
 
-def test_carrinho_da_edicao_deixa_reduzir_quando_o_saldo_caiu(client, usuario):
-    """O saldo do SCPI caiu abaixo do gravado: reduzir a quantidade não pode ser recusado. No
-    registro (sem `versao`) o saldo continua sendo o teto."""
+def alterar_no_carrinho(client, qtd, **edicao):
+    corpo = {"item_codigo": [FITA], "item_qtd": [qtd], "alterar": FITA, "anterior": "4", **edicao}
+    return client.post(reverse("pedidos:avulsa_carrinho"), corpo).text
+
+
+def test_carrinho_da_edicao_tem_o_teto_do_gravado_quando_o_saldo_caiu(client, usuario):
+    """O saldo do SCPI caiu abaixo do gravado: na edição, reduzir é aceito e o teto é a
+    quantidade gravada. No registro (sem `versao`) o saldo continua sendo o teto."""
     client.force_login(usuario)
+    pedido = registrar(usuario, (FITA, "4")).pedido
     Material.objects.filter(codigo=FITA).update(estoque=Decimal(1))
-    corpo = {
-        "item_codigo": [FITA],
-        "item_qtd": ["3"],
-        "alterar": FITA,
-        "anterior": "4",
-    }
-    url = reverse("pedidos:avulsa_carrinho")
-    editando = client.post(url, {**corpo, "versao": "0"}).text
-    assert "Quantidade acima do estoque" not in editando
-    assert 'name="item_qtd" value="3"' in editando
-    novo = client.post(url, corpo).text
-    assert "Quantidade acima do estoque" in novo
+    edicao = {"versao": "0", "pedido": pedido.numero}
+    assert 'name="item_qtd" value="3"' in alterar_no_carrinho(client, "3", **edicao)
+    assert "Quantidade acima do estoque. Estoque disponível: 4 UN." in alterar_no_carrinho(
+        client, "5", **edicao
+    )
+    assert "Quantidade acima do estoque. Estoque disponível: 1 UN." in alterar_no_carrinho(
+        client, "3"
+    )
+
+
+def test_carrinho_da_edicao_aceita_o_gravado_que_saiu_do_catalogo(client, usuario):
+    client.force_login(usuario)
+    pedido = registrar(usuario, (FITA, "4")).pedido
+    Material.objects.filter(codigo=FITA).update(estoque=Decimal(0))
+    edicao = {"versao": "0", "pedido": pedido.numero}
+    assert 'name="item_qtd" value="3"' in alterar_no_carrinho(client, "3", **edicao)
+    assert "Quantidade acima do estoque" in alterar_no_carrinho(client, "5", **edicao)
+
+
+def test_formulario_de_edicao_leva_o_numero_do_pedido(client, usuario):
+    client.force_login(usuario)
+    pedido = registrar(usuario, (FITA, "4")).pedido
+    r = client.get(reverse("pedidos:editar", args=[pedido.numero]))
+    assert f'name="pedido" value="{pedido.numero}"' in r.text
 
 
 # --- O "Adicionar" do atendimento ------------------------------------------------------------

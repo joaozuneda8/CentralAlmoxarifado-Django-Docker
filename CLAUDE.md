@@ -35,10 +35,11 @@ e `deploy/atualizar.ps1`). Resumo que vale para todo agente que trabalha aqui (C
   `C:\docker\almoxarifado-prod`, HEAD destacado numa tag, somente leitura). Essas branches só
   mudam pelo merge de um PR, e o merge é do usuário ou por ele autorizado; o agente não o faz por
   conta própria. Trazer `develop` para a sua branch (merge ou rebase dela) é permitido.
-- Promoção só por PR: `claude/*` ou `codex/*` → `develop` → `main`. Squash é aceito nos PRs dessas
-  branches de trabalho; entre `develop` e `main`, só merge commit. Correção urgente parte da tag
-  implantada (`claude/hotfix-<assunto>` ou `codex/hotfix-<assunto>`, conforme o agente), entra em
-  `main` e depois volta para `develop`. Não abra o PR de
+- Promoção só por PR. O fluxo normal é `claude/*` ou `codex/*` → `develop` → `main`. Squash é aceito
+  nos PRs dessas branches de trabalho; entre `develop` e `main`, só merge commit. Hotfix é uma
+  exceção ao fluxo normal: parte da tag implantada (`claude/hotfix-<assunto>` ou
+  `codex/hotfix-<assunto>`, conforme o agente), entra em `main` por PR e depois é sincronizado
+  por PR de `main` para `develop`, com merge commit. Não abra o PR de
   `develop` para `main` sem o pedido do usuário.
 - Produção é por tag `vMAJOR.MINOR.PATCH` em `main` e imagem aprovada (workflow **Imagem de
   release**, referência `ghcr.io/...@sha256:...`), numa ação separada e explícita, nunca como efeito

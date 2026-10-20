@@ -23,19 +23,22 @@ Fonte completa: `deploy/FLUXO_GIT.md` (branches, tags, imagem) e `deploy/AMBIENT
 e `deploy/atualizar.ps1`). Resumo que vale para todo agente que trabalha aqui (Claude Code usa
 `claude/*`; o Codex, `codex/*`; as demais regras são iguais):
 
-- Trabalhe sempre numa branch `claude/<assunto>` criada a partir de `develop` atualizada
-  (`git switch develop && git pull --ff-only origin develop && git switch -c claude/<assunto>`),
+- Trabalhe sempre numa branch com o prefixo do agente (`claude/<assunto>` ou `codex/<assunto>`),
+  criada a partir de `develop` atualizada (`git switch develop && git pull --ff-only origin develop`,
+  depois `git switch -c claude/<assunto>` ou `git switch -c codex/<assunto>`, conforme o agente),
   com `git status` limpo antes. Alterações já existentes na árvore são preservadas, nunca
   descartadas.
-- Commits e pushes só na sua branch de trabalho (`claude/*`). **Nunca** faça commit, push, merge
+- Commits e pushes só na sua branch de trabalho (`claude/*` ou `codex/*`, conforme o agente).
+  **Nunca** faça commit, push, merge
   local, rebase, force push, `reset --hard`, `clean -fd` nem troca de branch para apagar
   divergência em `main`, `develop` ou numa tag, nem na instalação de produção (clone em
   `C:\docker\almoxarifado-prod`, HEAD destacado numa tag, somente leitura). Essas branches só
   mudam pelo merge de um PR, e o merge é do usuário ou por ele autorizado; o agente não o faz por
   conta própria. Trazer `develop` para a sua branch (merge ou rebase dela) é permitido.
-- Promoção só por PR: `claude/*` → `develop` → `main`. Squash é aceito nos PRs de `claude/*`; entre
-  `develop` e `main`, só merge commit. Correção urgente parte da tag implantada
-  (`claude/hotfix-<assunto>`), entra em `main` e depois volta para `develop`. Não abra o PR de
+- Promoção só por PR: `claude/*` ou `codex/*` → `develop` → `main`. Squash é aceito nos PRs dessas
+  branches de trabalho; entre `develop` e `main`, só merge commit. Correção urgente parte da tag
+  implantada (`claude/hotfix-<assunto>` ou `codex/hotfix-<assunto>`, conforme o agente), entra em
+  `main` e depois volta para `develop`. Não abra o PR de
   `develop` para `main` sem o pedido do usuário.
 - Produção é por tag `vMAJOR.MINOR.PATCH` em `main` e imagem aprovada (workflow **Imagem de
   release**, referência `ghcr.io/...@sha256:...`), numa ação separada e explícita, nunca como efeito

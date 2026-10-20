@@ -417,6 +417,7 @@ class ItemSaida:
     codigo: str
     quantidade: Decimal | int | None  # None = inválida
     maximo: Decimal | int | None = None
+    estoque: Decimal | None = None  # saldo que limita a saída (None = sem limite)
 
 
 @dataclass(frozen=True)
@@ -517,6 +518,10 @@ def validar_saida(
             erros.append(Erro(i.codigo, f"Pedido AB: a quantidade de {i.codigo} deve ser inteira."))
         elif i.maximo is not None and q > i.maximo:
             erros.append(Erro(i.codigo, f"Entrega de {i.codigo} maior que a quantidade pedida."))
+        elif i.estoque is not None and q > i.estoque:
+            erros.append(
+                Erro(i.codigo, f"Saída de {i.codigo} maior que o estoque ({qtd_br(i.estoque)}).")
+            )
         if q is not None and q > 0:
             algum = True
     if not algum:

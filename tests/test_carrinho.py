@@ -11,7 +11,7 @@ from pedidos.carrinho import LinhaCarrinho, adicionar, alterar, remover
 from pedidos.fluxos import FLUXOS, LIMITE_RESULTADOS, buscar, opcoes_filtro
 from pedidos.regras import estoque_inteiro
 from pedidos.servicos import catalogo_de
-from tests.cenario import montar_cenario
+from tests.cenario import dar_saldo, montar_cenario
 
 LIMPEZA_F = FLUXOS["limpeza"]
 AB_F = FLUXOS["ab"]
@@ -414,6 +414,7 @@ def test_barra_e_gaveta_do_formulario_publico(client):
 @pytest.mark.django_db
 def test_barra_e_gaveta_da_saida_avulsa_seguem_o_formulario_com_os_textos_da_saida(client):
     montar_cenario()
+    dar_saldo("000.000.900")
     client.force_login(get_user_model().objects.create_user(username="12345", password="x"))
     r = client.post(
         reverse("pedidos:avulsa_carrinho"), {"adicionar": "000.000.900", "qtd-000.000.900": "1"}
@@ -512,6 +513,7 @@ def test_unidade_so_embaixo_do_nome_e_anuncio_do_adicionado(client):
 @pytest.mark.django_db
 def test_codigo_so_aparece_no_carrinho_da_avulsa(client):
     montar_cenario()
+    dar_saldo("000.000.900")
     r = client.post(
         reverse("pedidos:carrinho", args=["ab"]),
         {"adicionar": "016.005.010", "qtd-016.005.010": "1"},
@@ -560,6 +562,7 @@ def test_resultado_publico_adiciona_em_dois_passos(client):
 @pytest.mark.django_db
 def test_resultado_da_avulsa_tambem_adiciona_em_dois_passos(client):
     montar_cenario()
+    dar_saldo("000.000.900")
     client.force_login(get_user_model().objects.create_user(username="12345", password="x"))
     r = client.get(reverse("pedidos:avulsa_materiais"), {"q": "item"}).text
     assert '<div class="material-acao" data-adicionar>' in r
@@ -622,6 +625,7 @@ def test_quantidade_do_pedido_altera_em_dois_passos_no_formulario_publico(client
 @pytest.mark.django_db
 def test_quantidade_do_pedido_na_avulsa_tambem_se_confirma(client):
     montar_cenario()
+    dar_saldo("000.000.900")
     client.force_login(get_user_model().objects.create_user(username="12345", password="x"))
     r = client.post(
         reverse("pedidos:avulsa_carrinho"), {"adicionar": "000.000.900", "qtd-000.000.900": "1"}

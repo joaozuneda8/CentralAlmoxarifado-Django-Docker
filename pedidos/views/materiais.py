@@ -3,13 +3,17 @@
 As views só devolvem trechos (`_resultados.html`, `_carrinho.html`) e não guardam estado.
 """
 
+from dataclasses import replace
+
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from pedidos import carrinho as carrinho_mod
 from pedidos.fluxos import Fluxo, buscar, fluxo_publico, resultados
-from pedidos.servicos import catalogo_de
+from pedidos.models import ItemPedido
+from pedidos.regras import AVULSA
+from pedidos.servicos import catalogo_de, item_catalogo_gravado
 
 
 def urls_do_fluxo(fluxo: Fluxo) -> dict:
@@ -39,6 +43,24 @@ def _materiais(request, fluxo: Fluxo):
     return render(request, "pedidos/_resultados.html", contexto)
 
 
+def _item_da_edicao(post, fluxo: Fluxo, codigo: str, item):
+    """Na edição de uma saída avulsa (o formulário leva `versao` e o `pedido`), quem já está na
+    saída vale pelo que foi gravado: o teto é o maior entre o saldo e a quantidade gravada, como
+    no envio (`servicos._limites_de_estoque`), e o material que saiu do catálogo segue aceito.
+    Só na saída avulsa: os endpoints públicos não exigem login, e `versao` e `pedido` vêm do
+    navegador, então não podem levantar o teto de um formulário público."""
+    if fluxo.origem != AVULSA or "versao" not in post:
+        return item
+    gravado = ItemPedido.objects.filter(
+        pedido__numero=post.get("pedido", ""), pedido__origem=AVULSA, codigo=codigo
+    ).first()
+    if gravado is None:
+        return item
+    if item is None:
+        return item_catalogo_gravado(gravado)
+    return replace(item, estoque=max(item.estoque, gravado.qtd_entregue or 0))
+
+
 def _carrinho(request, fluxo: Fluxo):
     catalogo = catalogo_de(fluxo.origem) or []
     linhas = carrinho_mod.ler(request.POST, fluxo, catalogo)
@@ -57,6 +79,7 @@ def _carrinho(request, fluxo: Fluxo):
             request.POST, fluxo, catalogo, {codigo: request.POST.get("anterior", "")}
         )
         item = next((i for i in catalogo if i.codigo == codigo), None)
+        item = _item_da_edicao(request.POST, fluxo, codigo, item)
         resultado = carrinho_mod.alterar(linhas, fluxo, item, enviados.get(codigo, ""))
     elif "remover" in request.POST:
         resultado = carrinho_mod.remover(linhas, request.POST["remover"])

@@ -489,7 +489,8 @@ def test_telas_mostram_o_estoque_entre_o_codigo_e_a_unidade(client):
     botina = client.get(reverse("pedidos:avulsa_materiais"), {"q": "botina"}).text
     assert "Estoque 2,5 · UN" in botina
     limpeza = client.get(reverse("pedidos:materiais", args=["limpeza"]), {"q": "papel"}).text
-    assert "Estoque 50" in limpeza and "023.004.001" not in strip_tags(limpeza)
+    visivel = strip_tags(limpeza)
+    assert "Estoque 50 · UN" in visivel and "023.004.001" not in visivel
 
 
 @pytest.mark.django_db

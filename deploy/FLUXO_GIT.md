@@ -8,10 +8,10 @@ navegador, logs ou backups. Fazer push não altera nenhum container.
 
 | Referência | Função | Quem faz commit/push |
 |---|---|---|
-| `codex/<assunto>` | Uma alteração isolada, criada de `develop` | Desenvolvedor; push apenas dessa branch |
+| `claude/<assunto>` ou `codex/<assunto>` | Uma alteração isolada, criada de `develop` (`claude/*` para agentes Claude Code, `codex/*` para Codex) | Desenvolvedor ou agente; push apenas dessa branch |
 | `develop` | Integração e validação no desenvolvimento | Recebe PRs, sem commits diretos |
 | `main` | Código aprovado para release | Recebe PR de `develop`, sem commits diretos |
-| `codex/hotfix-<assunto>` | Correção baseada na tag realmente implantada | Desenvolvedor; PR para `main`, depois sincronização com `develop` |
+| `claude/hotfix-<assunto>` ou `codex/hotfix-<assunto>` | Correção baseada na tag realmente implantada | Desenvolvedor; PR para `main`, depois sincronização com `develop` |
 | `vMAJOR.MINOR.PATCH` | Versão de um commit aprovado de `main` | Responsável pela release; tag nunca movida/reutilizada |
 
 As mudanças deste fluxo entram primeiro por PR em `develop`, depois por PR em
@@ -27,11 +27,11 @@ alterações existentes são preservadas e publicadas em branch própria.
 ```powershell
 git switch develop
 git pull --ff-only origin develop
-git switch -c codex/minha-alteracao
+git switch -c claude/minha-alteracao
 # editar, testar e revisar o diff
 git add <arquivos-revisados>
 git commit -m "Descrição da alteração"
-git push -u origin codex/minha-alteracao
+git push -u origin claude/minha-alteracao
 ```
 
 Abrir PR para `develop`. A CI usa banco MariaDB descartável e não recebe segredos

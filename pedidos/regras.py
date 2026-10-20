@@ -108,13 +108,23 @@ def parse_inteiro(valor: object) -> int | None:
     return None if inteiro > QTD_MAXIMA else inteiro
 
 
-def qtd_br(numero: object) -> str:
-    """Número no formato que o robô espera: 1.5 → "1,5" (`qtdBR_`)."""
-    q = Decimal(str(numero)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+def _decimal_br(numero: object, casas: str) -> str:
+    q = Decimal(str(numero)).quantize(Decimal(casas), rounding=ROUND_HALF_UP)
     t = f"{q:f}"
     if "." in t:
         t = t.rstrip("0").rstrip(".")
     return t.replace(".", ",")
+
+
+def qtd_br(numero: object) -> str:
+    """Número no formato que o robô espera: 1.5 → "1,5" (`qtdBR_`)."""
+    return _decimal_br(numero, "0.001")
+
+
+def qtd_estoque(numero: object) -> str:
+    """Saldo do cadastro como está, com as 4 casas de `Material.estoque`: o `qtd_br`, de 3,
+    mostraria 0,0004 como "0"."""
+    return _decimal_br(numero, "0.0001")
 
 
 def data_valida_iso(valor: object) -> bool:

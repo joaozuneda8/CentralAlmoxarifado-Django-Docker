@@ -4,6 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles import finders
 from django.urls import reverse
+from django.utils.html import strip_tags
 
 from catalogo.catalogos import ItemCatalogo
 from pedidos.carrinho import LinhaCarrinho, adicionar, alterar, remover
@@ -467,6 +468,9 @@ def test_estoque_na_linha_da_avulsa_e_da_limpeza():
     avulsa = FLUXOS["avulsa"]
     assert resultados(avulsa, [item("1", "LUVA", 12)])[0].estoque == "Estoque 12"
     assert resultados(avulsa, [item("1", "LUVA", Decimal("2.5"))])[0].estoque == "Estoque 2,5"
+    # O saldo tem 4 casas: não se arredonda para as 3 da quantidade.
+    assert resultados(avulsa, [item("1", "LUVA", Decimal("0.0004"))])[0].estoque == "Estoque 0,0004"
+    assert resultados(avulsa, [item("1", "LUVA", Decimal("2.4996"))])[0].estoque == "Estoque 2,4996"
     assert resultados(AB_F, [item("1", "LUVA", 12)])[0].estoque == ""  # o AB já diz "N disponíveis"
     # Formulário público: o estoque vem antes da unidade, sem o "—" de quem não tem unidade.
     com_unidade = item("1", "SACO", 7, unidade="Pacote 500 g")
@@ -485,7 +489,7 @@ def test_telas_mostram_o_estoque_entre_o_codigo_e_a_unidade(client):
     botina = client.get(reverse("pedidos:avulsa_materiais"), {"q": "botina"}).text
     assert "Estoque 2,5 · UN" in botina
     limpeza = client.get(reverse("pedidos:materiais", args=["limpeza"]), {"q": "papel"}).text
-    assert "Estoque 50" in limpeza and "016.005.010" not in limpeza
+    assert "Estoque 50" in limpeza and "023.004.001" not in strip_tags(limpeza)
 
 
 @pytest.mark.django_db

@@ -225,6 +225,25 @@ def test_limpeza_continua_sem_limite_de_estoque():
     assert adicionar([], FLUXOS["limpeza"], item(DETERGENTE, "D", 0), "5").erro == ""
 
 
+def test_carrinho_da_edicao_deixa_reduzir_quando_o_saldo_caiu(client, usuario):
+    """O saldo do SCPI caiu abaixo do gravado: reduzir a quantidade não pode ser recusado. No
+    registro (sem `versao`) o saldo continua sendo o teto."""
+    client.force_login(usuario)
+    Material.objects.filter(codigo=FITA).update(estoque=Decimal(1))
+    corpo = {
+        "item_codigo": [FITA],
+        "item_qtd": ["3"],
+        "alterar": FITA,
+        "anterior": "4",
+    }
+    url = reverse("pedidos:avulsa_carrinho")
+    editando = client.post(url, {**corpo, "versao": "0"}).text
+    assert "Quantidade acima do estoque" not in editando
+    assert 'name="item_qtd" value="3"' in editando
+    novo = client.post(url, corpo).text
+    assert "Quantidade acima do estoque" in novo
+
+
 # --- O "Adicionar" do atendimento ------------------------------------------------------------
 
 

@@ -3,6 +3,8 @@
 As views só devolvem trechos (`_resultados.html`, `_carrinho.html`) e não guardam estado.
 """
 
+from dataclasses import replace
+
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
@@ -57,7 +59,11 @@ def _carrinho(request, fluxo: Fluxo):
             request.POST, fluxo, catalogo, {codigo: request.POST.get("anterior", "")}
         )
         item = next((i for i in catalogo if i.codigo == codigo), None)
-        resultado = carrinho_mod.alterar(linhas, fluxo, item, enviados.get(codigo, ""))
+        # Na edição, quem já está na saída vale pelo que foi gravado, mesmo que o saldo tenha
+        # caído abaixo: o teto certo (`servicos._limites_de_estoque`) só o envio conhece, e o
+        # saldo aqui impediria até reduzir a quantidade.
+        limite = replace(fluxo, limita_estoque=False) if "versao" in request.POST else fluxo
+        resultado = carrinho_mod.alterar(linhas, limite, item, enviados.get(codigo, ""))
     elif "remover" in request.POST:
         resultado = carrinho_mod.remover(linhas, request.POST["remover"])
     else:

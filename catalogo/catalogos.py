@@ -2,8 +2,8 @@
 
 Traduz `montarCatalogos_` do `Catalogo.gs`: limpeza vem do `ItemLimpeza`; AB, das saídas do
 SCPI no período da curva ABC, consolidadas pelo de/para e ordenadas por número de ocorrências; a
-saída avulsa, de todo material não oculto. Em todos, o material `duplicado` aparece (bloqueado
-pelo formulário).
+saída avulsa, de todo material não oculto e com saldo positivo. Em todos, o material `duplicado`
+aparece (bloqueado pelo formulário).
 """
 
 from dataclasses import dataclass, field
@@ -124,10 +124,11 @@ def catalogo_ab(hoje: date | None = None) -> CatalogoAB | None:
 
 
 def materiais_avulsa():
-    """Materiais da saída avulsa: todo o cadastro, menos os ocultos."""
-    return Material.objects.filter(oculto=False)
+    """Materiais da saída avulsa: o cadastro com saldo positivo, menos os ocultos."""
+    return Material.objects.filter(oculto=False, estoque__gt=0)
 
 
 def catalogo_avulsa() -> list[ItemCatalogo]:
-    """Itens da saída avulsa: todo o cadastro, menos os ocultos (duplicado aparece bloqueado)."""
+    """Itens da saída avulsa: o cadastro com saldo positivo, menos os ocultos (duplicado
+    aparece bloqueado)."""
     return [_item(m) for m in materiais_avulsa()]

@@ -439,6 +439,7 @@ def _erros_dos_adicionados(
     qtds_adicionadas: dict[str, Decimal | None],
     catalogo: dict[str, ItemCatalogo],
     validar,
+    limites: dict[str, Decimal],
 ) -> tuple[list[Adicionado], list[Erro]]:
     """Regras dos acrescentados: repetição, vínculo de troca, catálogo e quantidade. Devolve
     os que não repetem código (os que vão para a validação comum) e os erros."""
@@ -451,7 +452,13 @@ def _erros_dos_adicionados(
     # (os dos dados da saída já vêm da validação do pedido inteiro).
     if not unicos:
         return unicos, erros
-    v = validar([ItemSaida(a.codigo, qtds_adicionadas[a.codigo]) for a in unicos], catalogo)
+    v = validar(
+        [
+            ItemSaida(a.codigo, qtds_adicionadas[a.codigo], estoque=limites.get(a.codigo))
+            for a in unicos
+        ],
+        catalogo,
+    )
     dos_materiais = [e for e in v.erros if e.codigo is not None]
     com_erro = {e.codigo for e in dos_materiais}
     erros += dos_materiais
@@ -510,9 +517,15 @@ def _validar_atendimento(
         )
 
     catalogo = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
+    base = dict(catalogo)
     catalogo.update(catalogo_extra or {})
     unicos, erros_adicionados = _erros_dos_adicionados(
-        adicionados, itens, qtds_adicionadas, catalogo, validar
+        adicionados,
+        itens,
+        qtds_adicionadas,
+        catalogo,
+        validar,
+        _limites_de_estoque(catalogo, base=base),
     )
     # Os acrescentados entram aqui só para contar no "ao menos um material"; seus erros
     # por material vêm de `_erros_dos_adicionados`.
@@ -680,7 +693,8 @@ MENSAGEM_NADA_MUDOU = "Nada mudou; nada foi gravado."
 
 
 def item_catalogo_gravado(item: ItemPedido) -> ItemCatalogo:
-    """Material já gravado no pedido, aceito na edição mesmo que tenha saído do catálogo."""
+    """Material já gravado no pedido, aceito na edição mesmo que tenha saído do catálogo. O
+    estoque é a quantidade entregue gravada: o teto de quem já saiu (ver `_limites_de_estoque`)."""
     return ItemCatalogo(
         codigo=item.codigo,
         nome=item.material,
@@ -688,7 +702,7 @@ def item_catalogo_gravado(item: ItemPedido) -> ItemCatalogo:
         categoria="",
         grupo=item.grupo,
         subgrupo=item.subgrupo,
-        estoque=Decimal(0),
+        estoque=item.qtd_entregue or Decimal(0),
         disponivel=0,
         duplicado=False,
     )
@@ -921,12 +935,25 @@ def editar_atendimento(
     )
 
 
-def _validar_saida_avulsa(envio: EnvioSaida, *, hoje: date, catalogo: dict):
+def _limites_de_estoque(catalogo: dict, gravados=(), base: dict | None = None) -> dict:
+    """Teto da quantidade de cada material da saída: o estoque do catálogo, ou a quantidade já
+    gravada se for maior (o SCPI pode ter abatido o saldo, ou o material ter saído do catálogo,
+    e quem já está na saída continua valendo). `base` é o catálogo de verdade, quando
+    `catalogo` já traz os gravados por cima."""
+    limites = {c: i.estoque for c, i in catalogo.items()}
+    for c, i in (base or {}).items():
+        limites[c] = max(limites.get(c, Decimal(0)), i.estoque)
+    for item in gravados:
+        limites[item.codigo] = max(limites.get(item.codigo, Decimal(0)), item.qtd_entregue or 0)
+    return limites
+
+
+def _validar_saida_avulsa(envio: EnvioSaida, *, hoje: date, catalogo: dict, limites: dict):
     """Regras da saída avulsa (e da edição dela). Devolve a soma por código e os erros."""
     soma = somar_por_codigo(envio.itens, parse_qtd_br)
     v = validar_saida(
         envio.dados,
-        [ItemSaida(c, soma.soma[c]) for c in soma.ordem],
+        [ItemSaida(c, soma.soma[c], estoque=limites.get(c)) for c in soma.ordem],
         centros=centros(),
         tipos=tipos_saida(),
         hoje=hoje,
@@ -993,7 +1020,10 @@ def registrar_saida_avulsa(
             return Resposta(ok=False, mensagem="O cadastro de materiais não está disponível agora.")
         por_codigo = {i.codigo: i for i in catalogo}
         soma, erros = _validar_saida_avulsa(
-            envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo
+            envio,
+            hoje=hoje or timezone.localdate(),
+            catalogo=por_codigo,
+            limites=_limites_de_estoque(por_codigo),
         )
         if erros:
             return Resposta(ok=False, mensagem="Corrija os itens abaixo.", erros=erros)
@@ -1033,10 +1063,12 @@ def editar_saida_avulsa(
             return Resposta(ok=False, mensagem="O cadastro de materiais não está disponível agora.")
         por_codigo = {i.codigo: i for i in catalogo}
         # Material já na saída continua aceito, mesmo que tenha saído do catálogo.
-        for item in pedido.itens.all():
+        gravados = list(pedido.itens.all())
+        limites = _limites_de_estoque(por_codigo, gravados)
+        for item in gravados:
             por_codigo.setdefault(item.codigo, item_catalogo_gravado(item))
         soma, erros = _validar_saida_avulsa(
-            envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo
+            envio, hoje=hoje or timezone.localdate(), catalogo=por_codigo, limites=limites
         )
         nomes = {c: por_codigo[c].nome for c in soma.ordem if c in por_codigo}
         diferencas = diferencas_atendimento(

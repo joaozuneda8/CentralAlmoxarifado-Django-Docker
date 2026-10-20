@@ -588,6 +588,9 @@ def atendimento_adicionar(request, numero):
         # A regra da quantidade é a da origem do pedido (AB só inteiros), maior que zero.
         regra = FLUXOS["ab"] if pedido.origem == AB else FLUXOS["limpeza"]
         qtd, erro = carrinho_mod.quantidade(regra, request.POST.get(f"qtd-{codigo}", ""))
+        # O material vem do catálogo da saída avulsa: o teto é o saldo dele, qualquer que seja
+        # a origem do pedido.
+        erro = erro or carrinho_mod.acima_do_estoque(FLUXOS["avulsa"], item, qtd)
     if erro:
         resposta = render(request, "pedidos/_adicionado.html", {"erro": erro})
         resposta["HX-Retarget"] = "#adicionar-erro"

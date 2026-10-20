@@ -98,6 +98,12 @@ def montar_cenario(*, com_estoque: bool = True) -> None:
             CentroCusto.objects.create(descricao=descricao, codigo=codigo, placa=placa)
 
 
+def dar_saldo(*codigos: str, saldo: int = 10) -> None:
+    """Dá saldo a materiais do cenário que vêm zerados: a saída avulsa só lista material com
+    estoque."""
+    Material.objects.filter(codigo__in=codigos).update(estoque=Decimal(saldo))
+
+
 def itens(*pares) -> tuple[ItemEnviado, ...]:
     return tuple(ItemEnviado(c, q) for c, q in pares)
 

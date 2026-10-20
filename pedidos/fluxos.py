@@ -22,6 +22,8 @@ class Fluxo:
     inteiro: bool
     com_estoque: bool
     publico: bool
+    # Limita pelo saldo exato do cadastro (decimal), sem mostrar o estoque na lista.
+    limita_estoque: bool = False
 
     @property
     def max_itens(self) -> int | None:
@@ -63,7 +65,13 @@ FLUXOS: dict[str, Fluxo] = {
         publico=True,
     ),
     "avulsa": Fluxo(
-        "avulsa", AVULSA, "Saída avulsa", inteiro=False, com_estoque=False, publico=False
+        "avulsa",
+        AVULSA,
+        "Saída avulsa",
+        inteiro=False,
+        com_estoque=False,
+        publico=False,
+        limita_estoque=True,
     ),
 }
 

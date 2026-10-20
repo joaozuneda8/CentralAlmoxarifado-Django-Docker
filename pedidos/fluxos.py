@@ -9,7 +9,7 @@ from django.conf import settings
 from django.http import Http404
 
 from catalogo.catalogos import ItemCatalogo
-from pedidos.regras import AB, AVULSA, LIMPEZA, normalizar_busca, qtd_br
+from pedidos.regras import AB, AVULSA, LIMPEZA, normalizar_busca, qtd_estoque
 
 LIMITE_RESULTADOS = 50
 
@@ -165,7 +165,7 @@ def resultados(fluxo: Fluxo, itens) -> list[Resultado]:
             )
         else:
             info = i.unidade or "—"
-            estoque = f"Estoque {qtd_br(i.estoque)}"
+            estoque = f"Estoque {qtd_estoque(i.estoque)}"
         classe = i.grupo if fluxo.origem == AVULSA else classe_ab(i)
         lista.append(Resultado(i, motivo_bloqueio(fluxo, i), info, classe, estoque))
     return lista

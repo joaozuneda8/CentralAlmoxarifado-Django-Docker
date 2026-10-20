@@ -9,7 +9,7 @@ from django.conf import settings
 from django.http import Http404
 
 from catalogo.catalogos import ItemCatalogo
-from pedidos.regras import AB, AVULSA, LIMPEZA, normalizar_busca
+from pedidos.regras import AB, AVULSA, LIMPEZA, normalizar_busca, qtd_br
 
 LIMITE_RESULTADOS = 50
 
@@ -141,6 +141,13 @@ class Resultado:
     motivo: str  # por que não pode ser pedido ("" se pode)
     info: str  # unidade, ou o estoque disponível no AB
     classe: str
+    estoque: str = ""  # "Estoque N" (saldo exato) onde `info` não o diz: limpeza e saída avulsa
+
+    @property
+    def linha_publica(self) -> str:
+        """A informação do formulário público (sem código nem grupo): estoque e unidade."""
+        unidade = "" if self.info == "—" else self.info
+        return " · ".join(p for p in (self.estoque, unidade) if p) or self.info
 
 
 def resultados(fluxo: Fluxo, itens) -> list[Resultado]:
@@ -148,6 +155,7 @@ def resultados(fluxo: Fluxo, itens) -> list[Resultado]:
 
     lista = []
     for i in itens:
+        estoque = ""
         if fluxo.com_estoque:
             info = (
                 f"{i.disponivel} {i.unidade} disponíveis"
@@ -156,6 +164,7 @@ def resultados(fluxo: Fluxo, itens) -> list[Resultado]:
             )
         else:
             info = i.unidade or "—"
+            estoque = f"Estoque {qtd_br(i.estoque)}"
         classe = i.grupo if fluxo.origem == AVULSA else classe_ab(i)
-        lista.append(Resultado(i, motivo_bloqueio(fluxo, i), info, classe))
+        lista.append(Resultado(i, motivo_bloqueio(fluxo, i), info, classe, estoque))
     return lista

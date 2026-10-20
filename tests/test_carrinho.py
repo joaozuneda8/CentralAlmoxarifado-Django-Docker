@@ -462,6 +462,33 @@ def test_texto_de_estoque_do_ab():
     assert resultados(AB_F, [item("1", "LUVA", 3, unidade="")])[0].info == "3 disponíveis"
 
 
+def test_estoque_na_linha_da_avulsa_e_da_limpeza():
+    from pedidos.fluxos import resultados
+
+    avulsa = FLUXOS["avulsa"]
+    assert resultados(avulsa, [item("1", "LUVA", 12)])[0].estoque == "Estoque 12"
+    assert resultados(avulsa, [item("1", "LUVA", Decimal("2.5"))])[0].estoque == "Estoque 2,5"
+    assert resultados(AB_F, [item("1", "LUVA", 12)])[0].estoque == ""  # o AB já diz "N disponíveis"
+    # Formulário público: o estoque vem antes da unidade, sem o "—" de quem não tem unidade.
+    com_unidade = item("1", "SACO", 7, unidade="Pacote 500 g")
+    assert resultados(LIMPEZA_F, [com_unidade])[0].linha_publica == "Estoque 7 · Pacote 500 g"
+    sem_unidade = item("1", "SACO", 7, unidade="")
+    assert resultados(LIMPEZA_F, [sem_unidade])[0].linha_publica == "Estoque 7"
+    assert resultados(AB_F, [item("1", "LUVA", 3, unidade="")])[0].linha_publica == "3 disponíveis"
+
+
+@pytest.mark.django_db
+def test_telas_mostram_o_estoque_entre_o_codigo_e_a_unidade(client):
+    montar_cenario()
+    client.force_login(get_user_model().objects.create_user(username="12345", password="x"))
+    avulsa = client.get(reverse("pedidos:avulsa_materiais"), {"q": "fita"}).text
+    assert '<span class="mono">016.005.010</span> · Estoque 10 · UN · REDES DE ÁGUA' in avulsa
+    botina = client.get(reverse("pedidos:avulsa_materiais"), {"q": "botina"}).text
+    assert "Estoque 2,5 · UN" in botina
+    limpeza = client.get(reverse("pedidos:materiais", args=["limpeza"]), {"q": "papel"}).text
+    assert "Estoque 50" in limpeza and "016.005.010" not in limpeza
+
+
 @pytest.mark.django_db
 def test_unidade_so_embaixo_do_nome_e_anuncio_do_adicionado(client):
     montar_cenario()

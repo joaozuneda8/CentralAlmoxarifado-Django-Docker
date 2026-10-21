@@ -63,7 +63,7 @@ def _item_da_edicao(post, fluxo: Fluxo, codigo: str, item):
 
 def _carrinho(request, fluxo: Fluxo):
     catalogo = catalogo_de(fluxo.origem) or []
-    linhas = carrinho_mod.ler(request.POST, fluxo, catalogo)
+    linhas = carrinho_mod.ler(request.POST, fluxo, catalogo, manter_ilegiveis=fluxo.publico)
     if "adicionar" in request.POST:
         codigo = request.POST["adicionar"]
         item = next((i for i in catalogo if i.codigo == codigo), None)
@@ -76,7 +76,11 @@ def _carrinho(request, fluxo: Fluxo):
             zip(request.POST.getlist("item_codigo"), request.POST.getlist("item_qtd"), strict=False)
         )
         linhas = carrinho_mod.ler(
-            request.POST, fluxo, catalogo, {codigo: request.POST.get("anterior", "")}
+            request.POST,
+            fluxo,
+            catalogo,
+            {codigo: request.POST.get("anterior", "")},
+            manter_ilegiveis=fluxo.publico,
         )
         item = next((i for i in catalogo if i.codigo == codigo), None)
         item = _item_da_edicao(request.POST, fluxo, codigo, item)
@@ -88,6 +92,7 @@ def _carrinho(request, fluxo: Fluxo):
     contexto = {
         "fluxo": fluxo,
         "carrinho": resultado,
+        "codigos_erro": {linha.codigo for linha in resultado.linhas if linha.quantidade is None},
         # Na edição da saída avulsa o formulário leva a versão: o envio diz "Salvar alterações".
         "editando": "versao" in request.POST,
         **urls_do_fluxo(fluxo),

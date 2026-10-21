@@ -29,8 +29,8 @@ class LinhaCarrinho:
     codigo: str
     quantidade: Decimal | None
     item: ItemCatalogo | None
-    # O que a pessoa digitou, quando a quantidade não converte (só na recusa do envio: a linha
-    # fica no pedido para ser corrigida, em vez de sumir).
+    # O que a pessoa digitou, quando a quantidade não converte: a linha fica no pedido para ser
+    # corrigida, inclusive nas operações do carrinho depois de um envio recusado.
     bruto: str | None = None
 
     @property
@@ -59,8 +59,8 @@ def _fracionavel(fluxo, item: ItemCatalogo | None) -> bool:
 def ler(dados, fluxo, catalogo, anteriores=None, manter_ilegiveis=False) -> list[LinhaCarrinho]:
     """O carrinho enviado pela página; pares inválidos são ignorados. `anteriores`
     ({código: texto}) troca a quantidade de uma linha pela última válida: é o que vale enquanto
-    a alteração dela é conferida. Com `manter_ilegiveis` (o envio recusado), o par que não
-    converte continua no pedido, com o texto digitado, para a pessoa corrigi-lo."""
+    a alteração dela é conferida. Com `manter_ilegiveis` (o envio e o carrinho públicos), o par que
+    não converte continua no pedido, com o texto digitado, até ser corrigido ou removido."""
     por_codigo = {i.codigo: i for i in catalogo or []}
     anteriores = anteriores or {}
     linhas = []
@@ -138,7 +138,11 @@ def adicionar(linhas, fluxo, item: ItemCatalogo | None, texto_qtd: str) -> Carri
     if erro:
         return Carrinho(linhas, erro=erro)
 
-    ja = next((linha.quantidade for linha in linhas if linha.codigo == item.codigo), Decimal(0))
+    existente = next((linha for linha in linhas if linha.codigo == item.codigo), None)
+    if existente is not None and existente.quantidade is None:
+        _, erro = quantidade(fluxo, existente.texto, item)
+        return Carrinho(linhas, erro=f"{item.nome} ({item.codigo}): {erro}")
+    ja = existente.quantidade if existente is not None else Decimal(0)
     teto = limite(fluxo, item)
     if ja + q > teto:
         cabe = teto - ja

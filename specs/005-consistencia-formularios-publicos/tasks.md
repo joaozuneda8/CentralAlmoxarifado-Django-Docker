@@ -151,7 +151,7 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Implementation for User Story 4
 
-- [X] T036 [US4] Em `pedidos/carrinho.py`: `ler(..., manter_ilegiveis=False)` mantém, quando verdadeiro, a linha cujo par código/quantidade não converte, guardando o texto digitado (campo novo em `LinhaCarrinho`); `texto` devolve esse texto bruto; o padrão preserva o comportamento do `_carrinho` (descarta ilegíveis)
+- [X] T036 [US4] Em `pedidos/carrinho.py`: `ler(..., manter_ilegiveis=False)` mantém, quando verdadeiro, a linha cujo par código/quantidade não converte, guardando o texto digitado (campo novo em `LinhaCarrinho`); `texto` devolve esse texto bruto. O envio e as operações do carrinho público usam esse modo até a correção ou remoção explícita; a saída avulsa mantém o padrão de descartar ilegíveis.
 - [X] T037 [US4] Em `pedidos/views/publico.py` (`de_volta`) chamar `ler(..., manter_ilegiveis=True)` e, em `pedidos/templates/pedidos/_carrinho.html`, exibir o texto digitado da linha ilegível com o selo "Corrigir" (depende de T036)
 
 **Checkpoint**: nenhuma recusa faz um item desaparecer.

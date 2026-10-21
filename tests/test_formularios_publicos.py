@@ -628,14 +628,97 @@ def test_fracao_em_material_contado_continua_no_pedido_marcada(client):
     assert 'value="2,5"' in linha and "Corrigir" in linha
 
 
-def test_a_recusa_nao_muda_o_comportamento_do_carrinho_comum(client):
-    """Adicionar, alterar e remover continuam descartando o par ilegível (só o envio o mantém)."""
-    url = reverse("pedidos:carrinho", args=["limpeza"])
-    html = client.post(
-        url, {"item_codigo": ["023.001.002", "008.001.002"], "item_qtd": ["2", "x"], "remover": "9"}
-    ).text
-    assert 'name="item_codigo" value="023.001.002"' in html
-    assert 'name="item_codigo" value="008.001.002"' not in html
+def _itens_do_carrinho(html):
+    codigos = re.findall(r'name="item_codigo" value="([^"]*)"', html)
+    quantidades = re.findall(r'name="item_qtd" value="([^"]*)"', html)
+    return list(zip(codigos, quantidades, strict=True))
+
+
+@pytest.mark.parametrize(
+    ("fluxo", "codigo", "invalida", "corrigida"),
+    [
+        ("limpeza", "008.001.002", "1,5x", "1,5"),
+        ("limpeza", "023.004.001", "2,5", "2"),
+        ("ab", "013.006.001", "1,5", "1"),
+    ],
+)
+def test_corrigir_linha_invalida_pelo_carrinho_permite_reenviar(
+    client, fluxo, codigo, invalida, corrigida
+):
+    t = token()
+    recusado = postar(client, fluxo, t, itens=[(codigo, invalida)])
+    assert _itens_do_carrinho(recusado.text) == [(codigo, invalida)]
+    assert "Corrigir" in _linha_do_pedido(recusado.text, codigo)
+    assert not Pedido.objects.exists()
+
+    r = client.post(
+        reverse("pedidos:carrinho", args=[fluxo]),
+        {
+            "item_codigo": [codigo],
+            "item_qtd": [corrigida],
+            "alterar": codigo,
+            "anterior": invalida,
+        },
+    )
+    assert _itens_do_carrinho(r.text) == [(codigo, corrigida)]
+    assert "Corrigir" not in r.text and "data-carrinho-alerta" not in r.text
+    enviado = postar(client, fluxo, t, itens=_itens_do_carrinho(r.text))
+    assert "Pedido registrado" in enviado.text
+    assert Pedido.objects.get().itens.get().codigo == codigo
+
+
+@pytest.mark.parametrize(
+    ("acao", "esperados"),
+    [
+        ({"remover": "023.001.002"}, [("008.001.002", "1,5x")]),
+        (
+            {"adicionar": "023.004.001", "qtd-023.004.001": "1"},
+            [("023.001.002", "2"), ("008.001.002", "1,5x"), ("023.004.001", "1")],
+        ),
+        (
+            {"alterar": "023.001.002", "anterior": "2"},
+            [("023.001.002", "3"), ("008.001.002", "1,5x")],
+        ),
+        (
+            {"adicionar": "008.001.002", "qtd-008.001.002": "1"},
+            [("023.001.002", "2"), ("008.001.002", "1,5x")],
+        ),
+        ({"remover": "008.001.002"}, [("023.001.002", "2")]),
+    ],
+    ids=["remover-outro", "adicionar-outro", "alterar-outro", "somar-invalido", "remover-invalido"],
+)
+def test_operacoes_do_carrinho_preservam_linha_invalida_ate_corrigir_ou_remover(
+    client, acao, esperados
+):
+    recusado = postar(
+        client, "limpeza", token(), itens=[("023.001.002", "2"), ("008.001.002", "1,5x")]
+    )
+    itens = _itens_do_carrinho(recusado.text)
+    if "alterar" in acao:
+        itens[0] = ("023.001.002", "3")
+    r = client.post(
+        reverse("pedidos:carrinho", args=["limpeza"]),
+        {"item_codigo": [c for c, _ in itens], "item_qtd": [q for _, q in itens], **acao},
+    )
+    assert _itens_do_carrinho(r.text) == esperados
+    if ("008.001.002", "1,5x") in esperados:
+        assert "Corrigir" in _linha_do_pedido(r.text, "008.001.002")
+    else:
+        assert "Corrigir" not in r.text
+    if acao.get("adicionar") == "008.001.002":
+        assert "data-carrinho-alerta" in r.text
+    assert not Pedido.objects.exists()
+
+
+def test_nova_correcao_invalida_mantem_o_texto_anterior_para_corrigir(client):
+    codigo = "008.001.002"
+    r = client.post(
+        reverse("pedidos:carrinho", args=["limpeza"]),
+        {"item_codigo": [codigo], "item_qtd": ["x"], "alterar": codigo, "anterior": "1,5x"},
+    )
+    assert _itens_do_carrinho(r.text) == [(codigo, "1,5x")]
+    assert "Corrigir" in _linha_do_pedido(r.text, codigo)
+    assert "data-carrinho-alerta" in r.text
 
 
 # --- JavaScript é requisito dos formulários públicos (spec 005, US7) ---------------------------

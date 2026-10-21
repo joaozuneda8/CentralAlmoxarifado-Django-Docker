@@ -304,12 +304,14 @@ def test_endpoint_altera_a_quantidade_do_pedido(client):
 
 
 @pytest.mark.django_db
-def test_endpoint_alterar_com_anterior_invalido_avisa_em_vez_de_sumir_com_a_linha(client):
+def test_endpoint_alterar_corrige_anterior_invalido_sem_sumir_com_a_linha(client):
     montar_cenario()
     url = reverse("pedidos:carrinho", args=["ab"])
     pedido = {"item_codigo": "016.005.010", "alterar": "016.005.010", "item_qtd": "5"}
     r = client.post(url, {**pedido, "anterior": "lixo"})
-    assert "Material não está no pedido." in r.text and "data-carrinho-alerta" in r.text
+    assert 'name="item_codigo" value="016.005.010"' in r.text
+    assert 'name="item_qtd" value="5"' in r.text
+    assert "data-carrinho-alerta" not in r.text
 
 
 @pytest.mark.django_db

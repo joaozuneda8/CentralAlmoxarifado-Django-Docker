@@ -130,10 +130,12 @@ confirmação do usuário está em *Itens a confirmar*, no fim.
 
 - **Decisão:** `carrinho.ler(..., manter_ilegiveis=True)` mantém a linha cujo par código/quantidade
   não converte, guardando o texto digitado; `publico.formulario` usa esse modo ao devolver o
-  formulário recusado. O comportamento de `_carrinho` (adicionar, alterar, remover) continua
-  descartando pares ilegíveis.
-- **Justificativa:** FR-020 e FR-021 sem mudar o fluxo comum do carrinho. Para a linha manter o
-  alerta "Corrigir", o erro da validação já traz o `codigo`.
+  formulário recusado. O `_carrinho` público também preserva essas linhas ao adicionar, alterar
+  ou remover materiais, até a quantidade ser corrigida ou a linha ser removida explicitamente.
+  Somar ao próprio material com quantidade inválida é recusado, mantendo o texto anterior.
+- **Justificativa:** FR-020 e FR-021 também durante a recuperação do pedido. O envio marca os
+  códigos recusados pela validação; as operações do carrinho mantêm "Corrigir" nas linhas cuja
+  quantidade não converte. A saída avulsa continua descartando pares ilegíveis.
 - **Fora do escopo:** botão de ajuste automático ao estoque (FR-023).
 
 ## R12. Mensagens de recusa de proteção

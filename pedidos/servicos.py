@@ -116,13 +116,14 @@ def proximo_numero(sequencia: Sequencia, origem: str) -> str:
 
 
 def catalogo_de(origem: str) -> list[ItemCatalogo] | None:
-    """Catálogo do formulário, ou None quando ele está indisponível (a limpeza e o AB limitam
-    pelo saldo, então ficam indisponíveis enquanto ele nunca foi importado)."""
+    """Catálogo do formulário, ou None quando ele está indisponível: o saldo nunca foi importado
+    (a limpeza e o AB limitam pelo saldo) ou o catálogo não tem item algum (nos dois formulários,
+    para o funcionário não preencher um formulário que não pode ser enviado)."""
     if origem == LIMPEZA:
         return (catalogo_limpeza() if saldo_importado() else None) or None
     if origem == AB:
         ab = catalogo_ab()
-        return ab.itens if ab is not None else None
+        return (ab.itens if ab is not None else None) or None
     return catalogo_avulsa() or None
 
 

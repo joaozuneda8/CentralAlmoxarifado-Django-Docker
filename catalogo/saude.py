@@ -179,8 +179,8 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
         saude.append(
             ItemSaude(
                 "erro",
-                "Sem saldo importado: o formulário AB fica indisponível até a próxima "
-                "importação de estoque.",
+                "Sem saldo importado: os formulários de limpeza e AB ficam indisponíveis até a "
+                "próxima importação de estoque.",
             )
         )
     else:
@@ -194,7 +194,16 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
                 )
             )
 
-    saude.append(ItemSaude("ok", f"Formulário de limpeza: {len(catalogo_limpeza())} itens."))
+    itens_limpeza = len(catalogo_limpeza())
+    if itens_limpeza:
+        saude.append(ItemSaude("ok", f"Formulário de limpeza: {itens_limpeza} itens."))
+    else:
+        saude.append(
+            ItemSaude(
+                "erro",
+                "Formulário de limpeza: nenhum item no catálogo; o formulário fica indisponível.",
+            )
+        )
     limpeza_oculta = list(
         ItemLimpeza.objects.filter(material__oculto=True).values_list("material__codigo", flat=True)
     )
@@ -208,14 +217,25 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
         )
 
     if ab is not None:
-        saude.append(
-            ItemSaude(
-                "ok",
-                f"Formulário AB: {len(ab.itens)} itens de {ab.codigos} códigos com saída no "
-                f"SCPI ({ab.na_limpeza} também na lista de limpeza, que prevalece; "
-                f"{ab.ocultos} ocultos ou em grupo oculto).",
-            )
+        com_saida = f"{ab.codigos} códigos com saída no SCPI"
+        descartados = (
+            f"{ab.na_limpeza} também na lista de limpeza, que prevalece; "
+            f"{ab.ocultos} ocultos ou em grupo oculto"
         )
+        if ab.itens:
+            saude.append(
+                ItemSaude(
+                    "ok", f"Formulário AB: {len(ab.itens)} itens de {com_saida} ({descartados})."
+                )
+            )
+        else:
+            saude.append(
+                ItemSaude(
+                    "erro",
+                    f"Formulário AB: nenhum item no catálogo ({com_saida}; {descartados}); "
+                    "o formulário fica indisponível.",
+                )
+            )
         if ab.sem_cadastro:
             saude.append(
                 ItemSaude(

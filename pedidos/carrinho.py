@@ -27,12 +27,18 @@ from pedidos.regras import (
 @dataclass(frozen=True)
 class LinhaCarrinho:
     codigo: str
-    quantidade: Decimal
+    quantidade: Decimal | None
     item: ItemCatalogo | None
+    # O que a pessoa digitou, quando a quantidade não converte (só na recusa do envio: a linha
+    # fica no pedido para ser corrigida, em vez de sumir).
+    bruto: str | None = None
 
     @property
     def texto(self) -> str:
-        """Quantidade no campo escondido: pt-BR exata, sem zeros à direita."""
+        """Quantidade no campo escondido: pt-BR exata, sem zeros à direita; a linha ilegível
+        mostra o texto digitado."""
+        if self.bruto is not None:
+            return self.bruto
         return qtd_br(self.quantidade)
 
 
@@ -50,10 +56,11 @@ def _fracionavel(fluxo, item: ItemCatalogo | None) -> bool:
     return fluxo.regra_quantidade == REGRA_LIVRE or item is None or item.fracionavel
 
 
-def ler(dados, fluxo, catalogo, anteriores=None) -> list[LinhaCarrinho]:
+def ler(dados, fluxo, catalogo, anteriores=None, manter_ilegiveis=False) -> list[LinhaCarrinho]:
     """O carrinho enviado pela página; pares inválidos são ignorados. `anteriores`
     ({código: texto}) troca a quantidade de uma linha pela última válida: é o que vale enquanto
-    a alteração dela é conferida."""
+    a alteração dela é conferida. Com `manter_ilegiveis` (o envio recusado), o par que não
+    converte continua no pedido, com o texto digitado, para a pessoa corrigi-lo."""
     por_codigo = {i.codigo: i for i in catalogo or []}
     anteriores = anteriores or {}
     linhas = []
@@ -61,11 +68,12 @@ def ler(dados, fluxo, catalogo, anteriores=None) -> list[LinhaCarrinho]:
         dados.getlist("item_codigo"), dados.getlist("item_qtd"), strict=False
     ):
         item = por_codigo.get(codigo)
-        q, causa = interpretar_quantidade(
-            anteriores.get(codigo, texto_qtd), _fracionavel(fluxo, item)
-        )
+        digitado = anteriores.get(codigo, texto_qtd)
+        q, causa = interpretar_quantidade(digitado, _fracionavel(fluxo, item))
         if not causa:
             linhas.append(LinhaCarrinho(codigo, q, item))
+        elif manter_ilegiveis:
+            linhas.append(LinhaCarrinho(codigo, None, item, bruto=digitado))
     return linhas
 
 

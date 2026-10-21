@@ -54,7 +54,7 @@ Nenhuma mensagem diz que o formulário "expirou" (FR-027).
 | Situação | Nível | Texto |
 |---|---|---|
 | Saldo nunca importado | erro | Sem saldo importado: os formulários de limpeza e AB ficam indisponíveis até a próxima importação de estoque. |
-| Formulário sem itens | erro | Formulário {limpeza \| AB}: nenhum item no catálogo; o formulário fica indisponível. |
+| Formulário sem itens | erro | Limpeza: "Formulário de limpeza: nenhum item no catálogo; o formulário fica indisponível." AB: "Formulário AB: nenhum item no catálogo ({N} códigos com saída no SCPI; {N} também na lista de limpeza, que prevalece; {N} ocultos ou em grupo oculto); o formulário fica indisponível." |
 | Formulário com itens | ok | Os textos atuais ("Formulário de limpeza: N itens." etc.) |
 
 ## Equipe (sem mudança de texto, exceto o corte da fração)

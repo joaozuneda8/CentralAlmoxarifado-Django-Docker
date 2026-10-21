@@ -8,7 +8,13 @@ from django.urls import reverse
 from catalogo.models import CentroCusto
 from pedidos import servicos
 from pedidos.models import Pedido
-from pedidos.protecao import MENSAGEM_EXPIRADO, MENSAGEM_RECUSA, emitir, ler
+from pedidos.protecao import (
+    MENSAGEM_RAPIDO,
+    MENSAGEM_RECUSA,
+    MENSAGEM_TOKEN_INVALIDO,
+    emitir,
+    ler,
+)
 from pedidos.servicos import mensagem_divergente
 from tests.cenario import montar_cenario
 
@@ -92,10 +98,8 @@ def test_fluxo_desconhecido_ou_interno_da_404(client):
 def test_ab_indisponivel_sem_saldo(client):
     montar_cenario(com_estoque=False)
     r = client.get(reverse("pedidos:formulario", args=["ab"]))
-    assert (
-        "Este formulário está indisponível no momento (estoque ou catálogo não carregou). "
-        "Avise o almoxarifado." in r.text
-    )
+    assert "Este formulário está indisponível no momento. Avise o almoxarifado." in r.text
+    assert "estoque ou catálogo" not in r.text  # a mesma mensagem da limpeza
     assert 'name="token"' not in r.text
 
 
@@ -129,20 +133,40 @@ def test_divergente_troca_o_identificador_e_o_novo_envio_grava(client):
     assert "P-000002" in postar(client, "limpeza", novo, destino="ETA I", itens=LIMPEZA_ITENS).text
 
 
-def test_isca_e_envio_rapido_sao_recusados(client):
+def test_isca_recusa_com_a_mensagem_generica(client):
     r = postar(client, "limpeza", token(), itens=LIMPEZA_ITENS, isca="http://spam")
-    assert MENSAGEM_RECUSA in r.text
-    rapido = emitir().token
-    assert MENSAGEM_RECUSA in postar(client, "limpeza", rapido, itens=LIMPEZA_ITENS).text
+    assert MENSAGEM_RECUSA in r.text and MENSAGEM_RAPIDO not in r.text
     assert not Pedido.objects.exists()
 
 
-def test_token_invalido(client):
-    r = postar(client, "limpeza", "adulterado", itens=LIMPEZA_ITENS)
-    assert MENSAGEM_EXPIRADO in r.text
+def test_envio_rapido_demais_diz_para_esperar_e_mantem_os_dados(client):
+    rapido = emitir().token
+    r = postar(client, "limpeza", rapido, solicitante="Ana Paula", itens=LIMPEZA_ITENS)
+    assert MENSAGEM_RAPIDO == "Aguarde alguns segundos e toque em Enviar de novo."
+    assert MENSAGEM_RAPIDO in r.text and MENSAGEM_RECUSA not in r.text
+    assert 'value="Ana Paula"' in r.text
+    assert 'name="item_codigo" value="023.001.002"' in r.text
+    assert "expirou" not in r.text
+    assert not Pedido.objects.exists()
+
+
+def test_token_invalido_mantem_os_dados_e_o_envio_seguinte_entra(client, settings):
+    r = postar(client, "limpeza", "adulterado", solicitante="Ana Paula", itens=LIMPEZA_ITENS)
+    assert MENSAGEM_TOKEN_INVALIDO == (
+        "Houve um problema ao confirmar o formulário. Seus dados foram mantidos: "
+        "toque em Enviar de novo."
+    )
+    assert MENSAGEM_TOKEN_INVALIDO in r.text and "expirou" not in r.text
+    assert 'value="Ana Paula"' in r.text
+    assert 'name="item_codigo" value="023.001.002"' in r.text
     novo = re.search(r'name="token" value="([^"]+)"', r.text).group(1)
     assert ler(novo) is not None
     assert not Pedido.objects.exists()
+    # Reenviar logo depois cai no tempo mínimo (o ingresso novo nasce agora)...
+    assert MENSAGEM_RAPIDO in postar(client, "limpeza", novo, itens=LIMPEZA_ITENS).text
+    # ...e, passado o prazo, o pedido é aceito.
+    settings.PEDIDOS_TEMPO_MINIMO = 0
+    assert "Pedido registrado" in postar(client, "limpeza", novo, itens=LIMPEZA_ITENS).text
 
 
 def test_erros_mantem_o_preenchido_e_marcam_o_item(client):
@@ -418,7 +442,7 @@ def test_campos_sem_erro_nao_ficam_marcados(client):
 def test_mensagem_sem_lista_fica_so_no_resumo(client):
     r = postar(client, "limpeza", "adulterado", itens=LIMPEZA_ITENS).text
     resumo = _resumo(r)
-    assert MENSAGEM_EXPIRADO in resumo and "coisa" not in resumo
+    assert MENSAGEM_TOKEN_INVALIDO in resumo and "coisa" not in resumo
 
 
 def test_pedidos_js_foca_o_resumo_e_limpa_o_erro_ao_corrigir():
@@ -558,3 +582,57 @@ def test_pedidos_js_so_cancela_a_alteracao_aberta_com_hx_post_de_botao():
     trecho = js[js.index('closest("[hx-post]")') :]
     trecho = trecho[: trecho.index("forEach")]
     assert 'matches("form")' in trecho
+
+
+# --- itens com problema ficam no pedido (spec 005, US4) ----------------------------------------
+
+
+def _linha_do_pedido(html, codigo):
+    """O <li> do item no pedido (na gaveta e na coluna), com o que o funcionário vê."""
+    inicio = html.index('<li class="carrinho-linha')
+    lista = html[inicio : html.index("</ul>", inicio)]
+    (item,) = [i for i in re.split(r"(?=<li class=\"carrinho-linha)", lista) if codigo in i]
+    return item
+
+
+def test_recusa_por_estoque_mantem_o_pedido_e_corrigir_envia(client):
+    t = token()
+    r = postar(client, "ab", t, itens=[("016.005.010", "3"), ("013.006.001", "3")])
+    texto = "BOTINA (013.006.001): Quantidade acima do estoque. Estoque disponível: 2 UN."
+    assert texto in r.text
+    assert 'name="item_codigo" value="016.005.010"' in r.text  # o item sem problema fica
+    assert "Corrigir" in _linha_do_pedido(r.text, "013.006.001")
+    assert "Corrigir" not in _linha_do_pedido(r.text, "016.005.010")
+    # Corrigir a quantidade e reenviar com o mesmo ingresso registra o pedido.
+    r = postar(client, "ab", t, itens=[("016.005.010", "3"), ("013.006.001", "2")])
+    assert "Pedido registrado" in r.text
+
+
+def test_quantidade_ilegivel_continua_no_pedido_com_o_texto_digitado(client):
+    r = postar(client, "limpeza", token(), itens=[("023.001.002", "2"), ("008.001.002", "1,5x")])
+    assert (
+        "CAFÉ 500 G (008.001.002): "
+        "Informe uma quantidade maior que zero (use vírgula para decimais, ex.: 1,5)." in r.text
+    )
+    linha = _linha_do_pedido(r.text, "008.001.002")
+    assert 'name="item_codigo" value="008.001.002"' in linha
+    assert 'value="1,5x"' in linha and "Corrigir" in linha
+    assert "Corrigir" not in _linha_do_pedido(r.text, "023.001.002")
+    assert not Pedido.objects.exists()
+
+
+def test_fracao_em_material_contado_continua_no_pedido_marcada(client):
+    r = postar(client, "limpeza", token(), itens=[("023.004.001", "2,5")])  # PAPEL, em UN
+    assert "Este material só é pedido em quantidade inteira (unidade: UN)." in r.text
+    linha = _linha_do_pedido(r.text, "023.004.001")
+    assert 'value="2,5"' in linha and "Corrigir" in linha
+
+
+def test_a_recusa_nao_muda_o_comportamento_do_carrinho_comum(client):
+    """Adicionar, alterar e remover continuam descartando o par ilegível (só o envio o mantém)."""
+    url = reverse("pedidos:carrinho", args=["limpeza"])
+    html = client.post(
+        url, {"item_codigo": ["023.001.002", "008.001.002"], "item_qtd": ["2", "x"], "remover": "9"}
+    ).text
+    assert 'name="item_codigo" value="023.001.002"' in html
+    assert 'name="item_codigo" value="008.001.002"' not in html

@@ -125,15 +125,15 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Tests for User Story 3
 
-- [ ] T029 [P] [US3] Escrever `tests/test_estados_do_catalogo.py`: saldo nunca importado → "Este formulário está indisponível no momento. Avise o almoxarifado." nos dois, sem `name="token"`; catálogo vazio (limpeza sem itens; AB sem saídas na janela) → mesma mensagem; todos sem estoque → formulário abre com "Nenhum material deste formulário tem estoque agora." e itens "Sem estoque"; um item com estoque faz o aviso sumir; cadastro duplicado continua "Cadastro duplicado — avise o almoxarifado"
-- [ ] T030 [P] [US3] Em `tests/test_saude.py`: formulário sem itens aparece como `erro` por formulário; textos "formulários de limpeza e AB" no lugar de "formulário AB"; o "ok" com a contagem de itens continua
-- [ ] T031 [P] [US3] Em `tests/test_formularios_publicos.py`: `test_ab_indisponivel_sem_saldo` (≈linhas 92-99) passa a esperar a mensagem única (sem "estoque ou catálogo não carregou") e `test_formulario_indisponivel_sem_centros_de_custo` (≈198-201) continua
+- [X] T029 [P] [US3] Escrever `tests/test_estados_do_catalogo.py`: saldo nunca importado → "Este formulário está indisponível no momento. Avise o almoxarifado." nos dois, sem `name="token"`; catálogo vazio (limpeza sem itens; AB sem saídas na janela) → mesma mensagem; todos sem estoque → formulário abre com "Nenhum material deste formulário tem estoque agora." e itens "Sem estoque"; um item com estoque faz o aviso sumir; cadastro duplicado continua "Cadastro duplicado — avise o almoxarifado"
+- [X] T030 [P] [US3] Em `tests/test_saude.py`: formulário sem itens aparece como `erro` por formulário; textos "formulários de limpeza e AB" no lugar de "formulário AB"; o "ok" com a contagem de itens continua
+- [X] T031 [P] [US3] Em `tests/test_formularios_publicos.py`: `test_ab_indisponivel_sem_saldo` (≈linhas 92-99) passa a esperar a mensagem única (sem "estoque ou catálogo não carregou") e `test_formulario_indisponivel_sem_centros_de_custo` (≈198-201) continua
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] Em `pedidos/servicos.py`: `catalogo_de` devolve `None` também para o AB sem itens (`ab.itens or None`), igual à limpeza
-- [ ] T033 [US3] Em `pedidos/views/publico.py` (`_contexto`) criar `sem_estoque_agora` (há itens e todos têm `motivo_bloqueio` não vazio) e, em `pedidos/templates/pedidos/_formulario.html`, mostrar o aviso no topo e unificar a mensagem de indisponível, removendo o ramo `fluxo.nome == "ab"` (linha 9)
-- [ ] T034 [US3] Em `catalogo/saude.py` (`_demais`): "Sem saldo importado" cita os dois formulários; formulário sem itens vira `ItemSaude("erro", …)` com o texto de `contracts/mensagens.md` (a limpeza deixa de ser sempre "ok")
+- [X] T032 [US3] Em `pedidos/servicos.py`: `catalogo_de` devolve `None` também para o AB sem itens (`ab.itens or None`), igual à limpeza
+- [X] T033 [US3] Em `pedidos/views/publico.py` (`_contexto`) criar `sem_estoque_agora` (há itens e todos têm `motivo_bloqueio` não vazio) e, em `pedidos/templates/pedidos/_formulario.html`, mostrar o aviso no topo e unificar a mensagem de indisponível, removendo o ramo `fluxo.nome == "ab"` (linha 9)
+- [X] T034 [US3] Em `catalogo/saude.py` (`_demais`): "Sem saldo importado" cita os dois formulários; formulário sem itens vira `ItemSaude("erro", …)` com o texto de `contracts/mensagens.md` (a limpeza deixa de ser sempre "ok")
 
 **Checkpoint**: estados vazios iguais nos dois formulários e visíveis no painel.
 
@@ -147,12 +147,12 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Tests for User Story 4
 
-- [ ] T035 [P] [US4] Em `tests/test_formularios_publicos.py`: recusa por estoque devolve nome, destino, observação e todos os itens, resumo no topo e a linha "Corrigir" com o texto de adicionar; quantidade ilegível chegada ao servidor **mantém a linha** com o texto digitado, marcada "Corrigir"; corrigir e reenviar registra o pedido
+- [X] T035 [P] [US4] Em `tests/test_formularios_publicos.py`: recusa por estoque devolve nome, destino, observação e todos os itens, resumo no topo e a linha "Corrigir" com o texto de adicionar; quantidade ilegível chegada ao servidor **mantém a linha** com o texto digitado, marcada "Corrigir"; corrigir e reenviar registra o pedido
 
 ### Implementation for User Story 4
 
-- [ ] T036 [US4] Em `pedidos/carrinho.py`: `ler(..., manter_ilegiveis=False)` mantém, quando verdadeiro, a linha cujo par código/quantidade não converte, guardando o texto digitado (campo novo em `LinhaCarrinho`); `texto` devolve esse texto bruto; o padrão preserva o comportamento do `_carrinho` (descarta ilegíveis)
-- [ ] T037 [US4] Em `pedidos/views/publico.py` (`de_volta`) chamar `ler(..., manter_ilegiveis=True)` e, em `pedidos/templates/pedidos/_carrinho.html`, exibir o texto digitado da linha ilegível com o selo "Corrigir" (depende de T036)
+- [X] T036 [US4] Em `pedidos/carrinho.py`: `ler(..., manter_ilegiveis=False)` mantém, quando verdadeiro, a linha cujo par código/quantidade não converte, guardando o texto digitado (campo novo em `LinhaCarrinho`); `texto` devolve esse texto bruto; o padrão preserva o comportamento do `_carrinho` (descarta ilegíveis)
+- [X] T037 [US4] Em `pedidos/views/publico.py` (`de_volta`) chamar `ler(..., manter_ilegiveis=True)` e, em `pedidos/templates/pedidos/_carrinho.html`, exibir o texto digitado da linha ilegível com o selo "Corrigir" (depende de T036)
 
 **Checkpoint**: nenhuma recusa faz um item desaparecer.
 
@@ -166,13 +166,13 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Tests for User Story 5
 
-- [ ] T038 [P] [US5] Em `tests/test_protecao_pedidos.py`: `recusar` passa a devolver o **motivo** (`"isca"`, `"rapido"` ou `None`); ajustar as asserções de `test_recusar_isca_e_envio_rapido` (≈linhas 99-103)
-- [ ] T039 [P] [US5] Em `tests/test_formularios_publicos.py`: ingresso inválido → "Houve um problema ao confirmar o formulário. Seus dados foram mantidos: toque em Enviar de novo." com dados preservados (ajustar ≈linhas 142 e 418, que citam `MENSAGEM_EXPIRADO`); envio rápido → "Aguarde alguns segundos e toque em Enviar de novo."; isca → "Não foi possível registrar o pedido. Procure o almoxarifado."; nenhum texto diz "expirou"; reenvio idêntico e divergente seguem como estão
+- [X] T038 [P] [US5] Em `tests/test_protecao_pedidos.py`: `recusar` passa a devolver o **motivo** (`"isca"`, `"rapido"` ou `None`); ajustar as asserções de `test_recusar_isca_e_envio_rapido` (≈linhas 99-103)
+- [X] T039 [P] [US5] Em `tests/test_formularios_publicos.py`: ingresso inválido → "Houve um problema ao confirmar o formulário. Seus dados foram mantidos: toque em Enviar de novo." com dados preservados (ajustar ≈linhas 142 e 418, que citam `MENSAGEM_EXPIRADO`); envio rápido → "Aguarde alguns segundos e toque em Enviar de novo."; isca → "Não foi possível registrar o pedido. Procure o almoxarifado."; nenhum texto diz "expirou"; reenvio idêntico e divergente seguem como estão
 
 ### Implementation for User Story 5
 
-- [ ] T040 [US5] Em `pedidos/protecao.py`: `MENSAGEM_EXPIRADO` vira `MENSAGEM_TOKEN_INVALIDO` (texto novo), criar `MENSAGEM_RAPIDO`, manter `MENSAGEM_RECUSA` só para a isca; `recusar` devolve o motivo (tempo mínimo de 5 s e isca inalterados)
-- [ ] T041 [US5] Em `pedidos/views/publico.py`: usar o motivo de `recusar` para escolher a mensagem em `de_volta` (depende de T040)
+- [X] T040 [US5] Em `pedidos/protecao.py`: `MENSAGEM_EXPIRADO` vira `MENSAGEM_TOKEN_INVALIDO` (texto novo), criar `MENSAGEM_RAPIDO`, manter `MENSAGEM_RECUSA` só para a isca; `recusar` devolve o motivo (tempo mínimo de 5 s e isca inalterados)
+- [X] T041 [US5] Em `pedidos/views/publico.py`: usar o motivo de `recusar` para escolher a mensagem em `de_volta` (depende de T040)
 
 **Checkpoint**: nenhuma recusa de proteção deixa pessoa sem saída.
 

@@ -76,12 +76,12 @@ campo de cada erro de campo, e se repetem embaixo do próprio campo (`erros_por_
   </section>
 
   </div>
-  {% include "pedidos/_resumo_pedido.html" with rotulo="Enviar pedido" rotulo_novo="Já conferi com o almoxarifado — enviar como novo pedido" icone="enviar" %}
+  {% include "pedidos/_resumo_pedido.html" with rotulo=fluxo.rotulo_enviar rotulo_novo="Já conferi com o almoxarifado — enviar como novo pedido" icone=fluxo.icone_enviar %}
   </div>
   </div>
 
   <div class="acoes acoes-final">
-    {% include "pedidos/_enviar.html" with rotulo="Enviar pedido" rotulo_novo="Já conferi com o almoxarifado — enviar como novo pedido" icone="enviar" %}
+    {% include "pedidos/_enviar.html" with rotulo=fluxo.rotulo_enviar rotulo_novo="Já conferi com o almoxarifado — enviar como novo pedido" icone=fluxo.icone_enviar %}
   </div>
 </form>
 {% endif %}

@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from pedidos import carrinho as carrinho_mod
-from pedidos.fluxos import fluxo_publico, opcoes_filtro
+from pedidos.fluxos import fluxo_publico, fluxos_publicos, opcoes_filtro
 from pedidos.models import ItemPedido
 from pedidos.protecao import (
     CAMPO_ISCA,
@@ -21,7 +21,7 @@ from pedidos.views.materiais import contexto_busca, urls_do_fluxo
 
 def inicio(request):
     """Página pública dos funcionários (sem login)."""
-    return render(request, "pedidos/inicio.html")
+    return render(request, "pedidos/inicio.html", {"fluxos_publicos": fluxos_publicos()})
 
 
 def _contexto(fluxo, catalogo, envio, **extra) -> dict:

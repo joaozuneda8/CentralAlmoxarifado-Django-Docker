@@ -35,8 +35,9 @@ def norm_u(valor: object) -> str:
 
 
 def estoque_inteiro(valor: object) -> int:
-    """Estoque disponível nos formulários: a parte inteira do saldo, ou 0 se for menor que 1
-    ou inválido (`estoqueInteiro_`). Texto aceita vírgula decimal."""
+    """A parte inteira do saldo, ou 0 se for menor que 1 ou inválido (`estoqueInteiro_`). Só
+    preenche `ItemCatalogo.disponivel`, que nenhum formulário lê mais: o limite vem de
+    `maximo_pedivel`. Texto aceita vírgula decimal."""
     if isinstance(valor, (int, float, Decimal)) and not isinstance(valor, bool):
         bruto = str(valor)
     else:
@@ -119,12 +120,6 @@ def _decimal_br(numero: object, casas: str) -> str:
 def qtd_br(numero: object) -> str:
     """Número no formato que o robô espera: 1.5 → "1,5" (`qtdBR_`)."""
     return _decimal_br(numero, "0.001")
-
-
-def qtd_estoque(numero: object) -> str:
-    """Saldo do cadastro como está, com as 4 casas de `Material.estoque`: o `qtd_br`, de 3,
-    mostraria 0,0004 como "0"."""
-    return _decimal_br(numero, "0.0001")
 
 
 # ---------------------------------------------------------------------------
@@ -882,8 +877,14 @@ def cabecalho_saida(dados: DadosSaida, nao_lancar: bool) -> tuple[str, ...]:
     )
 
 
+def origem_publica(origem: str) -> bool:
+    """Toda origem que não é a saída avulsa vem de um formulário público (cabeçalho: solicitante,
+    destino e observação; sujeita ao limite por nome e à conferência de reenvio)."""
+    return origem != AVULSA
+
+
 def cabecalho_enviado(origem: str, envio) -> tuple[str, ...]:
-    if origem in (LIMPEZA, AB):
+    if origem_publica(origem):
         return (texto(envio.solicitante), texto(envio.destino), texto(envio.obs))
     return cabecalho_saida(envio.dados, envio.nao_lancar)
 

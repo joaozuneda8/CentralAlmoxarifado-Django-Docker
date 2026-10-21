@@ -153,3 +153,21 @@ def catalogo_avulsa() -> list[ItemCatalogo]:
     aparece bloqueado)."""
     fracionaveis = unidades_fracionaveis()
     return [_item(m, fracionaveis) for m in materiais_avulsa()]
+
+
+def formulario_limpeza() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário de limpeza, ou None se ele está indisponível: o saldo nunca foi
+    importado (o formulário limita pelo saldo) ou não há item algum."""
+    return (catalogo_limpeza() if saldo_importado() else None) or None
+
+
+def formulario_ab() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário AB, ou None se ele está indisponível: o saldo nunca foi importado
+    ou nenhum material com saída entra no catálogo."""
+    ab = catalogo_ab()
+    return (ab.itens if ab is not None else None) or None
+
+
+def formulario_avulsa() -> list[ItemCatalogo] | None:
+    """O catálogo da saída avulsa, ou None se nenhum material tem saldo."""
+    return catalogo_avulsa() or None

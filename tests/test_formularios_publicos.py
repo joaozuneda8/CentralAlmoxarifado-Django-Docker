@@ -636,3 +636,45 @@ def test_a_recusa_nao_muda_o_comportamento_do_carrinho_comum(client):
     ).text
     assert 'name="item_codigo" value="023.001.002"' in html
     assert 'name="item_codigo" value="008.001.002"' not in html
+
+
+# --- JavaScript é requisito dos formulários públicos (spec 005, US7) ---------------------------
+
+AVISO_SEM_JS = (
+    "Este formulário precisa de JavaScript para funcionar. Ative o JavaScript no navegador, "
+    "use outro navegador ou procure o almoxarifado."
+)
+
+
+@pytest.mark.parametrize("fluxo", ["limpeza", "ab"])
+def test_pagina_traz_o_aviso_de_javascript_dentro_de_noscript(client, fluxo):
+    html = client.get(reverse("pedidos:formulario", args=[fluxo])).text
+    noscript = html[html.index("<noscript>") : html.index("</noscript>")]
+    assert AVISO_SEM_JS in noscript
+    assert 'role="alert"' in noscript
+    # O aviso vem antes do formulário.
+    assert html.index("<noscript>") < html.index('id="formulario"')
+
+
+def test_css_esconde_o_formulario_publico_sem_a_classe_js():
+    from django.contrib.staticfiles import finders
+
+    css = open(finders.find("pedidos/css/pedidos.css"), encoding="utf-8").read()
+    assert "html:not(.js) .formulario-pedido { display: none; }" in css
+
+
+@pytest.mark.parametrize("modelo", ["_materiais.html", "_carrinho.html", "_resultados.html"])
+def test_modelos_nao_prometem_funcionar_sem_javascript(modelo):
+    """Texto do arquivo, não o navegador: o formulário público (e a saída avulsa, que usa os
+    mesmos trechos) depende do HTMX para buscar, adicionar, alterar e remover."""
+    from pathlib import Path
+
+    texto = (Path("pedidos/templates/pedidos") / modelo).read_text(encoding="utf-8")
+    assert "sem javascript" not in texto.lower()
+
+
+def test_formulario_ab_e_limpeza_so_escondem_o_formulario_quando_nao_ha_javascript(client):
+    """Com JavaScript (a classe `js` no <html>), nada muda: o aviso fica dentro de <noscript>."""
+    html = client.get(reverse("pedidos:formulario", args=["ab"])).text
+    assert 'document.documentElement.classList.add("js")' in html
+    assert html.count("<noscript>") == 1

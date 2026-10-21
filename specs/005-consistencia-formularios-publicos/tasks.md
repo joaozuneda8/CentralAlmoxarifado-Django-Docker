@@ -186,13 +186,13 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Tests for User Story 6
 
-- [ ] T042 [P] [US6] Em `tests/test_avulsa_estoque.py`: o teto da avulsa e do atendimento é o saldo truncado a 3 casas (saldo 2,4996 aceita 2,499 e recusa 2,5 com "Estoque disponível: 2,499"); a edição aceita o gravado maior que o saldo (comportamento atual preservado); fração aceita em qualquer unidade
-- [ ] T043 [P] [US6] Escrever `tests/test_pedidos_antigos.py` (SC-008): um pedido AB gravado com quantidades inteiras e um da limpeza com decimais continuam com o mesmo texto no recibo, no detalhe e no aviso do Telegram depois das mudanças
+- [X] T042 [P] [US6] Em `tests/test_avulsa_estoque.py`: o teto da avulsa e do atendimento é o saldo truncado a 3 casas (saldo 2,4996 aceita 2,499 e recusa 2,5 com "Estoque disponível: 2,499"); a edição aceita o gravado maior que o saldo (comportamento atual preservado); fração aceita em qualquer unidade
+- [X] T043 [P] [US6] Escrever `tests/test_pedidos_antigos.py` (SC-008): um pedido AB gravado com quantidades inteiras e um da limpeza com decimais continuam com o mesmo texto no recibo, no detalhe e no aviso do Telegram depois das mudanças
 
 ### Implementation for User Story 6
 
-- [ ] T044 [US6] Em `pedidos/servicos.py`: `_limites_de_estoque` e `item_catalogo_gravado` usam `truncar_qtd(estoque)`; o teto de quem já está gravado continua sendo o maior entre o saldo e a quantidade gravada
-- [ ] T045 [US6] Em `pedidos/regras.py` (`validar_saida`): a mensagem "Saída de {codigo} maior que o estoque ({N})." usa o teto truncado já passado em `ItemSaida.estoque`, formatado com `qtd_br`; conferir que as chamadas em `servicos.py` entregam o limite truncado (depende de T044)
+- [X] T044 [US6] Em `pedidos/servicos.py`: `_limites_de_estoque` e `item_catalogo_gravado` usam `truncar_qtd(estoque)`; o teto de quem já está gravado continua sendo o maior entre o saldo e a quantidade gravada
+- [X] T045 [US6] Em `pedidos/regras.py` (`validar_saida`): a mensagem "Saída de {codigo} maior que o estoque ({N})." usa o teto truncado já passado em `ItemSaida.estoque`, formatado com `qtd_br`; conferir que as chamadas em `servicos.py` entregam o limite truncado (depende de T044)
 
 **Checkpoint**: a equipe vê, entrega e registra frações sem perda.
 
@@ -206,12 +206,12 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Tests for User Story 7
 
-- [ ] T046 [P] [US7] Em `tests/test_formularios_publicos.py`: a página dos dois formulários traz `<noscript>` com o texto de `contracts/mensagens.md` ("Este formulário precisa de JavaScript para funcionar. …"); `pedidos.css` esconde o formulário quando o `<html>` não tem a classe `js`; os arquivos `_materiais.html`, `_carrinho.html` e `_resultados.html` não prometem funcionamento sem JavaScript (testes de texto: só provam o arquivo, não o navegador)
+- [X] T046 [P] [US7] Em `tests/test_formularios_publicos.py`: a página dos dois formulários traz `<noscript>` com o texto de `contracts/mensagens.md` ("Este formulário precisa de JavaScript para funcionar. …"); `pedidos.css` esconde o formulário quando o `<html>` não tem a classe `js`; os arquivos `_materiais.html`, `_carrinho.html` e `_resultados.html` não prometem funcionamento sem JavaScript (testes de texto: só provam o arquivo, não o navegador)
 
 ### Implementation for User Story 7
 
-- [ ] T047 [US7] Em `pedidos/templates/pedidos/formulario.html` colocar o `<noscript>` com o aviso (classes `aviso aviso-atencao`) e, em `pedidos/static/pedidos/css/pedidos.css`, a regra que esconde `#formulario` quando `html:not(.js)`
-- [ ] T048 [P] [US7] Remover ou corrigir os comentários que prometem o modo "sem JavaScript" dos formulários públicos: `pedidos/templates/pedidos/_materiais.html` (linhas 10 e 19), `_carrinho.html` (3 e 40), `_resultados.html` (18), `pedidos/static/pedidos/css/pedidos.css` (32, 49, 602) e `pedidos/static/pedidos/js/pedidos.js` (1024); **não** tocar nos comentários da área do almoxarifado (recibo, impressão, atendimento), que funcionam sem JavaScript
+- [X] T047 [US7] Em `pedidos/templates/pedidos/formulario.html` colocar o `<noscript>` com o aviso (classes `aviso aviso-atencao`) e, em `pedidos/static/pedidos/css/pedidos.css`, a regra que esconde `#formulario` quando `html:not(.js)`
+- [X] T048 [P] [US7] Remover ou corrigir os comentários que prometem o modo "sem JavaScript" dos formulários públicos: `pedidos/templates/pedidos/_materiais.html` (linhas 10 e 19), `_carrinho.html` (3 e 40), `_resultados.html` (18), `pedidos/static/pedidos/css/pedidos.css` (32, 49, 602) e `pedidos/static/pedidos/js/pedidos.js` (1024); **não** tocar nos comentários da área do almoxarifado (recibo, impressão, atendimento), que funcionam sem JavaScript
 
 **Checkpoint**: o requisito de JavaScript está declarado e o código não mente sobre ele.
 
@@ -225,15 +225,15 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Tests for User Story 8
 
-- [ ] T049 [P] [US8] Escrever `tests/test_fluxo_configuravel.py`: registrar (por `monkeypatch` em `FLUXOS`) um fluxo de teste com catálogo e textos próprios e uma origem de teste; ele abre, busca, valida, grava (prefixo `P-`), aparece no painel e no recibo, e o limite por nome o inclui; a página inicial lista os formulários públicos a partir de `FLUXOS`
+- [X] T049 [P] [US8] Escrever `tests/test_fluxo_configuravel.py`: registrar (por `monkeypatch` em `FLUXOS`) um fluxo de teste com catálogo e textos próprios e uma origem de teste; ele abre, busca, valida, grava (prefixo `P-`), aparece no painel e no recibo, e o limite por nome o inclui; a página inicial lista os formulários públicos a partir de `FLUXOS`
 
 ### Implementation for User Story 8
 
-- [ ] T050 [US8] Em `pedidos/fluxos.py`: `Fluxo` ganha `catalogo` (função sem argumentos), `exemplo_busca`, `exemplo_inicio` e `icone`, conforme `contracts/configuracao-fluxo.md`; preencher as três entradas de `FLUXOS` com os textos que hoje estão fixos nos modelos ("Ex.: detergente, café", "Ex.: luva, fita veda rosca", "Ex.: luva, fita veda rosca, 016.005.010" e os exemplos de `inicio.html`)
-- [ ] T051 [US8] Em `pedidos/servicos.py` e `pedidos/regras.py`: `catalogo_de(origem)` consulta o `Fluxo` da origem (mantendo `None` para indisponível); `PREFIXOS` vira regra única (`AV-` para a avulsa, `P-` para as demais); criar `origem_publica(origem)` (`origem != AVULSA`) e usá-la em `regras.py` (≈linhas 850) e `servicos._limite_atingido` (≈linha 199, no lugar de `origem__in=[LIMPEZA, AB]`) (depende de T050)
-- [ ] T052 [US8] Em `pedidos/templates/pedidos/_materiais.html` (placeholder da busca), `pedidos/templates/pedidos/_formulario.html` (mensagens e rótulos de envio) e `pedidos/templates/pedidos/inicio.html` (cartões gerados dos fluxos públicos, com `fluxo.titulo`, `fluxo.exemplo_inicio` e `fluxo.icone`): ler tudo de `fluxo.*`, sem testar `fluxo.nome`; ajustar `tests/test_formularios_publicos.py` (`test_inicio_*`, `test_exemplo_da_busca_combina_com_o_formulario`) se o HTML mudar
-- [ ] T053 [P] [US8] Atualizar `specs/005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md` com os campos `exemplo_inicio` e `icone`
-- [ ] T054 [US8] Em `pedidos/fluxos.py` e nos usos restantes (`grep` por `.inteiro`, `com_estoque`, `limita_estoque`): remover os campos antigos de `Fluxo` e qualquer uso que sobrar, com `uv run pytest` limpo (depende de T021 a T028 e T050)
+- [X] T050 [US8] Em `pedidos/fluxos.py`: `Fluxo` ganha `catalogo` (função sem argumentos), `exemplo_busca`, `exemplo_inicio` e `icone`, conforme `contracts/configuracao-fluxo.md`; preencher as três entradas de `FLUXOS` com os textos que hoje estão fixos nos modelos ("Ex.: detergente, café", "Ex.: luva, fita veda rosca", "Ex.: luva, fita veda rosca, 016.005.010" e os exemplos de `inicio.html`)
+- [X] T051 [US8] Em `pedidos/servicos.py` e `pedidos/regras.py`: `catalogo_de(origem)` consulta o `Fluxo` da origem (mantendo `None` para indisponível); `PREFIXOS` vira regra única (`AV-` para a avulsa, `P-` para as demais); criar `origem_publica(origem)` (`origem != AVULSA`) e usá-la em `regras.py` (≈linhas 850) e `servicos._limite_atingido` (≈linha 199, no lugar de `origem__in=[LIMPEZA, AB]`) (depende de T050)
+- [X] T052 [US8] Em `pedidos/templates/pedidos/_materiais.html` (placeholder da busca), `pedidos/templates/pedidos/_formulario.html` (mensagens e rótulos de envio) e `pedidos/templates/pedidos/inicio.html` (cartões gerados dos fluxos públicos, com `fluxo.titulo`, `fluxo.exemplo_inicio` e `fluxo.icone`): ler tudo de `fluxo.*`, sem testar `fluxo.nome`; ajustar `tests/test_formularios_publicos.py` (`test_inicio_*`, `test_exemplo_da_busca_combina_com_o_formulario`) se o HTML mudar
+- [X] T053 [P] [US8] Atualizar `specs/005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md` com os campos `exemplo_inicio` e `icone`
+- [X] T054 [US8] Em `pedidos/fluxos.py` e nos usos restantes (`grep` por `.inteiro`, `com_estoque`, `limita_estoque`): remover os campos antigos de `Fluxo` e qualquer uso que sobrar, com `uv run pytest` limpo (depende de T021 a T028 e T050)
 
 **Checkpoint**: um formulário novo é uma entrada de configuração mais uma função de catálogo.
 
@@ -247,12 +247,12 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 ### Tests for User Story 9
 
-- [ ] T055 [P] [US9] Em `tests/test_registrar_pedido.py`: a ordem das chamadas é `catalogo_de` e `centros` **antes** de `travar_sequencia`; `test_envio_duplo_simultaneo_grava_um_pedido`, `test_falha_inesperada_desfaz_tudo_e_a_retentativa_nao_duplica`, reenvio e divergência continuam passando; a ordem das respostas (reenvio, limite, indisponível, validação) não muda
+- [X] T055 [P] [US9] Em `tests/test_registrar_pedido.py`: a ordem das chamadas é `catalogo_de` e `centros` **antes** de `travar_sequencia`; `test_envio_duplo_simultaneo_grava_um_pedido`, `test_falha_inesperada_desfaz_tudo_e_a_retentativa_nao_duplica`, reenvio e divergência continuam passando; a ordem das respostas (reenvio, limite, indisponível, validação) não muda
 
 ### Implementation for User Story 9
 
-- [ ] T056 [US9] Em `pedidos/servicos.py` (`registrar_pedido`): carregar `catalogo_de(origem)` e `centros()` antes de `with transaction.atomic()`; manter dentro dele `travar_sequencia()`, reenvio, limites, validação e gravação (depende de T024 e T032)
-- [ ] T057 [US9] Rodar o trecho de `quickstart.md` (seção 5) com dados reais (cópia do banco ou ambiente com a carga; em produção só a pedido do usuário) e registrar tempo, número de consultas e tamanho dos dados na tabela *Medição* de `specs/005-consistencia-formularios-publicos/research.md`; não propor cache nesta funcionalidade (a medição indireta por HTTP já está registrada)
+- [X] T056 [US9] Em `pedidos/servicos.py` (`registrar_pedido`): carregar `catalogo_de(origem)` e `centros()` antes de `with transaction.atomic()`; manter dentro dele `travar_sequencia()`, reenvio, limites, validação e gravação (depende de T024 e T032)
+- [X] T057 [US9] Rodar o trecho de `quickstart.md` (seção 5) com dados reais (cópia do banco ou ambiente com a carga; em produção só a pedido do usuário) e registrar tempo, número de consultas e tamanho dos dados na tabela *Medição* de `specs/005-consistencia-formularios-publicos/research.md`; não propor cache nesta funcionalidade (a medição indireta por HTTP já está registrada)
 
 **Checkpoint**: a fila única de envios não carrega a montagem do catálogo.
 
@@ -262,15 +262,15 @@ description: "Tarefas da funcionalidade 005: consistência dos formulários púb
 
 **Purpose**: documentação, limpeza, portões e conferência final
 
-- [ ] T058 [P] Corrigir `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md` (§4 catálogos e §5 fluxo 1): regra por unidade, avulsa com saldo positivo, limite da limpeza, estados do catálogo, mensagens
-- [ ] T059 [P] Atualizar o `CLAUDE.md` no mesmo PR: seções de quantidades e estoque (regra por unidade e lista no admin), indisponível e sem estoque, equipe, JavaScript como requisito, `Fluxo` e como criar um formulário novo
-- [ ] T060 [P] Corrigir o docstring de `pedidos/fluxos.py` ("Cada fluxo diz de que catálogo lê…") e os docstrings de `pedidos/carrinho.py` e `pedidos/views/materiais.py` que citam "parte inteira do estoque no AB"
-- [ ] T061 Remover o que ficou sem uso (`grep` e Serena `find_referencing_symbols`): `qtd_estoque`, `parse_inteiro` e `estoque_inteiro` só se nada mais os referenciar; manter `ItemCatalogo.disponivel` se os testes ainda o usam, e anotar a decisão
-- [ ] T062 Rodar os portões: `uv run pytest`, `uv run ruff check . && uv run ruff format --check .`, `uv run python manage.py makemigrations --check --dry-run` e `uv run python manage.py check --deploy` com `DEBUG=0`; todos limpos
-- [ ] T063 Percorrer os cenários 1 a 12 de `quickstart.md` (seção 3) no servidor de desenvolvimento e anotar o resultado
-- [ ] T064 Conferência manual em tela de celular (375 px) dos dois formulários, com a lista da seção 4 do `quickstart.md`, e registrar o resultado (SC-010)
-- [ ] T065 Revisar `specs/005-consistencia-formularios-publicos/research.md` (itens a confirmar: unidade do código canônico no AB com um caso real de de/para; tabela *Medição*) e `checklists/requirements.md`
-- [ ] T066 Resumir as mudanças ao usuário; commit e PR para `develop` **só quando o usuário pedir** (regra Git do `CLAUDE.md`), PR com a lista de divergências deliberadas e sem lançar nada no SCPI
+- [X] T058 [P] Corrigir `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md` (§4 catálogos e §5 fluxo 1): regra por unidade, avulsa com saldo positivo, limite da limpeza, estados do catálogo, mensagens
+- [X] T059 [P] Atualizar o `CLAUDE.md` no mesmo PR: seções de quantidades e estoque (regra por unidade e lista no admin), indisponível e sem estoque, equipe, JavaScript como requisito, `Fluxo` e como criar um formulário novo
+- [X] T060 [P] Corrigir o docstring de `pedidos/fluxos.py` ("Cada fluxo diz de que catálogo lê…") e os docstrings de `pedidos/carrinho.py` e `pedidos/views/materiais.py` que citam "parte inteira do estoque no AB"
+- [X] T061 Remover o que ficou sem uso (`grep` e Serena `find_referencing_symbols`): `qtd_estoque`, `parse_inteiro` e `estoque_inteiro` só se nada mais os referenciar; manter `ItemCatalogo.disponivel` se os testes ainda o usam, e anotar a decisão
+- [X] T062 Rodar os portões: `uv run pytest`, `uv run ruff check . && uv run ruff format --check .`, `uv run python manage.py makemigrations --check --dry-run` e `uv run python manage.py check --deploy` com `DEBUG=0`; todos limpos
+- [X] T063 Percorrer os cenários 1 a 12 de `quickstart.md` (seção 3) no servidor de desenvolvimento e anotar o resultado
+- [X] T064 Conferência manual em tela de celular (375 px) dos dois formulários, com a lista da seção 4 do `quickstart.md`, e registrar o resultado (SC-010)
+- [X] T065 Revisar `specs/005-consistencia-formularios-publicos/research.md` (itens a confirmar: unidade do código canônico no AB com um caso real de de/para; tabela *Medição*) e `checklists/requirements.md`
+- [X] T066 Resumir as mudanças ao usuário; commit e PR para `develop` **só quando o usuário pedir** (regra Git do `CLAUDE.md`), PR com a lista de divergências deliberadas e sem lançar nada no SCPI
 
 ---
 

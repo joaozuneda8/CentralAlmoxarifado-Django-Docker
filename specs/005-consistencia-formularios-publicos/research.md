@@ -203,13 +203,15 @@ confirmação do usuário está em *Itens a confirmar*, no fim.
    ajustada. `Resultado.estoque` da avulsa deixa de usar `qtd_estoque` (4 casas) e passa a usar
    `truncar_qtd` + `qtd_br`; os testes `test_carrinho.py:466-481` (que fixam "Estoque 0,0004" e
    "Estoque 2,4996") mudam de acordo.
-2. **Unidade do código canônico no AB:** é dedução do código (`catalogo_ab` usa o `Material` do
-   canônico), registrada na spec; vale conferir com um caso real de de/para.
-3. **Medição do catálogo do AB:** precisa ser rodada por quem acessa os dados reais; o resultado vai
-   para *Medição*, abaixo.
+2. ~~Unidade do código canônico no AB.~~ **Conferido em 2026-10-21** no banco de desenvolvimento:
+   dos 397 pares de/para, 89 têm unidade diferente entre o código antigo e o novo (por exemplo
+   `MTS` → `MT`, `UN` → `BR`, `PC` → `UN`), então a escolha importa; `catalogo_ab` constrói o item
+   do `Material` do canônico, e `tests/test_catalogos.py` cobre o caso.
+3. ~~Medição do catálogo do AB.~~ **Feita em 2026-10-21** (ver *Medição*): tempo da ordem de 40 ms, sem justificativa para cache.
 
-## Medição (a preencher depois de rodar o quickstart)
+## Medição
 
 | Data | Ambiente | Tempo de `catalogo_ab()` | Nº de consultas | Observação |
 |---|---|---|---|---|
 | 2026-10-21 | Servidor em `http://45.172.240.231:8010`, medição indireta por HTTP (24 GETs, 8 rodadas, 1 s entre elas) | `/pedido/ab/materiais/?q=`: primeiro byte entre 0,14 e 0,19 s (média 0,17 s); `/pedido/limpeza/materiais/?q=`: mediana 0,13 s (um pico isolado de 0,86 s); página inicial, sem catálogo: mediana 0,12 s | Não medido (só pelo shell do projeto) | Sobra cerca de 40 a 50 ms para o AB sobre a linha de base, incluindo a montagem do catálogo, o filtro e a renderização de 50 linhas: a montagem sozinha fica abaixo disso. Não prova nada sobre concorrência, o envio (POST) nem o tamanho dos dados. Resposta do AB com 146 KB para 50 resultados (limpeza: 108 KB). Resta rodar o trecho do quickstart para o tempo exato e o número de consultas |
+| 2026-10-21 | Banco de desenvolvimento local, com dados reais (11.597 materiais, 5.079 saídas), medição direta pelo shell do projeto, 5 execuções | `catalogo_ab()`: 35 a 57 ms (a primeira, mais lenta; as demais, 35 a 39 ms), 377 itens; `catalogo_avulsa()`: 23 a 26 ms, 1.382 itens; `catalogo_limpeza()`: 2 ms, 38 itens | 8 (AB), 2 (avulsa), 2 (limpeza) | Abaixo dos 100 ms da faixa em que só tirar a conta da fila única basta: **cache não se justifica** e fica fora desta funcionalidade. Confirma a estimativa indireta por HTTP. O que ainda não foi medido: concorrência real e o envio (POST) em produção |

@@ -181,23 +181,45 @@ transações precisam se comportar como no servidor.
   "divergente", e nada duplica. Erro de negócio volta numa `Resposta` com a lista de erros. O
   aviso no Telegram (`telegram.py`) sai por `transaction.on_commit` e nunca desfaz o pedido.
 - Formulários públicos (`views/publico.py`): token assinado com o envio e o momento da
-  abertura, campo isca e tempo mínimo (`protecao.py`); limites por IP e por nome contados no
-  banco (`settings.PEDIDOS_*`). O envio vai pelo HTMX e a resposta substitui o formulário; o
+  abertura, campo isca e tempo mínimo (`protecao.py`: `recusar` devolve o motivo; token inválido e envio
+  rápido demais ganham mensagem humana, com os dados mantidos, só a isca recebe a genérica, e o
+  token não expira); limites por IP e por nome contados no banco (`settings.PEDIDOS_*`, o limite
+  por nome vale para toda origem que não é a avulsa, `regras.origem_publica`). O JavaScript é
+  requisito dos formulários públicos: sem ele, só o aviso do `<noscript>` aparece
+  (`html:not(.js) .formulario-pedido` esconde o formulário). O envio vai pelo HTMX e a resposta substitui o formulário; o
   `htmx-config` do `base.html` impede que respostas 4xx/5xx apaguem a página. Busca de
   materiais e carrinho (`fluxos.py`, `carrinho.py`, `views/materiais.py`) são comuns a limpeza,
   AB e saída avulsa: o carrinho vive em campos escondidos e o servidor não guarda estado. A busca
-  lista primeiro o que pode ser pedido e os bloqueados no fim, antes do corte de 50. Os três formulários limitam pelo saldo do cadastro
-  (`Fluxo.limita_estoque`, `carrinho.limite`): o AB pela parte inteira, a limpeza e a avulsa pelo saldo
-  exato, decimal; material com saldo 0 aparece bloqueado ("Sem estoque") e o envio o recusa
-  (`regras.validar_pedido_limpeza` e `validar_pedido_ab`). Limpeza e AB ficam indisponíveis enquanto o
-  saldo nunca foi importado (`catalogos.saldo_importado`), senão todo material apareceria sem estoque. Para o
-  funcionário, os formulários se chamam "Limpeza, copa e escritório" e "Ferramentas, peças e
+  lista primeiro o que pode ser pedido e os bloqueados no fim, antes do corte de 50. A quantidade segue a **unidade do material**, igual nos dois
+  formulários públicos (spec 005): a unidade fracionável (lista `Opcao.Lista.UNIDADE_FRACIONAVEL`,
+  mantida no admin e carregada pela migration `catalogo/0002` com `M`, `MT`, `MTS`, `KM`, `KG`, `L`,
+  `LT`, `M²`, `M³` e `T`; lista vazia = tudo inteiro) aceita até 3 casas; as demais, e o material
+  sem unidade, só inteiro, e a fração é recusada na hora (`regras.interpretar_quantidade`, com um
+  texto por causa em `texto_erro_quantidade`, o mesmo ao adicionar, alterar e enviar).
+  `ItemCatalogo.fracionavel` vem da unidade do SCPI (a do código canônico no AB), nunca da unidade
+  exibida da limpeza. O estoque exibido ("Estoque N · UN"), o teto de adicionar e alterar
+  (`carrinho.limite`), a validação do envio (`regras.validar_pedido`, uma só para os dois) e o texto
+  "Estoque disponível" são o mesmo número, `regras.maximo_pedivel`: o saldo truncado a 3 casas (para
+  unidade contada, a parte inteira), sem zeros à direita (`regras.qtd_br`); material com máximo 0
+  aparece bloqueado ("Sem estoque") e o envio o recusa. A equipe (atendimento e saída avulsa,
+  `Fluxo.regra_quantidade == "livre"`) aceita fração em qualquer unidade, com o teto no saldo
+  truncado a 3 casas, e o aviso do Telegram e o campo de entrega mostram a quantidade exata. Formulário
+  com o saldo nunca importado (`catalogos.saldo_importado`) ou sem item algum fica indisponível, com
+  a mesma mensagem nos dois, e vira aviso de saúde (`saude._demais`); com itens e todos sem estoque,
+  abre com o aviso `sem_estoque_agora` no topo. Recusa por item devolve o pedido inteiro, com a linha
+  ilegível mantida e marcada "Corrigir" (`carrinho.ler(manter_ilegiveis=True)`). Cada formulário é
+  uma entrada de `FLUXOS` (`Fluxo`: `catalogo`, `exemplo_busca`, `exemplo_inicio`, `icone`,
+  `publico`, `regra_quantidade`; contrato em
+  `specs/005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md`): um formulário
+  novo é uma entrada, uma função `formulario_*` em `catalogos.py` e um valor em `Pedido.Origem`, sem
+  mexer no núcleo. `registrar_pedido` lê o catálogo e os centros antes de travar a `Sequencia`.
+  Para o funcionário, os formulários se chamam "Limpeza, copa e escritório" e "Ferramentas, peças e
   materiais" (`Fluxo.titulo`); o nome interno (painel, Telegram, `Pedido.Origem`) continua
   "Materiais AB". `regras.Erro` tem `campo` (`solicitante`, `destino`, `obs`) nos erros de um campo:
   a view monta `erros_por_campo`, e o formulário mostra o resumo no topo (focado pelo `pedidos.js`,
   com link para o campo) e o erro embaixo do próprio campo. No celular, a gaveta do pedido envia
   (`data-carrinho-enviar`, que aciona o botão do fim do formulário por `requestSubmit`; esse botão
-  fica escondido com JavaScript e só aparece sem ele), também na saída avulsa, com os textos da
+  fica escondido com JavaScript), também na saída avulsa, com os textos da
   saída (`Fluxo.rotulo_carrinho` e afins: "Materiais da saída", "Revisar e registrar"). O "Nome completo" é texto livre, sem sugestões de nomes. O `pedidos.js`
   lembra no `localStorage` do aparelho (`almoxarifado.solicitante`) o último nome digitado (gravado
   ao digitar) e o destino do último pedido registrado (gravado pela tela de sucesso,
@@ -210,8 +232,7 @@ transações precisam se comportar como no servidor.
   fecha. Aberta, a linha mostra a quantidade à esquerda e o "Confirmar" no canto inferior direito, com o
   ✕ vermelho no superior direito; as outras linhas recuam (opacidade 0,6) mas seguem clicáveis. A
   informação do material quebra por dentro e o selo desce para a linha de baixo quando a unidade é
-  longa (limpeza). Sem JavaScript a quantidade fica à vista, e o painel do atendimento (`um_passo`)
-  adiciona ou troca direto, com botão. A coluna do `.passo-corpo` é `minmax(0, 1fr)`, para a busca não
+  longa (limpeza). O painel do atendimento (`um_passo`) adiciona ou troca direto, com botão. A coluna do `.passo-corpo` é `minmax(0, 1fr)`, para a busca não
   alargar com o conteúdo. O painel de resultados fica no fluxo da página, em qualquer tela (nunca
   absoluto: o cartão do passo cresce com ele, sem painel pendurado para fora); ao abrir, o pedidos.js
   rola o campo ao topo (`trazerAoTopo`, descontando a barra do topo no celular) e dá ao painel a altura
@@ -241,8 +262,9 @@ transações precisam se comportar como no servidor.
   (`ItemPedido.origem` `PEDIDO` ou `ALMOXARIFADO`; o acrescentado tem `qtd_pedida` nula,
   `adicionado_por` e, na troca, `no_lugar_de`, e o trocado fica com 0 sem deixar o pedido parcial),
   do catálogo da saída avulsa (só material não oculto e com saldo > 0, `catalogos.materiais_avulsa`),
-  com a quantidade limitada ao saldo exato do cadastro, decimal, não à parte inteira do AB
-  (`ItemSaida.estoque` em `regras.validar_saida`, e `Fluxo.limita_estoque` + `carrinho.limite` na
+  com a quantidade limitada ao saldo do cadastro truncado a 3 casas, em qualquer unidade
+  (`maximo_pedivel` com a regra `livre`; `ItemSaida.estoque` em `regras.validar_saida`, e
+  `carrinho.limite` na
   resposta imediata do carrinho e do "Adicionar"). Na edição (`servicos._limites_de_estoque`) o teto
   de quem já está gravado é o maior entre o saldo e a quantidade gravada: o SCPI pode ter abatido o
   saldo, ou o material ter saído do catálogo, e a edição não o recusa, só não deixa subir. A busca (`atendimento_materiais`) e o

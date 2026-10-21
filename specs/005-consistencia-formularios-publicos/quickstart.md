@@ -119,3 +119,22 @@ resultado é a base de uma nova decisão sobre cache (fora desta funcionalidade)
 - Medição registrada (seção 5).
 - `CLAUDE.md`, spec principal, docstring de `fluxos.py` e comentários dos modelos de página
   atualizados (FR-042).
+
+## 7. Resultado da verificação (2026-10-21)
+
+- **Portões automáticos:** `ruff check`, `ruff format --check`, `makemigrations --check`,
+  `check --deploy` (com `DEBUG=0`) e a suíte inteira (1501 passaram, 1 pulado) limpos.
+- **Banco de desenvolvimento:** migration `catalogo/0002` aplicada; as 10 unidades ficaram ativas.
+- **Cenários 1 a 12:** a lógica de cada um é coberta por testes automáticos em MariaDB
+  (`test_quantidade_por_unidade.py`, `test_estoque_exibido.py`, `test_estados_do_catalogo.py`,
+  `test_formularios_publicos.py`, `test_quantidade_equipe.py`, `test_pedidos_antigos.py`,
+  `test_fluxo_configuravel.py`, `test_registrar_pedido.py`). Os cenários que mudam saldo ou gravam
+  pedido não foram repetidos no banco de desenvolvimento, que tem dados reais.
+- **Conferência no navegador, em 375 px (só leitura, sem enviar pedido):** a página inicial lista os
+  dois formulários; o AB e a limpeza mostram "Estoque N · UN" (a limpeza com a unidade exibida);
+  adicionar 2,5 de um cabo em `M` entra no pedido ("2,5 M"); 1,5 de uma fita em `UN` é recusado com
+  "Este material só é pedido em quantidade inteira (unidade: UN)." e a gaveta abre mostrando o erro;
+  alterar o cabo para 301 mostra "Quantidade acima do estoque. Estoque disponível: 300 M." e a linha
+  fica em 2,5; sem a classe `js` no `<html>` o formulário some e resta o `<noscript>`.
+- **Não verificado:** o navegador com o JavaScript realmente desligado (simulei tirando a classe
+  `js`), o envio do pedido pelo navegador e os formulários em tablet e desktop.

@@ -9,7 +9,16 @@ from django.conf import settings
 from django.http import Http404
 
 from catalogo.catalogos import ItemCatalogo
-from pedidos.regras import AB, AVULSA, LIMPEZA, normalizar_busca, qtd_estoque
+from pedidos.regras import (
+    AB,
+    AVULSA,
+    LIMPEZA,
+    REGRA_LIVRE,
+    REGRA_POR_UNIDADE,
+    maximo_pedivel,
+    normalizar_busca,
+    qtd_br,
+)
 
 LIMITE_RESULTADOS = 50
 
@@ -24,6 +33,9 @@ class Fluxo:
     publico: bool
     # Limita pelo saldo exato do cadastro (decimal), sem mostrar o estoque na lista.
     limita_estoque: bool = False
+    # Quem pede segue a unidade do material (`por_unidade`); a equipe aceita fração em qualquer
+    # unidade (`livre`). Substitui, aos poucos, `inteiro`, `com_estoque` e `limita_estoque`.
+    regra_quantidade: str = REGRA_POR_UNIDADE
 
     @property
     def max_itens(self) -> int | None:
@@ -73,6 +85,7 @@ FLUXOS: dict[str, Fluxo] = {
         com_estoque=False,
         publico=False,
         limita_estoque=True,
+        regra_quantidade=REGRA_LIVRE,
     ),
 }
 
@@ -140,9 +153,11 @@ class Resultado:
 
     item: ItemCatalogo
     motivo: str  # por que não pode ser pedido ("" se pode)
-    info: str  # unidade, ou o estoque disponível no AB
+    info: str  # a unidade ("—" sem unidade)
     classe: str
-    estoque: str = ""  # "Estoque N" (saldo exato) onde `info` não o diz: limpeza e saída avulsa
+    # "Estoque N": o máximo que o formulário aceita (o mesmo número do limite e das mensagens),
+    # sem zeros à direita.
+    estoque: str = ""
 
     @property
     def linha_publica(self) -> str:
@@ -156,16 +171,8 @@ def resultados(fluxo: Fluxo, itens) -> list[Resultado]:
 
     lista = []
     for i in itens:
-        estoque = ""
-        if fluxo.com_estoque:
-            info = (
-                f"{i.disponivel} {i.unidade} disponíveis"
-                if i.unidade
-                else f"{i.disponivel} disponíveis"
-            )
-        else:
-            info = i.unidade or "—"
-            estoque = f"Estoque {qtd_estoque(i.estoque)}"
+        maximo = maximo_pedivel(i.estoque, i.fracionavel, fluxo.regra_quantidade)
+        estoque = f"Estoque {qtd_br(maximo)}"
         classe = i.grupo if fluxo.origem == AVULSA else classe_ab(i)
-        lista.append(Resultado(i, motivo_bloqueio(fluxo, i), info, classe, estoque))
+        lista.append(Resultado(i, motivo_bloqueio(fluxo, i), i.unidade or "—", classe, estoque))
     return lista

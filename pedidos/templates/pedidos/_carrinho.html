@@ -48,7 +48,7 @@ formulário (o rótulo do caso divergente vem de lá). Igual nos formulários p�
             <label class="visually-hidden" for="carrinho-qtd-{{ forloop.counter }}">Quantidade de {{ linha.item.nome|default:linha.codigo }}{% if linha.item.unidade %} ({{ linha.item.unidade }}){% endif %}</label>
             <span class="quantidade">
               <button type="button" id="carrinho-menos-{{ forloop.counter }}" class="botao botao-icone" data-quantidade="menos" aria-label="Diminuir {{ linha.item.nome|default:linha.codigo }}">{% include "interface/_icone.html" with nome="menos" %}</button>
-              <input id="carrinho-qtd-{{ forloop.counter }}" class="quantidade-campo" type="text" name="item_qtd" value="{{ linha.texto }}" inputmode="{% if fluxo.inteiro %}numeric{% else %}decimal{% endif %}" autocomplete="off" data-qtd-carrinho
+              <input id="carrinho-qtd-{{ forloop.counter }}" class="quantidade-campo" type="text" name="item_qtd" value="{{ linha.texto }}" inputmode="decimal" autocomplete="off" data-qtd-carrinho
                      hx-post="{{ url_carrinho }}" hx-target="#carrinho" hx-trigger="confirmar-quantidade" hx-vals='{"alterar": "{{ linha.codigo|escapejs }}", "anterior": "{{ linha.texto|escapejs }}"}'>
               <button type="button" id="carrinho-mais-{{ forloop.counter }}" class="botao botao-icone" data-quantidade="mais" aria-label="Aumentar {{ linha.item.nome|default:linha.codigo }}">{% include "interface/_icone.html" with nome="mais" %}</button>
             </span>

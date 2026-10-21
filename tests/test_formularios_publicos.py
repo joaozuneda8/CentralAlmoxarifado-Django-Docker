@@ -154,7 +154,7 @@ def test_erros_mantem_o_preenchido_e_marcam_o_item(client):
         destino="Elevatória",
         itens=[("016.005.010", "3"), ("013.006.001", "3")],
     )
-    assert "BOTINA (013.006.001): pedido 3 UN, estoque atual 2 UN." in r.text
+    assert "BOTINA (013.006.001): Quantidade acima do estoque. Estoque disponível: 2 UN." in r.text
     assert 'value="Bruno"' in r.text and 'value="Elevatória"' in r.text
     assert 'name="item_codigo" value="013.006.001"' in r.text
     assert "Corrigir" in r.text
@@ -402,7 +402,10 @@ def test_um_erro_so_e_erro_de_material_ficam_no_resumo(client):
     r = postar(client, "ab", token(), itens=[("013.006.001", "3")]).text
     resumo = _resumo(r)
     assert "Falta 1 coisa para enviar" in resumo
-    assert "<li>BOTINA (013.006.001): pedido 3 UN, estoque atual 2 UN.</li>" in resumo
+    assert (
+        "<li>BOTINA (013.006.001): Quantidade acima do estoque. Estoque disponível: 2 UN.</li>"
+        in resumo
+    )
     assert 'aria-invalid="true"' not in r and "Corrigir" in r
 
 

@@ -63,14 +63,12 @@ from pedidos.regras import (
     marcado_nao_lancar,
     norm_placa,
     norm_u,
-    parse_inteiro,
     parse_qtd_br,
     registro_confere,
     requisicao_valida,
     somar_por_codigo,
     texto,
-    validar_pedido_ab,
-    validar_pedido_limpeza,
+    validar_pedido,
     validar_saida,
 )
 from pedidos.telegram import notificar_pedido
@@ -248,10 +246,7 @@ def registrar_pedido(
                 mensagem="Não há centros de custo cadastrados para escolher o destino. "
                 "Avise o almoxarifado.",
             )
-        if origem == AB:
-            v = validar_pedido_ab(envio, catalogo, lista_centros)
-        else:
-            v = validar_pedido_limpeza(envio, catalogo, lista_centros)
+        v = validar_pedido(envio, catalogo, lista_centros)
         tamanhos = erros_de_tamanho(
             {
                 "Nome completo": envio.solicitante,
@@ -382,9 +377,8 @@ def _gravar_linhas(atendimento: Atendimento, pares, lote: str) -> None:
 
 
 def _qtd_adicionada(qtds: dict[str, str], codigo: str) -> Decimal | None:
-    """Quantidade de um acrescentado: vírgula decimal (o inteiro do AB é conferido pela regra
-    do `validar_saida`, com a mensagem "deve ser inteira"); campo vazio ou ausente vale 0, que
-    pede a quantidade."""
+    """Quantidade de um acrescentado: vírgula decimal, em qualquer unidade (a equipe não segue a
+    regra por unidade); campo vazio ou ausente vale 0, que pede a quantidade."""
     return parse_qtd_br(texto(qtds.get(codigo)) or "0")
 
 
@@ -520,7 +514,6 @@ def _validar_atendimento(
             tipos=tipos,
             hoje=hoje,
             catalogo=catalogo,
-            regra_inteira=pedido.origem == AB,
         )
 
     catalogo = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
@@ -626,8 +619,8 @@ def confirmar_atendimento(
             return Resposta(ok=False, mensagem="Pedido não encontrado.")
         todos = list(pedido.itens.all())
         itens = [i for i in todos if i.origem == ItemPedido.Origem.PEDIDO]
-        conv = parse_inteiro if pedido.origem == AB else parse_qtd_br
-        parsed = {i.codigo: conv(qtds.get(i.codigo, "")) for i in itens}
+        # A equipe aceita fração em qualquer unidade e em pedido de qualquer origem.
+        parsed = {i.codigo: parse_qtd_br(qtds.get(i.codigo, "")) for i in itens}
         qtds_adicionadas = {a.codigo: _qtd_adicionada(qtds, a.codigo) for a in adicionados}
 
         anterior = pedido.atendimento_ou_none
@@ -851,8 +844,8 @@ def editar_atendimento(
         itens = [i for i in todos if i.origem == ItemPedido.Origem.PEDIDO]
         gravados = {i.codigo: i for i in todos if i.origem == ItemPedido.Origem.ALMOXARIFADO}
         por_id = {i.id: i for i in todos}
-        conv = parse_inteiro if pedido.origem == AB else parse_qtd_br
-        parsed = {i.codigo: conv(qtds.get(i.codigo, "")) for i in itens}
+        # A equipe aceita fração em qualquer unidade e em pedido de qualquer origem.
+        parsed = {i.codigo: parse_qtd_br(qtds.get(i.codigo, "")) for i in itens}
         qtds_adicionadas = {a.codigo: _qtd_adicionada(qtds, a.codigo) for a in adicionados}
 
         mantidos = {

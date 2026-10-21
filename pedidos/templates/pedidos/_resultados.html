@@ -22,10 +22,10 @@
     {% endcomment %}
     <div class="material-acao"{% if not um_passo %} data-adicionar{% endif %}>
       <div class="material-qtd" id="qtd-area-{{ forloop.counter }}">
-        <label class="visually-hidden" for="qtd-{{ forloop.counter }}">Quantidade{% if fluxo.inteiro %} (inteira){% endif %} de {{ r.item.nome }}{% if r.item.unidade %} ({{ r.item.unidade }}){% endif %}</label>
+        <label class="visually-hidden" for="qtd-{{ forloop.counter }}">Quantidade de {{ r.item.nome }}{% if r.item.unidade %} ({{ r.item.unidade }}){% endif %}</label>
         <div class="quantidade">
           <button type="button" class="botao botao-icone" data-quantidade="menos" aria-label="Diminuir">{% include "interface/_icone.html" with nome="menos" %}</button>
-          <input id="qtd-{{ forloop.counter }}" class="quantidade-campo campo-qtd" type="text" name="qtd-{{ r.item.codigo }}" value="{{ qtd_inicial|default:'1' }}" inputmode="{% if fluxo.inteiro %}numeric{% else %}decimal{% endif %}">
+          <input id="qtd-{{ forloop.counter }}" class="quantidade-campo campo-qtd" type="text" name="qtd-{{ r.item.codigo }}" value="{{ qtd_inicial|default:'1' }}" inputmode="decimal">
           <button type="button" class="botao botao-icone" data-quantidade="mais" aria-label="Aumentar">{% include "interface/_icone.html" with nome="mais" %}</button>
         </div>
         <button type="button" class="botao {% if not um_passo or acao_primaria %}botao-primario{% else %}botao-secundario{% endif %}" data-adicionar-confirmar hx-post="{{ url_carrinho }}" hx-target="{{ alvo_resultado|default:'#carrinho' }}" hx-swap="{{ troca_resultado|default:'innerHTML' }}"{% if inclusao_resultado %} hx-include="{{ inclusao_resultado }}"{% endif %}{% if sincronia_resultado %} hx-sync="{{ sincronia_resultado }}"{% endif %}

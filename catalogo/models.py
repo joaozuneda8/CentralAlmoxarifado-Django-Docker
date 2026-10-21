@@ -41,6 +41,8 @@ class Opcao(models.Model):
         GRUPO_OCULTO_AB = "GRUPO_OCULTO_AB", "Grupos ocultos (AB)"
         CATEGORIA_LIMPEZA = "CATEGORIA_LIMPEZA", "Categorias (limpeza)"
         FUNCIONARIO = "FUNCIONARIO", "Funcionários"
+        # Unidades do SCPI em que a quantidade pode ter fração. Lista vazia = tudo inteiro.
+        UNIDADE_FRACIONAVEL = "UNIDADE_FRACIONAVEL", "Unidades fracionáveis"
 
     lista = models.CharField(max_length=30, choices=Lista.choices)
     valor = models.CharField(max_length=200)

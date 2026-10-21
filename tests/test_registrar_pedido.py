@@ -117,7 +117,7 @@ def test_ab_acima_do_estoque_e_recusado_inteiro():
     assert r.estoque_atual == {"013.006.001": 2}
     assert not Pedido.objects.exists() and not ItemPedido.objects.exists()
     sem = registrar_pedido(AB, uuid.uuid4(), envio_ab(itens=itens(("013.005.007", "1"))))
-    assert [e.texto for e in sem.erros] == ["LUVA NITRÍLICA (013.005.007) está sem estoque."]
+    assert [e.texto for e in sem.erros] == ["LUVA NITRÍLICA (013.005.007): Sem estoque."]
 
 
 def test_ab_sem_saldo_importado_fica_indisponivel():

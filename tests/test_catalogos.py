@@ -93,7 +93,8 @@ def test_ab_nao_faz_uma_consulta_por_material(django_assert_max_num_queries):
         material(f"M{n:02}", estoque_em=agora)
         saidas(f"M{n:02}", 1)
     ConfiguracaoCurva.atual()
-    with django_assert_max_num_queries(7):
+    # 7 consultas fixas, mais a lista de unidades fracionáveis (uma por montagem, nunca por item).
+    with django_assert_max_num_queries(8):
         assert len(catalogo_ab(HOJE).itens) == 30
 
 
@@ -218,3 +219,63 @@ def test_ab_so_conta_as_saidas_da_janela():
     saidas("A", 5, dia=date(2026, 8, 1))
     saidas("B", 1, dia=date(2026, 10, 1))
     assert [i.codigo for i in catalogo_ab(HOJE).itens] == ["B"]
+
+
+# ---------------------------------------------------------------- unidade fracionável (spec 005)
+
+
+@pytest.mark.parametrize(
+    ("unidade", "fracionavel"),
+    [
+        ("KG", True),
+        (" kg ", True),
+        ("M", True),
+        ("M²", True),
+        ("M2", True),  # a comparação é por `norm_u`: ² e 2 são o mesmo
+        ("T", True),
+        ("UN", False),
+        ("BR", False),
+        ("MC", False),
+        ("GL", False),
+        ("ML", False),
+        ("", False),
+    ],
+)
+def test_fracionavel_pela_unidade_do_scpi(unidade, fracionavel):
+    material("X", unidade=unidade, estoque=5)
+    assert [i.fracionavel for i in catalogo_avulsa()] == [fracionavel]
+
+
+def test_limpeza_decide_pela_unidade_do_scpi_e_nao_pela_exibida():
+    material("D", nome="DETERGENTE", unidade="UN", estoque=5)
+    material("K", nome="CAFÉ", unidade="KG", estoque=5)
+    limpeza("D", unidade_exibida="Pacote 500 g")
+    limpeza("K", unidade_exibida="Pacote")
+    itens = {i.codigo: i for i in catalogo_limpeza()}
+    assert (itens["D"].unidade, itens["D"].fracionavel) == ("Pacote 500 g", False)
+    assert (itens["K"].unidade, itens["K"].fracionavel) == ("Pacote", True)
+
+
+def test_ab_decide_pela_unidade_do_codigo_canonico():
+    agora = timezone.now()
+    material("000.000.001", unidade="UN", estoque=7, estoque_em=agora)
+    material("001.001.001", unidade="M", estoque=3, estoque_em=agora)
+    saidas("000.000.001", 3)
+    saidas("001.001.001", 1)
+    par("000.000.001", "001.001.001")
+    (item,) = catalogo_ab(HOJE).itens
+    assert (item.codigo, item.unidade, item.fracionavel) == ("001.001.001", "M", True)
+
+
+def test_lista_de_unidades_vazia_deixa_tudo_inteiro():
+    Opcao.objects.filter(lista=Opcao.Lista.UNIDADE_FRACIONAVEL).delete()
+    material("A", unidade="KG", estoque=5)
+    material("B", unidade="M", estoque=5)
+    assert [i.fracionavel for i in catalogo_avulsa()] == [False, False]
+
+
+def test_a_lista_de_unidades_vale_no_proximo_catalogo_sem_reiniciar():
+    material("A", unidade="KG", estoque=5)
+    assert catalogo_avulsa()[0].fracionavel is True
+    Opcao.objects.filter(lista=Opcao.Lista.UNIDADE_FRACIONAVEL, valor="KG").update(ativo=False)
+    assert catalogo_avulsa()[0].fracionavel is False

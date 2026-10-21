@@ -93,9 +93,8 @@ def test_data_tipo_codigo_entrega_e_inteira():
     assert textos(saida(), [ItemSaida("023.001.002", 0)]) == [
         "Informe ao menos um material com quantidade maior que zero."
     ]
-    assert textos(saida(), [ItemSaida("023.001.002", Decimal("1.5"))], regra_inteira=True) == [
-        "Pedido AB: a quantidade de 023.001.002 deve ser inteira."
-    ]
+    # A equipe aceita fração em qualquer unidade e em pedido de qualquer origem (spec 005).
+    assert textos(saida(), [ItemSaida("023.001.002", Decimal("1.5"))]) == []
     assert textos(saida(), [ItemSaida("023.001.002", None), ItemSaida("023.001.003", 1)]) == [
         "Quantidade inválida para 023.001.002."
     ]

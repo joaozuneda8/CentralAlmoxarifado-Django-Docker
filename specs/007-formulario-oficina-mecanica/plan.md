@@ -7,7 +7,8 @@
 ## Summary
 
 Um formulário público novo, "Oficina mecânica", para quem trabalha na oficina pedir ao almoxarifado
-autopeças e insumos. Ele é uma entrada de `FLUXOS` (PR #18), sem campo novo no `Fluxo`: busca,
+autopeças e insumos. Ele é uma entrada de `FLUXOS` (PR #18), com um único campo de texto novo no
+`Fluxo` (`exemplo_destino`, research R1, achado na validação manual): busca,
 carrinho, envio, proteções, painel, atendimento, edição, recibo, Telegram e lançamento no SCPI vêm
 prontos. O que é próprio do formulário:
 

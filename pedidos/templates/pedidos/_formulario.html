@@ -46,7 +46,7 @@ campo de cada erro de campo, e se repetem embaixo do próprio campo (`erros_por_
       <div class="campo{% if erros_destino %} campo-com-erro{% endif %}">
         <label class="campo-rotulo" for="destino">Destino dos materiais</label>
         <div class="com-acao">
-          <input id="destino" class="campo-entrada" type="text" name="destino" maxlength="200" list="destinos" autocomplete="off" placeholder="{% if fluxo.centros %}Centro de custo da equipe{% else %}Posto de trabalho, placa do veículo ou setor{% endif %}" value="{{ campos.destino }}"{% if erros_destino %} aria-describedby="destino-erro" aria-invalid="true"{% endif %}>
+          <input id="destino" class="campo-entrada" type="text" name="destino" maxlength="200" list="destinos" autocomplete="off" placeholder="{{ fluxo.exemplo_destino }}" value="{{ campos.destino }}"{% if erros_destino %} aria-describedby="destino-erro" aria-invalid="true"{% endif %}>
           <button type="button" class="botao-suave acao-campo acao-limpar" data-limpar-campo="destino" aria-label="Limpar o destino" hidden>{% include "interface/_icone.html" with nome="fechar" %}<span>Limpar</span></button>
         </div>
         {% include "pedidos/_erro_campo.html" with nome="destino" erros=erros_destino %}

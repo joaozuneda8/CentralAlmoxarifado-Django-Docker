@@ -210,8 +210,9 @@ transações precisam se comportar como no servidor.
   a mesma mensagem nos dois, e vira aviso de saúde (`saude._demais`); com itens e todos sem estoque,
   abre com o aviso `sem_estoque_agora` no topo. Recusa por item devolve o pedido inteiro, com a linha
   ilegível mantida e marcada "Corrigir" (`carrinho.ler(manter_ilegiveis=True)`). Cada formulário é
-  uma entrada de `FLUXOS` (`Fluxo`: `catalogo`, `exemplo_busca`, `exemplo_inicio`, `icone`,
-  `publico`, `regra_quantidade` e, opcionais, `folha`, `centros` e `pede_ocorrencia`; contratos em
+  uma entrada de `FLUXOS` (`Fluxo`: `catalogo`, `exemplo_busca`, `exemplo_inicio`,
+  `exemplo_destino`, `icone`, `publico`, `regra_quantidade` e, opcionais, `folha`, `centros` e
+  `pede_ocorrencia`; contratos em
   `specs/005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md` e
   `specs/006-reposicao-pecas-viaturas/contracts/configuracao-fluxo.md`): um formulário novo é uma
   entrada, uma função `formulario_*` em `catalogos.py` e um valor em `Pedido.Origem` (migration de
@@ -323,7 +324,8 @@ transações precisam se comportar como no servidor.
   catálogo (`saude._viaturas`) diz quanto o formulário oferece ou por que está indisponível.
 - Formulário da oficina mecânica (spec `specs/007-formulario-oficina-mecanica/`): o formulário
   público `FLUXOS["oficina"]` (origem `OFICINA`, `/pedido/oficina/`), pedido de autopeças e insumos
-  da oficina, sem campo novo no `Fluxo` (sem folha nem ocorrência). O catálogo
+  da oficina, sem folha nem ocorrência; o único campo novo no `Fluxo` é `exemplo_destino`, o
+  placeholder do destino (antes deduzido de `fluxo.centros`). O catálogo
   (`catalogos.formulario_oficina`) são os materiais visíveis dos grupos da lista `Opcao`
   `GRUPO_OFICINA` ("Grupos (oficina)", comparados por `_grupo`, como os ocultos do AB; lista vazia =
   nenhum grupo) mais os avulsos de `MaterialOficina` (um por material, `OneToOne` com `PROTECT`; para

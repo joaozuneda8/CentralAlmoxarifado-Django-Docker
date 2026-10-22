@@ -9,6 +9,7 @@ de sucesso, painel, detalhe e recibo usam os textos de hoje (specs 005 e 006).
 |---|---|
 | Cartão da página inicial | Oficina mecânica — Ex.: filtro, óleo, pneu, aditivo, lâmpada |
 | Exemplo da busca | Ex.: filtro de óleo, pneu |
+| Placeholder do destino | Oficina mecânica ou placa da viatura |
 
 ## Almoxarifado
 

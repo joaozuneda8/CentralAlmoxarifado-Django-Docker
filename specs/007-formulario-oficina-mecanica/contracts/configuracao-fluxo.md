@@ -3,8 +3,9 @@
 Usa o contrato da spec 005
 ([configuracao-fluxo.md](../../005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md))
 e os campos opcionais da spec 006
-([configuracao-fluxo.md](../../006-reposicao-pecas-viaturas/contracts/configuracao-fluxo.md)), sem
-campo novo no `Fluxo`.
+([configuracao-fluxo.md](../../006-reposicao-pecas-viaturas/contracts/configuracao-fluxo.md)), com um
+campo de texto novo, `exemplo_destino` (o placeholder do campo de destino; padrão "Posto de trabalho,
+placa do veículo ou setor"; viaturas: "Centro de custo da equipe"), research R1.
 
 | Campo | Valor |
 |---|---|
@@ -14,7 +15,8 @@ campo novo no `Fluxo`.
 | `catalogo` | `catalogos.formulario_oficina` (research R4) |
 | `exemplo_busca` | Ex.: filtro de óleo, pneu |
 | `exemplo_inicio` | Ex.: filtro, óleo, pneu, aditivo, lâmpada |
-| `icone` | um ícone já existente em `_icone.html` |
+| `icone` | `caixa-check` (já existente em `_icone.html`) |
+| `exemplo_destino` | Oficina mecânica ou placa da viatura |
 | `publico` | `True` |
 | `regra_quantidade` | `por_unidade` (padrão) |
 | `folha` | `None` (padrão) |

@@ -16,6 +16,14 @@ dados do banco de desenvolvimento (cópia do cadastro do SCPI).
   as duas features, contra o pedido do usuário); um formulário próprio fora de `FLUXOS` (duplicaria o
   núcleo).
 
+**Ajuste da implementação (2026-10-22):** a validação manual (quickstart §4) mostrou que o
+`_formulario.html` escolhia o placeholder do destino por `fluxo.centros` ("Centro de custo da equipe"
+sempre que o fluxo restringe os centros), um acoplamento escondido com o formulário das viaturas. A
+oficina ganharia o texto das equipes. Solução: um campo de texto opcional em `Fluxo`,
+`exemplo_destino` (padrão "Posto de trabalho, placa do veículo ou setor", o texto de hoje), como os
+`exemplo_*` que já existem; viaturas passa "Centro de custo da equipe" e a oficina "Oficina mecânica
+ou placa da viatura". Nenhum comportamento muda nos outros formulários.
+
 ## R2 — Grupos da oficina numa lista de `Opcao`
 
 - **Decision**: os grupos ficam numa lista nova de `Opcao`, `GRUPO_OFICINA` ("Grupos (oficina)"),

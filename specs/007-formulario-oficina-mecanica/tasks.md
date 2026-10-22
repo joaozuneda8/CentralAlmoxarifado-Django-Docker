@@ -98,6 +98,8 @@ description: "Tarefas da funcionalidade 007: formulário da oficina mecânica"
 - [X] T019 Portões: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run python manage.py makemigrations --check --dry-run`, todos limpos; comparar o número de testes com T001
 - [ ] T020 Validação manual pelo quickstart.md §2 a §5 no servidor de desenvolvimento (formulário no celular e no computador, atendimento, simulação sem `LANCAMENTO_REAL`)
 
+- [X] T021 Achado de T020: o placeholder do destino vinha de `fluxo.centros` (texto das equipes). Criar `Fluxo.exemplo_destino` em pedidos/fluxos.py (padrão o texto de hoje; viaturas "Centro de custo da equipe"; oficina "Oficina mecânica ou placa da viatura"), usá-lo em pedidos/templates/pedidos/_formulario.html e testá-lo em tests/test_oficina_formulario.py (research R1)
+
 ---
 
 ## Dependencies & Execution Order

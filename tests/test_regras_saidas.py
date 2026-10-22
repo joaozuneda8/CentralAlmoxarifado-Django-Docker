@@ -205,7 +205,7 @@ def envio_ab(q="2", **extra):
 
 
 def test_reenvio_confere():
-    gravado = ("Maria", "ETA II", "")
+    gravado = ("Maria", "ETA II", "", "")  # nome, destino, observação, ocorrência
     itens = [("001.000.010", Decimal(2))]
     assert registro_confere(AB, gravado, itens, envio_ab()) is True
     assert registro_confere(AB, gravado, itens, envio_ab("3")) is False
@@ -218,7 +218,7 @@ def test_reenvio_confere():
         itens=(ItemEnviado("023.001.002", "1,5"),),
     )
     assert registro_confere(
-        LIMPEZA, ("Ana", "ETA III", ""), [("023.001.002", Decimal("1.500"))], limpeza
+        LIMPEZA, ("Ana", "ETA III", "", ""), [("023.001.002", Decimal("1.500"))], limpeza
     )
 
 

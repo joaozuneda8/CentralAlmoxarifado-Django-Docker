@@ -728,3 +728,43 @@ html:not(.js) [data-quantidade] { display: none; }
 .rodape-saida [data-contagem-alteracoes]:not(:empty) { margin-right: auto; align-self: center; }
 .nao-gravadas [data-copiar-resumo] { justify-self: start; }
 .rodape-saida [data-contagem-alteracoes]:empty { display: none; }
+
+/* Folha (spec 006): a lista de peças preenchida como o papel. No celular, o diálogo ocupa a tela;
+   no computador, um painel centrado que rola por dentro. A linha tem o material à esquerda e a
+   quantidade à direita, como as colunas "Materiais | QTDE" da folha impressa. */
+.folha-chamada { display: grid; justify-items: start; gap: var(--esp-meio); margin-bottom: var(--esp-2); }
+.folha {
+  width: min(640px, calc(100% - 2 * var(--esp-2))); max-height: calc(100vh - 2 * var(--esp-4));
+  padding: 0; color: inherit; background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: var(--raio-cartao); box-shadow: var(--sombra-elevada);
+}
+.folha::backdrop { background: rgba(15, 14, 12, 0.4); }
+/* A barra "Fechar / Pôr no pedido" fica presa embaixo: a rolagem para o campo com foco desconta a
+   altura dela, para o foco nunca ficar escondido atrás (WCAG 2.4.11). */
+.folha { scroll-padding-bottom: 96px; }
+.folha-corpo { display: grid; gap: var(--esp-2); padding: var(--esp-3); }
+.folha-cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--esp-2); }
+.folha-titulo { margin: 0 0 var(--esp-meio); font-size: 20px; }
+.folha-lista { list-style: none; margin: 0; padding: 0; display: grid; }
+.folha-linha {
+  display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: var(--esp-meio) var(--esp-2);
+  padding: 10px 0; border-top: 1px solid var(--borda);
+}
+.folha-material { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+.folha-qtd { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
+.folha-motivo { justify-self: end; }
+.folha-linha-bloqueada .folha-material { opacity: 0.6; cursor: default; }
+.folha-linha-erro { padding-left: 12px; box-shadow: inset 3px 0 0 var(--erro-texto); }
+.folha-erro { grid-column: 1 / -1; margin: 0; }
+.folha-acoes {
+  position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: var(--esp-1);
+  margin: 0 calc(-1 * var(--esp-3)) calc(-1 * var(--esp-3)); padding: var(--esp-2) var(--esp-3);
+  background: var(--fundo); border-top: 1px solid var(--borda);
+}
+@media (max-width: 640px) {
+  .folha { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border: 0; border-radius: 0; }
+  .folha-corpo { padding: var(--esp-2); }
+  .folha-acoes { margin: 0 calc(-1 * var(--esp-2)) calc(-1 * var(--esp-2)); padding: var(--esp-2) var(--esp-2) calc(var(--esp-2) + env(safe-area-inset-bottom)); }
+  .folha-acoes .botao { white-space: nowrap; }
+  .folha-acoes .botao-primario { flex: 1; }
+}

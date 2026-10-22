@@ -13,12 +13,11 @@ from urllib.request import Request, urlopen
 from django.conf import settings
 
 from pedidos.models import ItemPedido
-from pedidos.regras import AB, LIMPEZA, qtd_br
+from pedidos.regras import qtd_br
 
 logger = logging.getLogger("pedidos")
 
 MAX_ITENS_AVISO = 15
-FORMULARIOS = {LIMPEZA: "Limpeza, copa/cozinha e escritório", AB: "Materiais AB"}
 
 
 def _esc(valor) -> str:
@@ -42,7 +41,7 @@ def texto_aviso(pedido) -> str:
     if len(itens) > MAX_ITENS_AVISO:
         linhas.append(f"<i>e mais {len(itens) - MAX_ITENS_AVISO} itens</i>")
     texto = (
-        f"📦 <b>Pedido {_esc(pedido.numero)}</b> — {FORMULARIOS.get(pedido.origem, '')}\n"
+        f"📦 <b>Pedido {_esc(pedido.numero)}</b> — {pedido.get_origem_display()}\n"
         f"{_esc(pedido.solicitante)}\nDestino: {_esc(pedido.destino)}\n\n" + "\n".join(linhas)
     )
     if pedido.obs:

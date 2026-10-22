@@ -9,7 +9,8 @@ from pedidos import regras
 
 
 class Pedido(models.Model):
-    """Cabeçalho de um pedido dos formulários (LIMPEZA, AB) ou de uma saída avulsa (AVULSA).
+    """Cabeçalho de um pedido dos formulários (LIMPEZA, AB, VIATURAS) ou de uma saída avulsa
+    (AVULSA).
 
     O `id` é o identificador do envio, gerado quando a página abre: o mesmo em todas as
     tentativas, para um reenvio nunca duplicar o pedido.
@@ -18,6 +19,7 @@ class Pedido(models.Model):
     class Origem(models.TextChoices):
         LIMPEZA = regras.LIMPEZA, "Limpeza, copa/cozinha e escritório"
         AB = regras.AB, "Materiais AB"
+        VIATURAS = regras.VIATURAS, "Reposição de peças das viaturas"
         AVULSA = regras.AVULSA, "Saída avulsa"
 
     id = models.UUIDField(primary_key=True, editable=False)
@@ -27,6 +29,8 @@ class Pedido(models.Model):
     solicitante = models.CharField(max_length=200, blank=True)
     destino = models.CharField(max_length=210, blank=True)
     obs = models.CharField("observação", max_length=200, blank=True)
+    # Só o formulário de viaturas pede (`Fluxo.pede_ocorrencia`); nos outros fica vazio.
+    ocorrencia = models.CharField("nº da ocorrência", max_length=20, blank=True, default="")
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

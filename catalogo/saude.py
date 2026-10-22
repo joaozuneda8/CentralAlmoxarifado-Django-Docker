@@ -12,8 +12,14 @@ from django.db.models import Max
 from django.utils import timezone
 from django.utils.formats import number_format
 
-from catalogo.catalogos import CatalogoAB, catalogo_ab, catalogo_limpeza
-from catalogo.models import CentroCusto, Importacao, ItemLimpeza, Material
+from catalogo.catalogos import (
+    CatalogoAB,
+    catalogo_ab,
+    catalogo_limpeza,
+    catalogo_viaturas,
+    centros_equipe_manutencao,
+)
+from catalogo.models import CentroCusto, Importacao, ItemLimpeza, Material, PecaViatura
 from scpi.gravacao import lista_curta
 
 # Importações que o catálogo precisa sempre; a carga dos pares de/para (DEPARA) é única e só
@@ -156,6 +162,50 @@ def _cadastro() -> tuple[int, int]:
     return total, (Material.objects.filter(oculto=True).count() if total else 0)
 
 
+FORMULARIO_VIATURAS = "Formulário de reposição de peças das viaturas"
+
+
+def _viaturas(ab: CatalogoAB) -> list[ItemSaude]:
+    """O formulário de reposição de peças das viaturas (spec 006): quanto oferece ou por que está
+    indisponível, e as peças da lista que não aparecem (o saldo já foi importado)."""
+    saude = []
+    lista = {i.codigo for i in catalogo_viaturas()}
+    do_ab = sum(1 for i in ab.itens if i.codigo not in lista)
+    if not centros_equipe_manutencao():
+        saude.append(
+            ItemSaude(
+                "erro",
+                f"{FORMULARIO_VIATURAS}: nenhum centro de custo marcado como de equipe de "
+                "manutenção; o formulário fica indisponível.",
+            )
+        )
+    elif not lista and not do_ab:
+        saude.append(
+            ItemSaude(
+                "erro",
+                f"{FORMULARIO_VIATURAS}: nenhuma peça na lista nem material no AB; o formulário "
+                "fica indisponível.",
+            )
+        )
+    else:
+        pecas = "1 peça" if len(lista) == 1 else f"{numero(len(lista))} peças"
+        materiais = "1 material" if do_ab == 1 else f"{numero(do_ab)} materiais"
+        saude.append(
+            ItemSaude("ok", f"{FORMULARIO_VIATURAS}: {pecas} na lista e {materiais} do AB.")
+        )
+    ocultas = list(
+        PecaViatura.objects.filter(material__oculto=True).values_list("material__codigo", flat=True)
+    )
+    if ocultas:
+        saude.append(
+            ItemSaude(
+                "aviso",
+                f"Peças das viaturas ocultas no SCPI (não aparecem): {lista_curta(ocultas)}.",
+            )
+        )
+    return saude
+
+
 def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) -> list[ItemSaude]:
     """Tudo o que não é a situação de uma importação: cadastro, saldo e formulários."""
     saude = []
@@ -179,8 +229,8 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
         saude.append(
             ItemSaude(
                 "erro",
-                "Sem saldo importado: os formulários de limpeza e AB ficam indisponíveis até a "
-                "próxima importação de estoque.",
+                "Sem saldo importado: os formulários públicos ficam indisponíveis até a próxima "
+                "importação de estoque.",
             )
         )
     else:
@@ -244,6 +294,9 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
                     f"{lista_curta(ab.sem_cadastro)}.",
                 )
             )
+
+    if ab is not None:
+        saude += _viaturas(ab)
 
     if not CentroCusto.objects.exists():
         saude.append(
@@ -362,6 +415,7 @@ class Situacao:
     avisos: list[ItemSaude]  # o que não é de uma importação e precisa de atenção
     limpeza: int
     ab: CatalogoAB | None
+    viaturas: int = 0  # peças visíveis na lista do formulário de viaturas (spec 006)
 
     @property
     def tem_avisos(self) -> bool:
@@ -397,4 +451,5 @@ def situacao_do_catalogo(agora: datetime | None = None) -> Situacao:
         avisos=[i for i in _demais(agora, ab, total, ocultos) if i.nivel != "ok"],
         limpeza=len(catalogo_limpeza()),
         ab=ab,
+        viaturas=len(catalogo_viaturas()),
     )

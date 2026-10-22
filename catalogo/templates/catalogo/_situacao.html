@@ -105,6 +105,11 @@ importação termina.
       <p class="campo-dica">Falta importar o saldo de estoque.</p>
       {% endif %}
     </div>
+    <div class="cartao cartao-sutil">
+      <p class="texto-secundario">Formulário de reposição de peças das viaturas</p>
+      <p class="metrica">{{ situacao.viaturas|floatformat:"0g" }} {% if situacao.viaturas == 1 %}peça{% else %}peças{% endif %}</p>
+      <p class="campo-dica">Da lista de peças; o resto do catálogo AB entra pela busca.</p>
+    </div>
   </div>
 
 </section>

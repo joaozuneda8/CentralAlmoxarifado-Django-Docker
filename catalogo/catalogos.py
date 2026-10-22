@@ -2,7 +2,8 @@
 
 Traduz `montarCatalogos_` do `Catalogo.gs`: limpeza vem do `ItemLimpeza`; AB, das saídas do
 SCPI no período da curva ABC, consolidadas pelo de/para e ordenadas por número de ocorrências; a
-saída avulsa, de todo material não oculto e com saldo positivo. Em todos, o material `duplicado`
+saída avulsa, de todo material não oculto e com saldo positivo; o de viaturas, da `PecaViatura`
+seguida do catálogo AB (spec 006). Em todos, o material `duplicado`
 aparece (bloqueado pelo formulário).
 """
 
@@ -14,8 +15,15 @@ from django.utils import timezone
 
 from catalogo.consultas_curva import consolidado
 from catalogo.curva import periodo
-from catalogo.models import ConfiguracaoCurva, ItemLimpeza, Material, Opcao
-from pedidos.regras import estoque_inteiro, norm_u
+from catalogo.models import (
+    CentroCusto,
+    ConfiguracaoCurva,
+    ItemLimpeza,
+    Material,
+    Opcao,
+    PecaViatura,
+)
+from pedidos.regras import Centro, estoque_inteiro, norm_u
 
 # Usados quando a lista GRUPO_OCULTO_AB está vazia (como `GRUPOS_OCULTOS_PADRAO_`).
 GRUPOS_OCULTOS_PADRAO = (
@@ -171,3 +179,37 @@ def formulario_ab() -> list[ItemCatalogo] | None:
 def formulario_avulsa() -> list[ItemCatalogo] | None:
     """O catálogo da saída avulsa, ou None se nenhum material tem saldo."""
     return catalogo_avulsa() or None
+
+
+def catalogo_viaturas() -> list[ItemCatalogo]:
+    """Peças da lista das viaturas (spec 006), na ordem da lista, sem as de material oculto; o
+    nome exibido tem prioridade sobre o do cadastro, e a unidade é sempre a do SCPI."""
+    pecas = PecaViatura.objects.select_related("material").filter(material__oculto=False)
+    fracionaveis = unidades_fracionaveis()
+    return [_item(p.material, fracionaveis, nome=p.nome_exibido or p.material.nome) for p in pecas]
+
+
+def formulario_viaturas() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário de viaturas: a lista e, depois, o catálogo AB sem repetir as peças
+    da lista; None se o saldo nunca foi importado ou não há nada a oferecer."""
+    if not saldo_importado():
+        return None
+    lista = catalogo_viaturas()
+    na_lista = {norm_u(i.codigo) for i in lista}
+    ab = catalogo_ab()
+    resto = [i for i in (ab.itens if ab is not None else []) if norm_u(i.codigo) not in na_lista]
+    return (lista + resto) or None
+
+
+def folha_viaturas() -> list[str]:
+    """Os códigos da folha do formulário de viaturas: a lista visível, na ordem."""
+    return [i.codigo for i in catalogo_viaturas()]
+
+
+def centros_equipe_manutencao() -> list[Centro]:
+    """Destinos do formulário de viaturas: os centros de custo com alguma linha marcada como de
+    equipe de manutenção, um por descrição e sem placa (o pedido não identifica a viatura)."""
+    centros: dict[str, Centro] = {}
+    for c in CentroCusto.objects.filter(equipe_manutencao=True).order_by("descricao", "codigo"):
+        centros.setdefault(c.descricao, Centro(c.descricao, c.codigo))
+    return list(centros.values())

@@ -1,8 +1,10 @@
 """Busca de materiais e carrinho via HTMX, comuns aos formulários públicos e à saída avulsa.
 
-As views só devolvem trechos (`_resultados.html`, `_carrinho.html`) e não guardam estado.
+As views só devolvem trechos (`_resultados.html`, `_carrinho.html` e, nos formulários com folha,
+`_folha.html`) e não guardam estado.
 """
 
+import uuid
 from dataclasses import replace
 
 from django.shortcuts import render
@@ -87,6 +89,21 @@ def _carrinho(request, fluxo: Fluxo):
         resultado = carrinho_mod.alterar(linhas, fluxo, item, enviados.get(codigo, ""))
     elif "remover" in request.POST:
         resultado = carrinho_mod.remover(linhas, request.POST["remover"])
+    elif fluxo.folha is not None and "folha_abrir" in request.POST:
+        return _folha(request, fluxo, catalogo, carrinho_mod.Carrinho(linhas))
+    elif fluxo.folha is not None and "folha" in request.POST:
+        digitado = {
+            chave.removeprefix("folha-"): valor
+            for chave, valor in request.POST.items()
+            if chave.startswith("folha-")
+        }
+        resultado = carrinho_mod.aplicar_folha(linhas, fluxo, catalogo, digitado)
+        if resultado.erros_folha or resultado.erro:
+            # A folha volta para o diálogo, com o que foi digitado e os erros; o carrinho fica.
+            resposta = _folha(request, fluxo, catalogo, resultado, digitado)
+            resposta["HX-Retarget"] = "#folha-conteudo"
+            resposta["HX-Reswap"] = "innerHTML"
+            return resposta
     else:
         resultado = carrinho_mod.Carrinho(linhas)
     contexto = {
@@ -97,7 +114,38 @@ def _carrinho(request, fluxo: Fluxo):
         "editando": "versao" in request.POST,
         **urls_do_fluxo(fluxo),
     }
-    return render(request, "pedidos/_carrinho.html", contexto)
+    resposta = render(request, "pedidos/_carrinho.html", contexto)
+    if "folha" in request.POST and fluxo.folha is not None:
+        # O pedidos.js fecha o diálogo e anuncia quantas peças ficaram no pedido.
+        resposta["HX-Trigger"] = "folha-aplicada"
+    return resposta
+
+
+def _folha(request, fluxo: Fluxo, catalogo, carrinho, digitado=None):
+    """O conteúdo do diálogo da folha (spec 006): uma linha por peça, com a quantidade que ela tem
+    no pedido ou, depois de uma recusa, a que foi digitada, e o erro de cada linha."""
+    no_pedido = {linha.codigo: linha.texto for linha in carrinho.linhas}
+    linhas = [
+        {
+            "r": r,
+            "valor": digitado.get(r.item.codigo, "")
+            if digitado is not None
+            else (no_pedido.get(r.item.codigo, "")),
+            "erro": carrinho.erros_folha.get(r.item.codigo, ""),
+        }
+        for r in resultados(fluxo, carrinho_mod.pecas_da_folha(fluxo, catalogo))
+    ]
+    contexto = {
+        "fluxo": fluxo,
+        "linhas": linhas,
+        # Os ids dos campos mudam a cada desenho: com o mesmo id, o "settle" do HTMX 4 copiaria no
+        # campo novo o valor do antigo, por cima do que o servidor devolveu.
+        "desenho": uuid.uuid4().hex[:8],
+        "n_erros": sum(1 for linha in linhas if linha["erro"]),
+        "erro_geral": carrinho.erro,
+        **urls_do_fluxo(fluxo),
+    }
+    return render(request, "pedidos/_folha.html", contexto)
 
 
 @require_GET

@@ -70,6 +70,8 @@
 /* Números dos formulários. */
 .formularios .cartao { display: grid; align-content: start; gap: var(--esp-meio); }
 .formularios p { margin: 0; }
+/* Três formulários públicos (limpeza, AB e viaturas): três colunas onde há largura. */
+.formularios { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .metrica { font-family: var(--fonte-titulo); font-size: 1.6em; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .formularios { grid-template-columns: minmax(0, 1fr); } }
 

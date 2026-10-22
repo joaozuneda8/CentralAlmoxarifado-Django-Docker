@@ -85,6 +85,7 @@ Use estes nomes, e nenhum outro para essas funções.
 | Dropdown | `dropdown` (envolve o campo), `dropdown-gatilho`, `dropdown-valor`, `dropdown-seta`, `dropdown-combo`, `dropdown-painel`, `dropdown-lista`, `dropdown-grupo`, `dropdown-opcao`, `dropdown-texto`, `dropdown-check`, `dropdown-sem-opcoes`; montados pelo `dropdown.js` |
 | Resultados | `resultados-vazio` ("Nenhum material encontrado."; o painel não tem legenda); `material-info` (linha de baixo do material); com o material no pedido, o botão diz "Alterar (N)" (`pedidos.js`) |
 | Carrinho | `carrinho`, `carrinho-barra` (fixa), `carrinho-gaveta` (`<dialog>` sempre que o pedido cairia embaixo da busca, isto é, passo com menos de 760px: `data-gaveta` no `<html>`; bloco azul ao lado da busca nos demais casos), `carrinho-lista`, `carrinho-linha`, `carrinho-linha-erro`; nos formulários públicos e na saída avulsa (com os textos da saída), `carrinho-barra-contagem`, `carrinho-barra-vazia`, `carrinho-acoes-gaveta` (enviar e adicionar mais) e a quantidade em dois passos (`carrinho-qtd-texto`, `carrinho-qtd-area`, `carrinho-confirmar`, `carrinho-cancelar`, `carrinho-remover`; a linha toda é o `material-abrir`, com o lápis `material-mais`, como no resultado da busca; estado `aberto` no `[data-alterar]`) |
+| Folha (formulário com lista fixa, spec 006) | `folha-chamada` (botão "Preencher a lista de peças" e a dica), `folha` (`<dialog>`: tela cheia abaixo de 640px, painel centrado com rolagem acima), `folha-corpo`, `folha-cabecalho`, `folha-titulo`, `folha-lista` (`<ol>`), `folha-linha` (+ `folha-linha-bloqueada`, `folha-linha-erro`), `folha-material` (o `<label>` do campo), `folha-qtd`, `folha-motivo` (selo no lugar do campo), `folha-erro`, `folha-acoes` (barra presa embaixo; a rolagem desconta a altura dela); o resumo de erros é o `resumo-erros` |
 | Envio recusado (formulário público) | `resumo-erros` (+ `resumo-erros-titulo`, focável, com link para o campo), `campo-com-erro` + `campo-erro` com ícone embaixo do campo; `botao-esquecer` ("Não é você? Limpar"); `sucesso-itens` (lista da tela de sucesso) |
 | Recibo e atendimento | `recibo-grupo` (linha de grupo da tabela de materiais: "Pedido pelo solicitante" e o selo `selo-info` "Adicionado pelo almoxarifado", só com material acrescentado; no atendimento, a dos acrescentados some enquanto o grupo está vazio), `recibo-nota` (nota pequena embaixo do nome: "Trocado por …", "No lugar de …"), `atendimento-painel` (+ `atendimento-painel-titulo`; painel de busca da troca e do acréscimo, um `<form>` com os resultados de sempre; na troca, o `pedidos.js` o põe numa `atendimento-painel-linha` logo abaixo do material, preso à esquerda da rolagem) |
 | Vazio | `vazio`, `vazio-titulo` |
@@ -120,7 +121,8 @@ o Django admin e `<input type="date">`.
 Lucide (traço 1.5, `currentColor`, `aria-hidden`). O conjunto é fechado: `caixa`, `busca`,
 `mais`, `menos`, `lixeira`, `impressora`, `sair`, `seta-direita`, `seta-esquerda`, `alerta`,
 `check`, `menu`, `fechar`, `painel`, `recibo`, `catalogo`, `cadastros`, `saida`, `enviar`,
-`olho`, `robo`, `grafico`, `trocar`. Nome
+`olho`, `robo`, `grafico`, `trocar`, `atualizar`, `caixa-check`, `filtro`, `seta-baixo`, `lapis`,
+`usuario`, `cadeado`, `info`, `check-duplo`. Nome
 desconhecido não desenha nada. Ícone novo entra no `_icone.html`, com os traços do Lucide.
 Nunca emoji na interface.
 

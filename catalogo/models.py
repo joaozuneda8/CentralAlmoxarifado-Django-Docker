@@ -77,6 +77,9 @@ class CentroCusto(models.Model):
     descricao = models.CharField("descrição", max_length=200)
     codigo = models.CharField("código", max_length=20)
     placa = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    # Destino aceito pelo formulário de reposição de peças das viaturas (spec 006). Um centro
+    # com várias linhas é de equipe se alguma delas estiver marcada.
+    equipe_manutencao = models.BooleanField("equipe de manutenção", default=False)
 
     class Meta:
         ordering = ["descricao", "placa"]
@@ -137,6 +140,24 @@ class ItemLimpeza(models.Model):
                     "de limpeza (Cadastros › Opções)."
                 }
             )
+
+
+class PecaViatura(models.Model):
+    """Peça da lista do formulário de reposição de peças das viaturas (spec 006): o quadro
+    "Materiais" da folha em papel. Uma linha, um material; o nome exibido, quando preenchido,
+    tem prioridade sobre o do cadastro do SCPI."""
+
+    material = models.OneToOneField(Material, on_delete=models.PROTECT, related_name="peca_viatura")
+    nome_exibido = models.CharField(max_length=255, blank=True)
+    ordem = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["ordem", "material__nome"]
+        verbose_name = "peça das viaturas"
+        verbose_name_plural = "peças das viaturas"
+
+    def __str__(self):
+        return self.nome_exibido or str(self.material)
 
 
 class SaidaSCPI(models.Model):

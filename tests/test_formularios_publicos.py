@@ -247,7 +247,8 @@ def test_sem_htmx_devolve_a_pagina_inteira(client):
 
 def test_inicio_no_estilo_clean(client):
     r = client.get(reverse("pedidos:inicio"))
-    assert r.text.count('class="cartao cartao-opcao"') == 2
+    # Limpeza, AB e reposição de peças das viaturas (spec 006).
+    assert r.text.count('class="cartao cartao-opcao"') == 3
     assert '<p class="rotulo-secao">Almoxarifado SAEP</p>' in r.text
 
 

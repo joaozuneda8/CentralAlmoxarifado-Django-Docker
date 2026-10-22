@@ -15,7 +15,7 @@ from pedidos.protecao import (
     recusar,
 )
 from pedidos.regras import EnvioPedido, opcoes_destino, resolver_destino
-from pedidos.servicos import catalogo_de, centros, registrar_pedido
+from pedidos.servicos import catalogo_de, centros_do_fluxo, registrar_pedido
 from pedidos.views.materiais import contexto_busca, urls_do_fluxo
 
 
@@ -25,7 +25,7 @@ def inicio(request):
 
 
 def _contexto(fluxo, catalogo, envio, **extra) -> dict:
-    destinos = opcoes_destino(centros())
+    destinos = opcoes_destino(centros_do_fluxo(fluxo))
     contexto = {
         "fluxo": fluxo,
         "envio": envio,
@@ -35,6 +35,8 @@ def _contexto(fluxo, catalogo, envio, **extra) -> dict:
         and all(carrinho_mod.limite(fluxo, i) <= 0 for i in catalogo),
         "sem_destinos": not destinos,
         "destinos": destinos,
+        # Quantas peças a folha mostra (a dica do botão); 0 sem folha.
+        "n_folha": len(carrinho_mod.pecas_da_folha(fluxo, catalogo)),
         "filtros": opcoes_filtro(fluxo, catalogo),
         "carrinho": carrinho_mod.Carrinho(),
         "campos": {},
@@ -48,15 +50,21 @@ def _contexto(fluxo, catalogo, envio, **extra) -> dict:
 
 
 def formulario(request, fluxo):
-    """Formulário de pedido (limpeza ou AB). O envio vem pelo HTMX, e a resposta substitui o
-    formulário: o sucesso não tem URL própria, para o número não virar página pública."""
+    """Formulário de pedido (limpeza, AB ou viaturas). O envio vem pelo HTMX, e a resposta
+    substitui o formulário: o sucesso não tem URL própria, para o número não virar página
+    pública."""
     fluxo = fluxo_publico(fluxo)
     catalogo = catalogo_de(fluxo.origem)
     parcial = bool(request.headers.get("HX-Request"))
     if request.method != "POST":
         return render(request, "pedidos/formulario.html", _contexto(fluxo, catalogo, emitir()))
 
-    campos = {c: request.POST.get(c, "") for c in ("solicitante", "destino", "obs")}
+    nomes = (
+        ("solicitante", "destino", "obs", "ocorrencia")
+        if fluxo.pede_ocorrencia
+        else ("solicitante", "destino", "obs")
+    )
+    campos = {c: request.POST.get(c, "") for c in nomes}
 
     def de_volta(envio, **extra):
         contexto = _contexto(
@@ -82,11 +90,12 @@ def formulario(request, fluxo):
         )
 
     # O texto como está no cadastro; o que não existe segue como veio, para a validação recusar.
-    destino = resolver_destino(campos["destino"], centros()) or campos["destino"]
+    destino = resolver_destino(campos["destino"], centros_do_fluxo(fluxo)) or campos["destino"]
     pedido = EnvioPedido(
         solicitante=campos["solicitante"],
         destino=destino,
         obs=campos["obs"],
+        ocorrencia=campos.get("ocorrencia", ""),
         itens=carrinho_mod.itens_enviados(request.POST),
     )
     resposta = registrar_pedido(

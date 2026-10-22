@@ -164,11 +164,13 @@ def _com_catalogo(formulario, catalogo):
 
 def test_a_pagina_inicial_lista_os_formularios_publicos_a_partir_de_fluxos(client, novo):
     html = client.get(reverse("pedidos:inicio")).text
-    assert html.count('class="cartao cartao-opcao"') == 3
+    # Os três formulários públicos de `FLUXOS` (limpeza, AB e viaturas) e o de teste.
+    assert html.count('class="cartao cartao-opcao"') == 4
     assert TITULO in html and "Ex.: parafuso, cabo, fusível" in html
     assert reverse("pedidos:formulario", args=["reposicao"]) in html
-    # Os dois formulários de sempre continuam lá, e a saída avulsa nunca é pública.
+    # Os formulários de sempre continuam lá, e a saída avulsa nunca é pública.
     assert "Limpeza, copa e escritório" in html and "Ferramentas, peças e materiais" in html
+    assert reverse("pedidos:formulario", args=["viaturas"]) in html
     assert re.search(r"Sa[ií]da avulsa", html) is None
 
 
@@ -209,3 +211,11 @@ def test_a_regra_do_fluxo_vale_no_carrinho_e_no_envio(
     if aceita_fracao:
         assert Pedido.objects.get().itens.get().qtd_pedida == Decimal("1.5")
         assert f"Estoque disponível: {maximo} UN." in enviar(client, [(PORCA, "3")], "Bia").text
+
+
+def test_folha_destinos_e_ocorrencia_sao_opcionais_e_desligados_nos_fluxos_antigos():
+    """Os campos da spec 006 têm padrão neutro: limpeza, AB e saída avulsa não ganham folha, não
+    restringem destinos e não pedem o número da ocorrência."""
+    for nome in ("limpeza", "ab", "avulsa"):
+        fluxo = fluxos.FLUXOS[nome]
+        assert fluxo.folha is None and fluxo.centros is None and not fluxo.pede_ocorrencia

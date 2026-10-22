@@ -47,6 +47,8 @@ class Carrinho:
     linhas: list[LinhaCarrinho] = field(default_factory=list)
     erro: str = ""
     aviso: str = ""
+    # Erros da folha, por código: com algum, a folha não muda o carrinho (`aplicar_folha`).
+    erros_folha: dict[str, str] = field(default_factory=dict)
 
 
 def _fracionavel(fluxo, item: ItemCatalogo | None) -> bool:
@@ -195,3 +197,57 @@ def alterar(linhas, fluxo, item: ItemCatalogo | None, texto_qtd: str) -> Carrinh
             for linha in linhas
         ]
     )
+
+
+def pecas_da_folha(fluxo, catalogo) -> list[ItemCatalogo]:
+    """As peças da folha do formulário que estão no catálogo, na ordem da folha ([] sem folha)."""
+    if fluxo.folha is None or not catalogo:
+        return []
+    por_codigo = {i.codigo: i for i in catalogo}
+    return [por_codigo[c] for c in fluxo.folha() if c in por_codigo]
+
+
+def aplicar_folha(linhas, fluxo, catalogo, quantidades: dict[str, str]) -> Carrinho:
+    """Põe a folha no pedido de uma vez (spec 006): cada peça da folha preenchida fica no pedido
+    com a quantidade digitada (substitui, não soma) e a vazia ou zero sai dele; o que veio da
+    busca não muda. Tudo ou nada: com algum erro, o carrinho volta como estava, com o erro de
+    cada linha em `erros_folha`. Códigos fora da folha ou do catálogo são ignorados."""
+    linhas = list(linhas)
+    por_codigo = {i.codigo: i for i in catalogo or []}
+    da_folha = [i.codigo for i in pecas_da_folha(fluxo, catalogo)]
+    novas: dict[str, Decimal] = {}
+    erros: dict[str, str] = {}
+    for codigo in da_folha:
+        texto_qtd = (quantidades.get(codigo) or "").strip()
+        if not texto_qtd.strip("0,"):  # em branco ou zero ("0", "0,0"): fora do pedido
+            continue
+        item = por_codigo[codigo]
+        if motivo := motivo_bloqueio(fluxo, item):
+            erros[codigo] = f"{motivo} — não pode ser adicionado."
+            continue
+        q, erro = quantidade(fluxo, texto_qtd, item)
+        if erro := erro or acima_do_estoque(fluxo, item, q):
+            erros[codigo] = erro
+        else:
+            novas[codigo] = q
+    if erros:
+        return Carrinho(linhas, erros_folha=erros)
+
+    # Na ordem do carrinho; as peças novas da folha entram no fim, na ordem da folha.
+    folha = set(da_folha)
+    no_pedido = {linha.codigo for linha in linhas}
+    resultado = [
+        LinhaCarrinho(linha.codigo, novas[linha.codigo], por_codigo[linha.codigo])
+        if linha.codigo in novas
+        else linha
+        for linha in linhas
+        if linha.codigo in novas or linha.codigo not in folha
+    ]
+    resultado += [
+        LinhaCarrinho(codigo, q, por_codigo[codigo])
+        for codigo, q in novas.items()
+        if codigo not in no_pedido
+    ]
+    if fluxo.max_itens is not None and len(resultado) > fluxo.max_itens:
+        return Carrinho(linhas, erro=f"O pedido pode ter no máximo {fluxo.max_itens} materiais.")
+    return Carrinho(resultado)

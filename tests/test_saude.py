@@ -39,8 +39,8 @@ def test_banco_vazio_nao_quebra():
     assert (
         ItemSaude(
             "erro",
-            "Sem saldo importado: os formulários de limpeza e AB ficam indisponíveis até a "
-            "próxima importação de estoque.",
+            "Sem saldo importado: os formulários públicos ficam indisponíveis até a próxima "
+            "importação de estoque.",
         )
         in itens
     )
@@ -302,3 +302,58 @@ def test_formulario_ab_sem_saidas_na_janela_e_erro():
     Material.objects.create(codigo="A", nome="A", estoque_em=AGORA)
     (item,) = itens_de("Formulário AB")
     assert item.nivel == "erro" and "nenhum item no catálogo" in item.texto
+
+
+# Formulário de reposição de peças das viaturas (spec 006, FR-008a e FR-013)
+
+VIATURAS = "Formulário de reposição de peças das viaturas"
+
+
+def lista_de_viaturas():
+    from catalogo.models import PecaViatura
+
+    for codigo, nome, oculto in [
+        ("1", "LUVA 3/4", False),
+        ("2", "TEE 3/4", False),
+        ("3", "PLUG", True),
+    ]:
+        PecaViatura.objects.create(
+            material=Material.objects.create(
+                codigo=codigo, nome=nome, unidade="UN", estoque=5, estoque_em=AGORA, oculto=oculto
+            )
+        )
+
+
+def test_viaturas_disponivel_conta_a_lista_e_o_ab():
+    lista_de_viaturas()
+    CentroCusto.objects.create(descricao="EQUIPE NORTE", codigo="51", equipe_manutencao=True)
+    assert texto_de(VIATURAS) == ItemSaude(
+        "ok", f"{VIATURAS}: 2 peças na lista e 0 materiais do AB."
+    )
+    assert texto_de("Peças das viaturas ocultas") == ItemSaude(
+        "aviso", "Peças das viaturas ocultas no SCPI (não aparecem): 3."
+    )
+    assert situacao_do_catalogo(AGORA).viaturas == 2
+
+
+def test_viaturas_sem_centro_marcado_fica_indisponivel():
+    lista_de_viaturas()
+    CentroCusto.objects.create(descricao="ETA I", codigo="12")
+    assert texto_de(VIATURAS) == ItemSaude(
+        "erro",
+        f"{VIATURAS}: nenhum centro de custo marcado como de equipe de manutenção; o formulário "
+        "fica indisponível.",
+    )
+
+
+def test_viaturas_sem_nada_a_oferecer_fica_indisponivel():
+    Material.objects.create(codigo="9", nome="X", estoque_em=AGORA)
+    CentroCusto.objects.create(descricao="EQUIPE NORTE", codigo="51", equipe_manutencao=True)
+    assert texto_de(VIATURAS) == ItemSaude(
+        "erro",
+        f"{VIATURAS}: nenhuma peça na lista nem material no AB; o formulário fica indisponível.",
+    )
+
+
+def test_viaturas_sem_saldo_fica_so_no_aviso_geral():
+    assert not itens_de(VIATURAS)

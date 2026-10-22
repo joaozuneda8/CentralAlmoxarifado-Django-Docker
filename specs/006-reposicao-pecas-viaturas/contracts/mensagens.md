@@ -17,7 +17,7 @@ são os da spec 005 e não mudam.
 | Ação do diálogo | Pôr no pedido |
 | Fechar o diálogo | Fechar |
 | Resumo de erros da folha | Corrija 1 linha para pôr no pedido. / Corrija N linhas para pôr no pedido. |
-| Anúncio depois de aplicar | Lista aplicada: N peças no pedido. |
+| Anúncio depois de aplicar | Lista posta no pedido: N materiais. |
 
 ## Almoxarifado
 

@@ -1652,4 +1652,101 @@
       setTimeout(function () { rotulo.textContent = antes; }, 2000);
     });
   });
+
+  // Folha (spec 006, contracts/folha.md): a lista de peças preenchida como o papel, num <dialog>
+  // dentro do <form>. O botão `data-folha-abrir` pede ao servidor o conteúdo já com as quantidades
+  // do pedido; aqui o diálogo abre, recebe o foco e fecha. "Pôr no pedido" (`data-folha-aplicar`)
+  // manda a folha inteira: sem erro, o servidor devolve o carrinho e o evento `folha-aplicada`; com
+  // erro, devolve a própria folha (HX-Retarget) e o foco vai para o resumo.
+  function folha() {
+    return document.getElementById("folha");
+  }
+
+  function botaoDaFolha() {
+    return document.querySelector("[data-folha-abrir]");
+  }
+
+  function fecharFolha() {
+    var d = folha();
+    if (d && d.open) d.close();
+  }
+
+  // Cada conteúdo novo do servidor chega marcado (`data-folha-nova`) e é mostrado uma vez: as outras
+  // trocas da página (o carrinho, a busca) não reabrem a folha.
+  document.addEventListener("htmx:after:swap", function () {
+    var d = folha();
+    var nova = d && d.querySelector("[data-folha-nova]");
+    if (!nova) return;
+    nova.removeAttribute("data-folha-nova");
+    if (!d.open && d.showModal) d.showModal();
+    var botao = botaoDaFolha();
+    if (botao) botao.setAttribute("aria-expanded", "true");
+    var resumo = nova.querySelector("[data-folha-resumo]");
+    var primeiro = nova.querySelector(".folha-qtd[aria-invalid='true']") || nova.querySelector(".folha-qtd");
+    if (resumo) resumo.focus();
+    else if (primeiro) primeiro.focus();
+  });
+
+  document.addEventListener("folha-aplicada", function () {
+    fecharFolha();
+    var anuncio = document.querySelector("[data-anuncio-adicionado]");
+    var n = document.querySelectorAll('#carrinho input[name="item_codigo"]').length;
+    if (anuncio) {
+      anuncio.textContent =
+        "Lista posta no pedido: " + n + (n === 1 ? " material." : " materiais.");
+    }
+  });
+
+  // Fechar (botão, Esc ou fundo) não muda o pedido; o foco volta ao botão que abriu.
+  document.addEventListener(
+    "close",
+    function (e) {
+      if (e.target.id !== "folha") return;
+      var botao = botaoDaFolha();
+      if (!botao) return;
+      botao.setAttribute("aria-expanded", "false");
+      botao.focus();
+    },
+    true
+  );
+
+  document.addEventListener("click", function (e) {
+    var alvo = e.target;
+    if (!alvo || !alvo.closest) return;
+    if (alvo.closest("[data-folha-fechar]")) return fecharFolha();
+    var d = folha();
+    if (d && d.open && alvo === d) {
+      var r = d.getBoundingClientRect();
+      if (e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right) {
+        fecharFolha();
+      }
+    }
+  });
+
+  // Enter numa linha da folha põe a folha no pedido; nunca envia o pedido inteiro.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || !e.target.matches || !e.target.matches(".folha-qtd")) return;
+    e.preventDefault();
+    var aplicar = document.querySelector("[data-folha-aplicar]");
+    if (aplicar) aplicar.click();
+  });
+
+  // Falha de rede ou do servidor ao abrir ou aplicar a folha: o que foi digitado fica, e o aviso
+  // aparece dentro dela (ou no topo do formulário, se ela nem abriu).
+  function avisarFalhaDaFolha(e) {
+    var origem = e.target;
+    if (!origem || !origem.closest) return;
+    if (!origem.closest("[data-folha-aplicar]") && !origem.closest("[data-folha-abrir]")) return;
+    var caixa = document.querySelector("[data-folha-falha]");
+    var d = folha();
+    if (!caixa || !d || !d.open) {
+      caixa = document.querySelector("[data-formulario-pedido] [data-erro-envio]");
+    }
+    if (!caixa) return;
+    caixa.className = "aviso aviso-erro";
+    caixa.textContent =
+      "Não foi possível pôr a lista no pedido. O que foi digitado foi mantido; tente de novo.";
+  }
+  document.addEventListener("htmx:error", avisarFalhaDaFolha);
+  document.addEventListener("htmx:response:error", avisarFalhaDaFolha);
 })();

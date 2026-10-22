@@ -211,13 +211,16 @@ transações precisam se comportar como no servidor.
   abre com o aviso `sem_estoque_agora` no topo. Recusa por item devolve o pedido inteiro, com a linha
   ilegível mantida e marcada "Corrigir" (`carrinho.ler(manter_ilegiveis=True)`). Cada formulário é
   uma entrada de `FLUXOS` (`Fluxo`: `catalogo`, `exemplo_busca`, `exemplo_inicio`, `icone`,
-  `publico`, `regra_quantidade`; contrato em
-  `specs/005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md`): um formulário
-  novo é uma entrada, uma função `formulario_*` em `catalogos.py` e um valor em `Pedido.Origem`, sem
-  mexer no núcleo. `registrar_pedido` lê o catálogo e os centros antes de travar a `Sequencia`.
-  Para o funcionário, os formulários se chamam "Limpeza, copa e escritório" e "Ferramentas, peças e
-  materiais" (`Fluxo.titulo`); o nome interno (painel, Telegram, `Pedido.Origem`) continua
-  "Materiais AB". `regras.Erro` tem `campo` (`solicitante`, `destino`, `obs`) nos erros de um campo:
+  `publico`, `regra_quantidade` e, opcionais, `folha`, `centros` e `pede_ocorrencia`; contratos em
+  `specs/005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md` e
+  `specs/006-reposicao-pecas-viaturas/contracts/configuracao-fluxo.md`): um formulário novo é uma
+  entrada, uma função `formulario_*` em `catalogos.py` e um valor em `Pedido.Origem` (migration de
+  `choices`), sem mexer no núcleo. `registrar_pedido` lê o catálogo e os centros
+  (`servicos.centros_do_fluxo`) antes de travar a `Sequencia`. Para o funcionário, os formulários
+  se chamam "Limpeza, copa e escritório", "Ferramentas, peças e materiais" e "Reposição de peças das
+  viaturas" (`Fluxo.titulo`); o nome interno (painel, Telegram, `Pedido.Origem`) do segundo continua
+  "Materiais AB", e o rótulo do Telegram é o da origem (`get_origem_display`). `regras.Erro` tem
+  `campo` (`solicitante`, `destino`, `obs`, `ocorrencia`) nos erros de um campo:
   a view monta `erros_por_campo`, e o formulário mostra o resumo no topo (focado pelo `pedidos.js`,
   com link para o campo) e o erro embaixo do próprio campo. No celular, a gaveta do pedido envia
   (`data-carrinho-enviar`, que aciona o botão do fim do formulário por `requestSubmit`; esse botão
@@ -300,9 +303,28 @@ transações precisam se comportar como no servidor.
   alterações e pede confirmação para sair; com o robô rodando, a faixa (`_edicao_faixa.html`,
   `div#edicao-faixa` pelo `HX-Target`) se recarrega a cada 5 s e, se o lote travar, tira o
   "Salvar".
+- Reposição de peças das viaturas (spec `specs/006-reposicao-pecas-viaturas/`): o formulário
+  público `FLUXOS["viaturas"]` (origem `VIATURAS`, `/pedido/viaturas/`), para o encarregado da
+  equipe de manutenção. O catálogo (`catalogos.formulario_viaturas`) é a lista `PecaViatura` (uma
+  linha por material, `OneToOne` com `PROTECT`, nome exibido opcional e ordem; o quadro "Materiais"
+  da folha em papel) seguida do catálogo AB sem repetir códigos; a peça da lista aparece mesmo fora
+  do AB, e a unidade é sempre a do SCPI. A lista é preenchida numa **folha**: o botão "Preencher a
+  lista de peças" pede ao endpoint do carrinho `folha_abrir` e abre o `<dialog id="folha">` (dentro
+  do `<form>`) com `_folha.html`; "Pôr no pedido" manda `folha=1` e os `folha-<código>`, e
+  `carrinho.aplicar_folha` (pura) aplica **tudo ou nada**: linha preenchida substitui a quantidade,
+  vazia ou zero tira do pedido, o que veio da busca não muda; com erro, a resposta é a própria folha
+  (`HX-Retarget: #folha-conteudo`) com o erro por linha, e sem erro é o carrinho com
+  `HX-Trigger: folha-aplicada` (o `pedidos.js` fecha o diálogo e anuncia). Os destinos são só os
+  centros com alguma linha marcada `equipe_manutencao`, sem placa (`centros_equipe_manutencao`,
+  pelo `Fluxo.centros`); sem nenhum marcado, o formulário fica indisponível. `Pedido.ocorrencia`
+  (até 20 caracteres, opcional, só onde `Fluxo.pede_ocorrencia`) entra na conferência de reenvio
+  (`cabecalho_enviado` das origens públicas tem 4 campos), aparece no detalhe, no recibo e na lista
+  do painel e é achada pela busca do painel; não vai no Telegram nem muda na edição. A saúde do
+  catálogo (`saude._viaturas`) diz quanto o formulário oferece ou por que está indisponível.
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,
-  `CentroCusto` e `Opcao` são mantidos à mão no admin. A placa do `CentroCusto` é normalizada
+  `PecaViatura`, `CentroCusto` (com a marca `equipe_manutencao`) e `Opcao` são mantidos à mão no
+  admin. A placa do `CentroCusto` é normalizada
   (`norm_placa`), única no banco, e vazia vira NULL. `catalogos.py` monta os catálogos dos
   formulários (limpeza, AB pelo número de saídas consolidadas pelo de/para, avulsa) direto do
   banco, sem cache;

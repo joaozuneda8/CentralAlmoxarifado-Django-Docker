@@ -39,13 +39,19 @@ O servidor (`carrinho.aplicar_folha`) aplica **tudo ou nada**:
 
 - Sem erro: resposta é o `_carrinho.html` atualizado (mesmo alvo de hoje) e um evento HTMX
   (`folha-aplicada`) que fecha o diálogo, devolve o foco ao botão e anuncia no `role="status"` do
-  carrinho "Lista aplicada: N peças no pedido."
+  carrinho "Lista posta no pedido: N materiais."
 - Com erro: resposta é o `_folha.html`, posta no conteúdo do diálogo pelos cabeçalhos
   `HX-Retarget` e `HX-Reswap` (lidos pelo HTMX 4.0.0 vendorizado), com os valores digitados, o erro embaixo de cada linha
   (`aria-describedby`, `aria-invalid`), um resumo no topo ("Corrija N linhas para pôr no pedido.") e o
   foco no resumo; o carrinho não muda. Os textos de erro são os de sempre:
   `texto_erro_quantidade` (quantidade ilegível, fração em unidade contada, acima de 999.999),
   `texto_acima_do_estoque` e "O pedido pode ter no máximo 40 materiais." (`PEDIDOS_MAX_ITENS`).
+
+## Ids dos campos
+
+Os `id`s dos campos (`folha-<desenho>-<n>`) mudam a cada desenho da folha. Com o mesmo `id`, o
+"settle" do HTMX 4 copiava para o campo novo o valor do campo antigo que tinha o foco, por cima do
+valor devolvido pelo servidor (achado na conferência no navegador, 2026-10-22).
 
 ## Relação com o resto
 

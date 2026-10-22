@@ -11,6 +11,7 @@ from catalogo.models import (
     Opcao,
     ParametroReposicao,
     ParDePara,
+    PecaViatura,
     SaidaSCPI,
 )
 
@@ -74,9 +75,23 @@ class ItemLimpezaAdmin(admin.ModelAdmin):
     search_fields = ["material__codigo", "material__nome", "nome_exibido"]
 
 
+@admin.register(PecaViatura)
+class PecaViaturaAdmin(admin.ModelAdmin):
+    """A lista de peças do formulário de reposição de peças das viaturas (spec 006): uma linha por
+    material, com o nome que a equipe conhece e a ordem da folha."""
+
+    autocomplete_fields = ["material"]
+    list_display = ["material", "nome_exibido", "ordem"]
+    list_editable = ["ordem"]
+    search_fields = ["material__codigo", "material__nome", "nome_exibido"]
+
+
 @admin.register(CentroCusto)
 class CentroCustoAdmin(admin.ModelAdmin):
-    list_display = ["descricao", "codigo", "placa"]
+    list_display = ["descricao", "codigo", "placa", "equipe_manutencao"]
+    # A marca de equipe de manutenção define os destinos do formulário de viaturas (spec 006).
+    list_editable = ["equipe_manutencao"]
+    list_filter = ["equipe_manutencao"]
     search_fields = ["descricao", "codigo", "placa"]
 
 

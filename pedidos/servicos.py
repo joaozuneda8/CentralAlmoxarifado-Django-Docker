@@ -8,7 +8,7 @@ leva a lista do que corrigir.
 import logging
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -210,13 +210,16 @@ def registrar_pedido(
     # o estoque é só um teto, nada é reservado, e os outros envios não podem esperar essa conta.
     # A ordem das respostas abaixo não muda (reenvio, limite, indisponível, validação).
     catalogo = catalogo_de(origem)
-    lista_centros = centros()
     fluxo = fluxo_da_origem(origem)  # None só para origem desconhecida, que não tem catálogo
+    lista_centros = centros_do_fluxo(fluxo)
+    # O número da ocorrência só vale no formulário que o pede; nos outros, o que vier é ignorado.
+    if fluxo is None or not fluxo.pede_ocorrencia:
+        envio = replace(envio, ocorrencia="")
     with transaction.atomic():
         seq = travar_sequencia()
         anterior = Pedido.objects.filter(pk=envio_id).first()
         if anterior is not None:
-            gravado = (anterior.solicitante, anterior.destino, anterior.obs)
+            gravado = (anterior.solicitante, anterior.destino, anterior.obs, anterior.ocorrencia)
             if anterior.origem == origem and registro_confere(
                 origem, gravado, _itens_gravados(anterior), envio
             ):
@@ -271,6 +274,7 @@ def registrar_pedido(
             solicitante=texto(envio.solicitante),
             destino=texto(envio.destino),
             obs=texto(envio.obs),
+            ocorrencia=texto(envio.ocorrencia),
         )
         _gravar_itens(pedido, v.validos)
         resposta = Resposta(ok=True, numero=pedido.numero, pedido=pedido)
@@ -289,6 +293,11 @@ def registrar_pedido(
 
 def centros() -> list[Centro]:
     return [Centro(c.descricao, c.codigo, c.placa or "") for c in CentroCusto.objects.all()]
+
+
+def centros_do_fluxo(fluxo) -> list[Centro]:
+    """Os destinos aceitos pelo formulário: os do `Fluxo` quando ele restringe, senão todos."""
+    return fluxo.centros() if fluxo is not None and fluxo.centros is not None else centros()
 
 
 def tipos_saida() -> list[str]:

@@ -13,6 +13,15 @@ grupo fica acima da busca, recolhido; o painel abre logo abaixo da busca.
 Quando o passo tem largura para isso (container query em `pedidos.css`), a busca e o "Seu
 pedido" ficam lado a lado; senão, um embaixo do outro.
 {% endcomment %}
+{% if n_folha %}
+{# Folha (spec 006): a lista de peças preenchida como o papel, num diálogo que vem do servidor com as quantidades do pedido (pedidos.js abre e fecha). #}
+<div class="folha-chamada">
+  <button type="button" class="botao botao-primario" data-folha-abrir aria-haspopup="dialog" aria-controls="folha"
+          hx-post="{{ url_carrinho }}" hx-target="#folha-conteudo" hx-swap="innerHTML" hx-vals='{"folha_abrir": "1"}'>{% include "interface/_icone.html" with nome="caixa-check" %}Preencher a lista de peças</button>
+  <p class="texto-secundario texto-pequeno">{{ n_folha }} {% if n_folha == 1 %}peça{% else %}peças{% endif %}, como na folha de papel</p>
+</div>
+<dialog id="folha" class="folha" aria-labelledby="folha-titulo"><div id="folha-conteudo"></div></dialog>
+{% endif %}
 <div class="busca-area" data-busca-area>
 <div id="busca-materiais" class="busca-materiais{% if not filtros %} busca-materiais-sem-filtro{% endif %}">
   {% if filtros %}

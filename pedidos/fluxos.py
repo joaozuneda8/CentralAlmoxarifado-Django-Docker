@@ -1,9 +1,11 @@
-"""Os formulários que montam um carrinho de materiais: limpeza e AB (públicos) e saída avulsa.
+"""Os formulários que montam um carrinho de materiais: limpeza, AB e viaturas (públicos) e saída
+avulsa.
 
-Cada formulário é uma entrada de `FLUXOS`, com só o que muda: o catálogo, os textos, a origem e a
-regra de quantidade. Busca, carrinho, envio, proteções e recibo são o núcleo, igual para todos, e
-não perguntam pelo nome nem pela origem do formulário. Um formulário novo é uma entrada aqui, uma
-função de catálogo e (fora desta etapa) um valor novo em `Pedido.Origem`.
+Cada formulário é uma entrada de `FLUXOS`, com só o que muda: o catálogo, os textos, a origem, a
+regra de quantidade e, se precisar, a folha, os destinos aceitos e o número da ocorrência. Busca,
+carrinho, envio, proteções e recibo são o núcleo, igual para todos, e não perguntam pelo nome nem
+pela origem do formulário. Um formulário novo é uma entrada aqui, uma função de catálogo e um valor
+novo em `Pedido.Origem` (com a migration de `choices`).
 """
 
 from collections.abc import Callable
@@ -14,9 +16,12 @@ from django.http import Http404
 
 from catalogo.catalogos import (
     ItemCatalogo,
+    centros_equipe_manutencao,
+    folha_viaturas,
     formulario_ab,
     formulario_avulsa,
     formulario_limpeza,
+    formulario_viaturas,
 )
 from pedidos.regras import (
     AB,
@@ -24,6 +29,8 @@ from pedidos.regras import (
     LIMPEZA,
     REGRA_LIVRE,
     REGRA_POR_UNIDADE,
+    VIATURAS,
+    Centro,
     maximo_pedivel,
     normalizar_busca,
     qtd_br,
@@ -47,6 +54,12 @@ class Fluxo:
     # Quem pede segue a unidade do material (`por_unidade`); a equipe aceita fração em qualquer
     # unidade (`livre`).
     regra_quantidade: str = REGRA_POR_UNIDADE
+    # Os códigos da folha (a lista preenchida de uma vez, num diálogo), na ordem; None: sem folha.
+    folha: Callable[[], list[str]] | None = None
+    # Os centros de custo aceitos como destino; None: todos os cadastrados.
+    centros: Callable[[], list[Centro]] | None = None
+    # Mostra, grava e compara no reenvio o "Nº da ocorrência" (opcional para quem pede).
+    pede_ocorrencia: bool = False
 
     @property
     def max_itens(self) -> int | None:
@@ -88,6 +101,18 @@ FLUXOS: dict[str, Fluxo] = {
         exemplo_busca="Ex.: luva, fita veda rosca",
         exemplo_inicio="Ex.: luva, botina, fita veda-rosca, cimento",
         icone="catalogo",
+    ),
+    "viaturas": Fluxo(
+        nome="viaturas",
+        origem=VIATURAS,
+        titulo="Reposição de peças das viaturas",
+        catalogo=formulario_viaturas,
+        exemplo_busca="Ex.: luva, tubo, registro",
+        exemplo_inicio="Ex.: cotovelo, luva, tee, registro, tubo",
+        icone="atualizar",
+        folha=folha_viaturas,
+        centros=centros_equipe_manutencao,
+        pede_ocorrencia=True,
     ),
     "avulsa": Fluxo(
         nome="avulsa",

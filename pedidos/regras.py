@@ -58,6 +58,7 @@ def estoque_inteiro(valor: object) -> int:
 
 LIMPEZA = "LIMPEZA"
 AB = "AB"
+VIATURAS = "VIATURAS"
 AVULSA = "AVULSA"
 
 # Acima disto a quantidade é inválida: protege a coluna decimal (12,3) do banco.
@@ -237,6 +238,12 @@ class EnvioPedido:
     destino: str = ""
     obs: str = ""
     itens: tuple[ItemEnviado, ...] = ()
+    # Só no formulário que a pede (`Fluxo.pede_ocorrencia`); nos outros fica "".
+    ocorrencia: str = ""
+
+
+# O número da ocorrência é texto livre e curto (spec 006, FR-002a).
+MAX_OCORRENCIA = 20
 
 
 @dataclass
@@ -348,6 +355,8 @@ def validar_pedido(
         campo("Informe o nome completo.", "solicitante")
     if erro := _erro_destino(envio, centros):
         campo(erro, "destino")
+    if len(texto(envio.ocorrencia)) > MAX_OCORRENCIA:
+        campo(f"Nº da ocorrência: no máximo {MAX_OCORRENCIA} caracteres.", "ocorrencia")
     if not envio.itens:
         campo("Adicione ao menos um material ao pedido.")
 
@@ -900,7 +909,12 @@ def origem_publica(origem: str) -> bool:
 
 def cabecalho_enviado(origem: str, envio) -> tuple[str, ...]:
     if origem_publica(origem):
-        return (texto(envio.solicitante), texto(envio.destino), texto(envio.obs))
+        return (
+            texto(envio.solicitante),
+            texto(envio.destino),
+            texto(envio.obs),
+            texto(envio.ocorrencia),
+        )
     return cabecalho_saida(envio.dados, envio.nao_lancar)
 
 

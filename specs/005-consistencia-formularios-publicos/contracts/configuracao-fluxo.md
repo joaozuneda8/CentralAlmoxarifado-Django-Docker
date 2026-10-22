@@ -40,3 +40,8 @@ Cada formulário, atual ou novo, é uma entrada de `FLUXOS` em `pedidos/fluxos.p
 Criar a origem nova (migration de `choices` em `Pedido.Origem`), os destinos aceitos de cada
 formulário futuro e um limite próprio de quantidade (por exemplo, o estoque-padrão de um kit) são
 tratados na especificação de cada formulário novo. Hoje o limite de todos é `maximo_pedivel`.
+
+## Campos acrescentados depois
+
+A spec 006 acrescentou três campos opcionais, com padrão neutro: `folha`, `centros` e
+`pede_ocorrencia` ([contrato](../../006-reposicao-pecas-viaturas/contracts/configuracao-fluxo.md)).

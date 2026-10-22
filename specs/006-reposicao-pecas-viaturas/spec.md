@@ -218,8 +218,10 @@ o incluído aparece e o retirado não.
   JavaScript.
 - **FR-002a**: Além do cabeçalho comum, o formulário DEVE ter um campo opcional "Nº da ocorrência",
   o número da ocorrência da Ordem de Serviço em que as peças foram usadas: texto livre de até 20
-  caracteres (os espaços nas pontas não contam); acima disso, o envio é recusado com um erro no
-  próprio campo, como os demais erros de tamanho do cabeçalho. Preenchido, ele DEVE ser
+  caracteres; acima disso, o envio é recusado com um erro no próprio campo, como os demais erros
+  de tamanho do cabeçalho. O valor é o digitado sem os espaços nas pontas (os de dentro ficam): é
+  ele que conta para o limite, que é gravado e que é comparado no reenvio, e a busca do painel
+  também tira os espaços das pontas do que se procura. Preenchido, ele DEVE ser
   gravado com o pedido, mostrado ao encarregado na tela de sucesso e ao almoxarifado no detalhe
   do pedido, no recibo e na linha do pedido na lista do painel, e a busca do painel DEVE achar o pedido por ele (além de número,
   solicitante e recebedor); em branco, o pedido segue normalmente. O aviso no Telegram não o mostra. Um reenvio só é o mesmo pedido se o número também for o mesmo. Como o

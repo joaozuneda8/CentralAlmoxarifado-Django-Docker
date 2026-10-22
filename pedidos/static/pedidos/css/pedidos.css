@@ -29,8 +29,11 @@ html:not([data-gaveta]) .pedido-resumo .quantidade-campo { width: 44px; min-heig
 html:not([data-gaveta]) .acoes-final { display: none; }
 /* Formulários públicos e saída avulsa: no celular, o envio é pela gaveta ("Revisar e enviar" →
    "Enviar pedido"), então o botão do fim some também ali. Ele fica na página, porque a gaveta envia
-   por meio dele (rótulo do caso divergente) e, sem JavaScript, é o único envio. */
+   por meio dele (rótulo do caso divergente). */
 .js .acoes-final { display: none; }
+/* O formulário público depende do JavaScript (HTMX) para buscar e montar o pedido: sem ele, só o
+   aviso do <noscript> (formulario.html) aparece. A classe `js` é posta no <html> pelo base.html. */
+html:not(.js) .formulario-pedido { display: none; }
 @container (min-width: 960px) {
   .pedido-grade { grid-template-columns: minmax(0, 1fr) 340px; gap: var(--esp-3); }
   /* O cartão não manda na altura da linha (a coluna dos passos manda): ele preenche a coluna e
@@ -45,8 +48,7 @@ html:not([data-gaveta]) .acoes-final { display: none; }
 .js[data-gaveta] .pedido-resumo { display: block; padding: 0; background: none; border: 0; }
 .js[data-gaveta] .pedido-enviar { display: none; }
 
-/* Busca de materiais em destaque; os resultados abrem num painel preso a ela (pedidos.js).
-   Sem JavaScript, o painel fica na página. */
+/* Busca de materiais em destaque; os resultados abrem num painel preso a ela (pedidos.js). */
 .busca-area { position: relative; }
 .busca-materiais .campo-rotulo { font-size: 1rem; font-weight: 600; }
 /* Filtro de grupo (acima da busca): secundário, recolhido num <details> cujo resumo é um botão
@@ -599,8 +601,7 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
    direita só indica que clica. Fechada, a linha é só o nome e a informação, com o selo azul claro
    "N no pedido" quando o material já está lá. Aberta, a ação aparece no pé da célula: a quantidade à
    esquerda e o "Confirmar" (ou "Atualizar") no canto inferior direito; o ✕ (vermelho) fica no canto
-   superior direito, no lugar do "+". As outras linhas ficam recuadas, mas clicáveis. Sem JavaScript, a
-   quantidade fica à vista e o ✕, o "+" e o botão de abrir não aparecem. */
+   superior direito, no lugar do "+". As outras linhas ficam recuadas, mas clicáveis. */
 .material-qtd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
 .material-abrir, .material-cancelar, .material-mais { display: none; }
 .selo[hidden] { display: none; }

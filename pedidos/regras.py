@@ -10,7 +10,7 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 from django.utils import timezone
@@ -35,8 +35,9 @@ def norm_u(valor: object) -> str:
 
 
 def estoque_inteiro(valor: object) -> int:
-    """Estoque disponível nos formulários: a parte inteira do saldo, ou 0 se for menor que 1
-    ou inválido (`estoqueInteiro_`). Texto aceita vírgula decimal."""
+    """A parte inteira do saldo, ou 0 se for menor que 1 ou inválido (`estoqueInteiro_`). Só
+    preenche `ItemCatalogo.disponivel`, que nenhum formulário lê mais: o limite vem de
+    `maximo_pedivel`. Texto aceita vírgula decimal."""
     if isinstance(valor, (int, float, Decimal)) and not isinstance(valor, bool):
         bruto = str(valor)
     else:
@@ -121,10 +122,82 @@ def qtd_br(numero: object) -> str:
     return _decimal_br(numero, "0.001")
 
 
-def qtd_estoque(numero: object) -> str:
-    """Saldo do cadastro como está, com as 4 casas de `Material.estoque`: o `qtd_br`, de 3,
-    mostraria 0,0004 como "0"."""
-    return _decimal_br(numero, "0.0001")
+# ---------------------------------------------------------------------------
+# Quantidade por unidade do material (spec 005)
+#
+# O funcionário que faz o pedido (regra `por_unidade`) pede fração só em material de unidade
+# fracionável (a lista mantida no admin); a equipe (atendimento e saída avulsa, regra `livre`)
+# aceita fração em qualquer unidade. O estoque exibido, o teto aceito e a mensagem de erro são
+# sempre o mesmo número: `maximo_pedivel`.
+# ---------------------------------------------------------------------------
+
+REGRA_POR_UNIDADE = "por_unidade"
+REGRA_LIVRE = "livre"
+
+CAUSA_ILEGIVEL = "ilegivel"
+CAUSA_ZERO = "zero"
+CAUSA_FRACAO_EM_CONTAVEL = "fracao_em_contavel"
+CAUSA_ACIMA_DO_MAXIMO = "acima_do_maximo"
+
+_TEXTO_QUANTIDADE_FRACIONAVEL = (
+    "Informe uma quantidade maior que zero (use vírgula para decimais, ex.: 1,5)."
+)
+_TEXTO_QUANTIDADE_CONTADA = "Informe um número inteiro maior que zero."
+
+
+def truncar_qtd(valor: object) -> Decimal:
+    """Corta (nunca arredonda) para as 3 casas da quantidade: 2,4996 → 2,499."""
+    return Decimal(str(valor)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+
+
+def maximo_pedivel(estoque: object, fracionavel: bool, regra: str) -> Decimal:
+    """O mais que se pode pôr no pedido, nunca negativo. Na regra `por_unidade`, o saldo
+    truncado a 3 casas para unidade fracionável e a parte inteira para as demais; na `livre`, o
+    saldo truncado a 3 casas."""
+    saldo = max(truncar_qtd(estoque), Decimal(0))
+    if regra != REGRA_POR_UNIDADE or fracionavel:
+        return saldo
+    return Decimal(math.floor(saldo))
+
+
+def interpretar_quantidade(texto: object, fracionavel: bool) -> tuple[Decimal | None, str]:
+    """A quantidade digitada, ou a causa que a recusa: `(valor, "")` ou `(None, causa)`.
+
+    Formato pt-BR estrito ("1.5" é recusado: o robô leria 15), até 3 casas, de 0,001 a
+    `QTD_MAXIMA`. Fração em material de unidade contável é recusada (`fracionavel` falso)."""
+    if _numero(texto):
+        valor = Decimal(texto)
+        if not valor.is_finite() or valor < 0:
+            return None, CAUSA_ILEGIVEL
+    elif isinstance(texto, str) and _QTD_BR.match(texto.strip()):
+        valor = Decimal(texto.strip().replace(",", "."))
+    else:
+        return None, CAUSA_ILEGIVEL
+    if valor > QTD_MAXIMA:
+        return None, CAUSA_ACIMA_DO_MAXIMO
+    if valor == 0:
+        return None, CAUSA_ZERO
+    if not fracionavel and valor != valor.to_integral_value():
+        return None, CAUSA_FRACAO_EM_CONTAVEL
+    return valor, ""
+
+
+def texto_erro_quantidade(causa: str, *, fracionavel: bool, unidade: str = "") -> str:
+    """O texto único de cada causa de erro de quantidade, o mesmo ao adicionar, ao alterar e ao
+    enviar (contracts/mensagens.md)."""
+    if causa == CAUSA_FRACAO_EM_CONTAVEL:
+        com_unidade = f" (unidade: {unidade})" if unidade else ""
+        return f"Este material só é pedido em quantidade inteira{com_unidade}."
+    if causa == CAUSA_ACIMA_DO_MAXIMO:
+        return "A quantidade máxima é 999.999."
+    return _TEXTO_QUANTIDADE_FRACIONAVEL if fracionavel else _TEXTO_QUANTIDADE_CONTADA
+
+
+def texto_acima_do_estoque(maximo: object, unidade: str = "") -> str:
+    """O texto único de quantidade acima do estoque. `maximo` é o máximo pedível, o mesmo número
+    que a lista mostra como estoque."""
+    disponivel = f"{qtd_br(maximo)} {unidade}" if unidade else qtd_br(maximo)
+    return f"Quantidade acima do estoque. Estoque disponível: {disponivel}."
 
 
 def data_valida_iso(valor: object) -> bool:
@@ -249,9 +322,22 @@ def _sem_codigo(codigo: str) -> str:
     return codigo or "(sem código)"
 
 
-def validar_pedido_limpeza(envio: EnvioPedido, catalogo, centros) -> Validacao:
-    """Formulário de limpeza, copa/cozinha e escritório (`validarPedidoLimpeza_`). Dos itens
-    só lê código e quantidade: nome, unidade e categoria vêm do catálogo do servidor."""
+def aceita_fracao(regra: str, material) -> bool:
+    """Se a quantidade deste material pode ter fração numa regra de quantidade. A `livre` (a
+    equipe) aceita em qualquer unidade; na `por_unidade`, quem pede segue a unidade do material.
+    Material fora do catálogo (`None`) não decide nada aqui, o envio o recusa: vale a leitura com
+    fração. O carrinho e a validação do envio usam esta mesma conta."""
+    return regra == REGRA_LIVRE or material is None or material.fracionavel
+
+
+def validar_pedido(
+    envio: EnvioPedido, catalogo, centros, regra_quantidade: str = REGRA_POR_UNIDADE
+) -> Validacao:
+    """Validação do envio dos formulários públicos de limpeza e AB (`validarPedidoLimpeza_` e
+    `validarPedidoAB_`, hoje uma só, spec 005). A quantidade e o teto vêm da unidade do material
+    (`interpretar_quantidade` e `maximo_pedivel`), pela `regra_quantidade` do `Fluxo` (a mesma que
+    o carrinho usa), e os textos são os mesmos do carrinho. Dos itens só lê código e quantidade:
+    nome, unidade e categoria vêm do catálogo do servidor."""
     v = Validacao()
 
     def campo(t, nome=None):
@@ -265,22 +351,45 @@ def validar_pedido_limpeza(envio: EnvioPedido, catalogo, centros) -> Validacao:
         campo("Adicione ao menos um material ao pedido.")
 
     por_codigo = _por_codigo(catalogo)
-    s = somar_por_codigo(envio.itens, parse_qtd_br)
-    for i in s.invalidos:
-        m = por_codigo.get(i.codigo)
-        nome = m.nome if m else _sem_codigo(i.codigo)
-        v.erros.append(
-            Erro(
-                i.codigo,
-                f"Quantidade inválida para {nome} (use vírgula para decimais, ex.: 1,5).",
-            )
-        )
-    for codigo in s.ordem:
-        m = por_codigo.get(codigo)
-        if m is None:
+    sem_catalogo: set[str] = set()
+
+    def fora_do_catalogo(codigo):
+        if codigo not in sem_catalogo:
+            sem_catalogo.add(codigo)
             v.erros.append(
                 Erro(codigo, f"O material {_sem_codigo(codigo)} não está mais no catálogo.")
             )
+            v.estoque_atual[codigo] = 0
+
+    def maximo_do(m):
+        if m.duplicado:
+            return Decimal(0)
+        return maximo_pedivel(m.estoque, m.fracionavel, regra_quantidade)
+
+    soma: dict[str, Decimal] = {}  # na ordem de chegada
+    for item in envio.itens or ():
+        codigo = texto(item.codigo)
+        m = por_codigo.get(codigo)
+        fracionavel = aceita_fracao(regra_quantidade, m)
+        q, causa = interpretar_quantidade(item.quantidade, fracionavel)
+        if causa and m is None:
+            fora_do_catalogo(codigo)
+        elif causa:
+            v.erros.append(
+                Erro(
+                    codigo,
+                    f"{m.nome} ({codigo}): "
+                    + texto_erro_quantidade(causa, fracionavel=fracionavel, unidade=m.unidade),
+                )
+            )
+            v.estoque_atual[codigo] = maximo_do(m)
+        else:
+            soma[codigo] = soma.get(codigo, Decimal(0)) + q
+
+    for codigo, total in soma.items():
+        m = por_codigo.get(codigo)
+        if m is None:
+            fora_do_catalogo(codigo)
         elif m.duplicado:
             v.erros.append(
                 Erro(
@@ -288,80 +397,17 @@ def validar_pedido_limpeza(envio: EnvioPedido, catalogo, centros) -> Validacao:
                     f"O material {codigo} está com cadastro duplicado. Avise o almoxarifado.",
                 )
             )
-        elif m.estoque <= 0:
-            v.erros.append(Erro(codigo, f"{m.nome} ({codigo}) está sem estoque."))
             v.estoque_atual[codigo] = 0
-        elif s.soma[codigo] > m.estoque:
-            pedido = _com_unidade(qtd_br(s.soma[codigo]), m.unidade)
-            estoque = _com_unidade(qtd_br(m.estoque), m.unidade)
+        elif (maximo := maximo_do(m)) <= 0:
+            v.erros.append(Erro(codigo, f"{m.nome} ({codigo}): Sem estoque."))
+            v.estoque_atual[codigo] = 0
+        elif total > maximo:
             v.erros.append(
-                Erro(codigo, f"{m.nome} ({codigo}): pedido {pedido}, estoque atual {estoque}.")
+                Erro(codigo, f"{m.nome} ({codigo}): {texto_acima_do_estoque(maximo, m.unidade)}")
             )
-            v.estoque_atual[codigo] = m.estoque
+            v.estoque_atual[codigo] = maximo
         else:
-            v.validos.append(ItemValido(m, s.soma[codigo]))
-    return v
-
-
-def _com_unidade(numero: str, unidade: str) -> str:
-    return f"{numero} {unidade}" if unidade else numero
-
-
-def validar_pedido_ab(envio: EnvioPedido, catalogo, centros) -> Validacao:
-    """Formulário AB (`validarPedidoAB_`): quantidade inteira positiva, limitada à parte
-    inteira do estoque do catálogo. O estoque é só um limite: nada é reservado."""
-    v = Validacao()
-
-    def campo(t, nome=None):
-        v.erros.append(Erro(None, t, nome))
-
-    if not texto(envio.solicitante):
-        campo("Informe o nome completo.", "solicitante")
-    if erro := _erro_destino(envio, centros):
-        campo(erro, "destino")
-    if not envio.itens:
-        campo("Adicione ao menos um material ao pedido.")
-
-    por_codigo = _por_codigo(catalogo)
-
-    def fq(q, unidade):
-        return f"{q} {unidade}" if unidade else f"{q}"
-
-    def erro_item(codigo, m, t):
-        v.erros.append(Erro(codigo, t))
-        v.estoque_atual[codigo] = m.disponivel if m and not m.duplicado else 0
-
-    s = somar_por_codigo(envio.itens, parse_inteiro)
-    for i in s.invalidos:
-        m = por_codigo.get(i.codigo)
-        nome = m.nome if m else _sem_codigo(i.codigo)
-        erro_item(i.codigo, m, f"Quantidade de {nome} deve ser um número inteiro maior que zero.")
-    for codigo in s.ordem:
-        m = por_codigo.get(codigo)
-        pedido = s.soma[codigo]
-        if m is None:
-            erro_item(
-                codigo,
-                None,
-                f"O material {_sem_codigo(codigo)} não está mais disponível no catálogo.",
-            )
-        elif m.duplicado:
-            erro_item(
-                codigo,
-                m,
-                f"O material {codigo} está com cadastro duplicado. Avise o almoxarifado.",
-            )
-        elif m.disponivel == 0:
-            erro_item(codigo, m, f"{m.nome} ({codigo}) está sem estoque.")
-        elif pedido > m.disponivel:
-            erro_item(
-                codigo,
-                m,
-                f"{m.nome} ({codigo}): pedido {fq(pedido, m.unidade)}, "
-                f"estoque atual {fq(m.disponivel, m.unidade)}.",
-            )
-        else:
-            v.validos.append(ItemValido(m, pedido))
+            v.validos.append(ItemValido(m, total))
     return v
 
 
@@ -486,7 +532,6 @@ def validar_saida(
     hoje: date,
     tipos=None,
     catalogo: dict | None = None,
-    regra_inteira: bool = False,
 ) -> ValidacaoSaida:
     """Valida os dados de uma saída (`validarSaida_`). Centro de custo e placa só valem se
     estiverem no cadastro de centros de custo."""
@@ -528,8 +573,6 @@ def validar_saida(
             erros.append(Erro(i.codigo, f"Material {i.codigo} está com cadastro duplicado."))
         elif q is None or q < 0:
             erros.append(Erro(i.codigo, f"Quantidade inválida para {i.codigo}."))
-        elif regra_inteira and Decimal(q) != Decimal(q).to_integral_value():
-            erros.append(Erro(i.codigo, f"Pedido AB: a quantidade de {i.codigo} deve ser inteira."))
         elif i.maximo is not None and q > i.maximo:
             erros.append(Erro(i.codigo, f"Entrega de {i.codigo} maior que a quantidade pedida."))
         elif i.estoque is not None and q > i.estoque:
@@ -846,8 +889,14 @@ def cabecalho_saida(dados: DadosSaida, nao_lancar: bool) -> tuple[str, ...]:
     )
 
 
+def origem_publica(origem: str) -> bool:
+    """Toda origem que não é a saída avulsa vem de um formulário público (cabeçalho: solicitante,
+    destino e observação; sujeita ao limite por nome e à conferência de reenvio)."""
+    return origem != AVULSA
+
+
 def cabecalho_enviado(origem: str, envio) -> tuple[str, ...]:
-    if origem in (LIMPEZA, AB):
+    if origem_publica(origem):
         return (texto(envio.solicitante), texto(envio.destino), texto(envio.obs))
     return cabecalho_saida(envio.dados, envio.nao_lancar)
 
@@ -859,7 +908,7 @@ def itens_conferem(origem: str, itens_gravados, envio) -> bool:
         gravados[codigo] = gravados.get(codigo, Decimal(0)) + Decimal(qtd)
     if not gravados:
         return False
-    enviados = somar_por_codigo(envio.itens, parse_inteiro if origem == AB else parse_qtd_br)
+    enviados = somar_por_codigo(envio.itens, parse_qtd_br)
     if enviados.invalidos:
         return False
     return set(enviados.soma) == set(gravados) and all(

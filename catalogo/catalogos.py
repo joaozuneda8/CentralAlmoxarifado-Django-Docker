@@ -36,6 +36,9 @@ class ItemCatalogo:
     estoque: Decimal
     disponivel: int
     duplicado: bool
+    # A unidade do SCPI (não a exibida) admite fração: decide a regra de quantidade do formulário
+    # público. O padrão é o lado seguro, só inteiro.
+    fracionavel: bool = False
 
 
 @dataclass
@@ -57,7 +60,13 @@ def grupos_ocultos_ab() -> set[str]:
     return {_grupo(v) for v in valores}
 
 
-def _item(material: Material, **outros) -> ItemCatalogo:
+def unidades_fracionaveis() -> set[str]:
+    """As unidades do SCPI em que a quantidade pode ter fração (lista mantida no admin),
+    normalizadas como `norm_u`. Lista vazia: nenhuma, e todo material aceita só inteiro."""
+    return {norm_u(v) for v in Opcao.valores(Opcao.Lista.UNIDADE_FRACIONAVEL)}
+
+
+def _item(material: Material, fracionaveis: set[str], **outros) -> ItemCatalogo:
     campos = {
         "codigo": material.codigo,
         "nome": material.nome,
@@ -68,6 +77,8 @@ def _item(material: Material, **outros) -> ItemCatalogo:
         "estoque": material.estoque,
         "disponivel": estoque_inteiro(material.estoque),
         "duplicado": material.duplicado,
+        # Pela unidade do cadastro do SCPI, antes de `outros` trocar o texto exibido.
+        "fracionavel": norm_u(material.unidade) in fracionaveis,
     }
     campos.update(outros)
     return ItemCatalogo(**campos)
@@ -77,9 +88,11 @@ def catalogo_limpeza() -> list[ItemCatalogo]:
     """Itens do formulário de limpeza cujo material não está oculto; nome e unidade
     exibidos têm prioridade sobre o cadastro."""
     itens = ItemLimpeza.objects.select_related("material").filter(material__oculto=False)
+    fracionaveis = unidades_fracionaveis()
     return [
         _item(
             i.material,
+            fracionaveis,
             nome=i.nome_exibido or i.material.nome,
             unidade=i.unidade_exibida or i.material.unidade,
             categoria=i.categoria,
@@ -115,6 +128,7 @@ def catalogo_ab(hoje: date | None = None) -> CatalogoAB | None:
         )
     }
     ocultos = grupos_ocultos_ab()
+    fracionaveis = unidades_fracionaveis()
     ab = CatalogoAB(codigos=len(ranking))
     for codigo in ranking:
         material = materiais.get(norm_u(codigo))
@@ -125,7 +139,7 @@ def catalogo_ab(hoje: date | None = None) -> CatalogoAB | None:
         elif material.oculto or _grupo(material.grupo) in ocultos:
             ab.ocultos += 1
         else:
-            ab.itens.append(_item(material))
+            ab.itens.append(_item(material, fracionaveis))
     return ab
 
 
@@ -137,4 +151,23 @@ def materiais_avulsa():
 def catalogo_avulsa() -> list[ItemCatalogo]:
     """Itens da saída avulsa: o cadastro com saldo positivo, menos os ocultos (duplicado
     aparece bloqueado)."""
-    return [_item(m) for m in materiais_avulsa()]
+    fracionaveis = unidades_fracionaveis()
+    return [_item(m, fracionaveis) for m in materiais_avulsa()]
+
+
+def formulario_limpeza() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário de limpeza, ou None se ele está indisponível: o saldo nunca foi
+    importado (o formulário limita pelo saldo) ou não há item algum."""
+    return (catalogo_limpeza() if saldo_importado() else None) or None
+
+
+def formulario_ab() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário AB, ou None se ele está indisponível: o saldo nunca foi importado
+    ou nenhum material com saída entra no catálogo."""
+    ab = catalogo_ab()
+    return (ab.itens if ab is not None else None) or None
+
+
+def formulario_avulsa() -> list[ItemCatalogo] | None:
+    """O catálogo da saída avulsa, ou None se nenhum material tem saldo."""
+    return catalogo_avulsa() or None

@@ -54,14 +54,16 @@ def test_nega_acima_do_saldo_e_nao_grava():
     saldo(DETERGENTE, 3)
     r = pedir((DETERGENTE, "4"))
     assert not r.ok
-    assert textos(r) == ["DETERGENTE NEUTRO (023.001.002): pedido 4 UN, estoque atual 3 UN."]
+    assert textos(r) == [
+        "DETERGENTE NEUTRO (023.001.002): Quantidade acima do estoque. Estoque disponível: 3 UN."
+    ]
     assert not Pedido.objects.exists()
 
 
 def test_nega_material_sem_estoque():
     saldo(DETERGENTE, 0)
     r = pedir((DETERGENTE, "1"))
-    assert textos(r) == ["DETERGENTE NEUTRO (023.001.002) está sem estoque."]
+    assert textos(r) == ["DETERGENTE NEUTRO (023.001.002): Sem estoque."]
 
 
 def test_formulario_fica_indisponivel_se_o_saldo_nunca_foi_importado():
@@ -89,10 +91,15 @@ def test_carrinho_nega_acima_do_saldo_e_soma_o_que_ja_esta():
 
 
 def test_carrinho_usa_o_saldo_fracionado_e_nao_o_inteiro():
-    meio = item("1", "SABÃO", Decimal("0.5"), unidade="UN")
+    meio = item("1", "SABÃO", Decimal("0.5"), unidade="KG", fracionavel=True)
     assert adicionar([], LIMPEZA_F, meio, "0,5").erro == ""
     assert adicionar([], LIMPEZA_F, meio, "0,6").erro == (
-        "Quantidade acima do estoque. Estoque disponível: 0,5 UN."
+        "Quantidade acima do estoque. Estoque disponível: 0,5 KG."
+    )
+    # Em unidade contada, o saldo 0,5 não dá uma unidade inteira: o material fica sem estoque.
+    contado = item("2", "SABÃO", Decimal("0.5"), unidade="UN")
+    assert adicionar([], LIMPEZA_F, contado, "1").erro == (
+        "SABÃO (2): Sem estoque — não pode ser adicionado."
     )
 
 

@@ -2,12 +2,14 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from pedidos import carrinho as carrinho_mod
-from pedidos.fluxos import fluxo_publico, opcoes_filtro
+from pedidos.fluxos import fluxo_publico, fluxos_publicos, opcoes_filtro
 from pedidos.models import ItemPedido
 from pedidos.protecao import (
     CAMPO_ISCA,
-    MENSAGEM_EXPIRADO,
+    MENSAGEM_RAPIDO,
     MENSAGEM_RECUSA,
+    MENSAGEM_TOKEN_INVALIDO,
+    MOTIVO_ISCA,
     emitir,
     ler,
     recusar,
@@ -19,7 +21,7 @@ from pedidos.views.materiais import contexto_busca, urls_do_fluxo
 
 def inicio(request):
     """Página pública dos funcionários (sem login)."""
-    return render(request, "pedidos/inicio.html")
+    return render(request, "pedidos/inicio.html", {"fluxos_publicos": fluxos_publicos()})
 
 
 def _contexto(fluxo, catalogo, envio, **extra) -> dict:
@@ -28,6 +30,9 @@ def _contexto(fluxo, catalogo, envio, **extra) -> dict:
         "fluxo": fluxo,
         "envio": envio,
         "indisponivel": catalogo is None,
+        # Há itens, mas o máximo pedível de todos é zero: o formulário abre com um aviso no topo.
+        "sem_estoque_agora": bool(catalogo)
+        and all(carrinho_mod.limite(fluxo, i) <= 0 for i in catalogo),
         "sem_destinos": not destinos,
         "destinos": destinos,
         "filtros": opcoes_filtro(fluxo, catalogo),
@@ -59,7 +64,9 @@ def formulario(request, fluxo):
             catalogo,
             envio,
             campos=campos,
-            carrinho=carrinho_mod.Carrinho(carrinho_mod.ler(request.POST, fluxo, catalogo)),
+            carrinho=carrinho_mod.Carrinho(
+                carrinho_mod.ler(request.POST, fluxo, catalogo, manter_ilegiveis=True)
+            ),
             **extra,
         )
         modelo = "pedidos/_formulario.html" if parcial else "pedidos/formulario.html"
@@ -67,9 +74,12 @@ def formulario(request, fluxo):
 
     envio = ler(request.POST.get("token", ""))
     if envio is None:
-        return de_volta(emitir(), mensagem=MENSAGEM_EXPIRADO)
-    if recusar(envio, request.POST.get(CAMPO_ISCA, "")):
-        return de_volta(envio, mensagem=MENSAGEM_RECUSA)
+        return de_volta(emitir(), mensagem=MENSAGEM_TOKEN_INVALIDO)
+    if motivo := recusar(envio, request.POST.get(CAMPO_ISCA, "")):
+        # Só a isca (que uma pessoa nunca preenche) recebe a mensagem genérica.
+        return de_volta(
+            envio, mensagem=MENSAGEM_RECUSA if motivo == MOTIVO_ISCA else MENSAGEM_RAPIDO
+        )
 
     # O texto como está no cadastro; o que não existe segue como veio, para a validação recusar.
     destino = resolver_destino(campos["destino"], centros()) or campos["destino"]

@@ -39,8 +39,8 @@ def test_banco_vazio_nao_quebra():
     assert (
         ItemSaude(
             "erro",
-            "Sem saldo importado: o formulário AB fica indisponível até a próxima importação "
-            "de estoque.",
+            "Sem saldo importado: os formulários de limpeza e AB ficam indisponíveis até a "
+            "próxima importação de estoque.",
         )
         in itens
     )
@@ -280,3 +280,25 @@ def test_situacao_em_andamento(trava_importacao_ocupada):
     situacao = situacao_do_catalogo(AGORA)
     assert situacao.em_andamento.rotulo == "Saídas do SCPI"
     assert situacao.resumo == "Saídas do SCPI: importação em andamento desde 14:20."
+
+
+def test_formulario_de_limpeza_sem_itens_e_erro():
+    assert texto_de("Formulário de limpeza") == ItemSaude(
+        "erro", "Formulário de limpeza: nenhum item no catálogo; o formulário fica indisponível."
+    )
+
+
+def test_formulario_ab_sem_itens_e_erro_e_diz_por_que():
+    Material.objects.create(codigo="O", nome="O", oculto=True, estoque_em=AGORA)
+    SaidaSCPI.objects.create(id_requi="1", cadpro="O", data=date(2026, 1, 1), qtd=1, valor=0)
+    assert texto_de("Formulário AB") == ItemSaude(
+        "erro",
+        "Formulário AB: nenhum item no catálogo (1 códigos com saída no SCPI; 0 também na lista "
+        "de limpeza, que prevalece; 1 ocultos ou em grupo oculto); o formulário fica indisponível.",
+    )
+
+
+def test_formulario_ab_sem_saidas_na_janela_e_erro():
+    Material.objects.create(codigo="A", nome="A", estoque_em=AGORA)
+    (item,) = itens_de("Formulário AB")
+    assert item.nivel == "erro" and "nenhum item no catálogo" in item.texto

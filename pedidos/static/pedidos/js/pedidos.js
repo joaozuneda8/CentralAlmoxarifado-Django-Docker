@@ -1021,8 +1021,7 @@
   // material abre a quantidade (uma aberta por vez; tocar de novo na linha aberta a fecha), já com a do
   // pedido se ele estiver lá; "Confirmar" manda ao servidor como antes, e "Atualizar" (material já no
   // pedido) troca a quantidade da linha do pedido, sem somar. Esc ou o ✕ fecham. Com um aberto, as
-  // outras linhas ficam recuadas (pedidos.css), mas clicáveis. Sem JavaScript, a quantidade fica sempre
-  // à vista.
+  // outras linhas ficam recuadas (pedidos.css), mas clicáveis.
   var DURACAO_FEITO = 2000;
 
   function nomeDoMaterial(item) {

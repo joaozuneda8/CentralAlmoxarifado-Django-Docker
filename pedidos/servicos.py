@@ -17,14 +17,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from catalogo.catalogos import (
-    ItemCatalogo,
-    catalogo_ab,
-    catalogo_avulsa,
-    catalogo_limpeza,
-    saldo_importado,
-)
+from catalogo.catalogos import ItemCatalogo
 from catalogo.models import CentroCusto, Opcao
+from pedidos.fluxos import fluxo_da_origem
 from pedidos.models import (
     TRAVA_LANCAMENTO,
     AlteracaoPedido,
@@ -36,12 +31,10 @@ from pedidos.models import (
     Sequencia,
 )
 from pedidos.regras import (
-    AB,
     AVULSA,
     EM_LANCAMENTO,
     ERRO,
     LANCADA,
-    LIMPEZA,
     NAO_LANCAR,
     PENDENTE,
     ROTULOS_CABECALHO,
@@ -63,22 +56,19 @@ from pedidos.regras import (
     marcado_nao_lancar,
     norm_placa,
     norm_u,
-    parse_inteiro,
     parse_qtd_br,
     registro_confere,
     requisicao_valida,
     somar_por_codigo,
     texto,
-    validar_pedido_ab,
-    validar_pedido_limpeza,
+    truncar_qtd,
+    validar_pedido,
     validar_saida,
 )
 from pedidos.telegram import notificar_pedido
 from scpi.execucao import trava
 
 logger = logging.getLogger("pedidos")
-
-PREFIXOS = {LIMPEZA: "P-", AB: "P-", AVULSA: "AV-"}
 
 
 @dataclass
@@ -111,21 +101,21 @@ def travar_sequencia() -> Sequencia:
 
 
 def proximo_numero(sequencia: Sequencia, origem: str) -> str:
-    """Próximo Nº de uma sequência única para pedidos (P-) e saídas avulsas (AV-)."""
+    """Próximo Nº de uma sequência única para pedidos (P-, de qualquer formulário público) e
+    saídas avulsas (AV-)."""
     sequencia.ultimo += 1
     sequencia.save(update_fields=["ultimo"])
-    return f"{PREFIXOS[origem]}{sequencia.ultimo:06d}"
+    prefixo = "AV-" if origem == AVULSA else "P-"
+    return f"{prefixo}{sequencia.ultimo:06d}"
 
 
 def catalogo_de(origem: str) -> list[ItemCatalogo] | None:
-    """Catálogo do formulário, ou None quando ele está indisponível (a limpeza e o AB limitam
-    pelo saldo, então ficam indisponíveis enquanto ele nunca foi importado)."""
-    if origem == LIMPEZA:
-        return (catalogo_limpeza() if saldo_importado() else None) or None
-    if origem == AB:
-        ab = catalogo_ab()
-        return ab.itens if ab is not None else None
-    return catalogo_avulsa() or None
+    """Catálogo do formulário da origem, ou None quando ele está indisponível: o saldo nunca foi
+    importado (a limpeza e o AB limitam pelo saldo) ou o catálogo não tem item algum (nos dois
+    formulários, para o funcionário não preencher um formulário que não pode ser enviado). Quem
+    diz de onde vem o catálogo é o `Fluxo` da origem."""
+    fluxo = fluxo_da_origem(origem)
+    return fluxo.catalogo() if fluxo is not None else None
 
 
 def _itens_gravados(pedido: Pedido) -> list[tuple[str, Decimal]]:
@@ -195,9 +185,11 @@ def _limite_atingido(ip: str | None, solicitante: str, agora: datetime) -> str:
             return MENSAGEM_LIMITE_IP
     if solicitante:
         # A collation do banco já ignora maiúsculas e acentos.
-        do_nome = Pedido.objects.filter(
-            origem__in=[LIMPEZA, AB], solicitante=solicitante, criado_em__gte=dia
-        ).count()
+        do_nome = (
+            Pedido.objects.exclude(origem=AVULSA)
+            .filter(solicitante=solicitante, criado_em__gte=dia)
+            .count()
+        )
         if do_nome >= settings.PEDIDOS_LIMITE_SOLICITANTE_DIA:
             return MENSAGEM_LIMITE_SOLICITANTE
     return ""
@@ -212,8 +204,14 @@ def registrar_pedido(
     url_painel: str = "",
     agora: datetime | None = None,
 ) -> Resposta:
-    """Pedido dos formulários de limpeza e AB (`registrarPedido`)."""
+    """Pedido dos formulários públicos (`registrarPedido`)."""
     agora = agora or timezone.now()
+    # O catálogo (o do AB é uma conta pesada) e os centros são lidos antes de travar a numeração:
+    # o estoque é só um teto, nada é reservado, e os outros envios não podem esperar essa conta.
+    # A ordem das respostas abaixo não muda (reenvio, limite, indisponível, validação).
+    catalogo = catalogo_de(origem)
+    lista_centros = centros()
+    fluxo = fluxo_da_origem(origem)  # None só para origem desconhecida, que não tem catálogo
     with transaction.atomic():
         seq = travar_sequencia()
         anterior = Pedido.objects.filter(pk=envio_id).first()
@@ -234,24 +232,20 @@ def registrar_pedido(
         if limite:
             return Resposta(ok=False, mensagem=limite)
 
-        catalogo = catalogo_de(origem)
-        if catalogo is None:
+        if fluxo is None or catalogo is None:
             return Resposta(
                 ok=False,
                 mensagem="O catálogo deste formulário não está disponível agora. "
                 "Avise o almoxarifado.",
             )
-        lista_centros = centros()
         if not lista_centros:
             return Resposta(
                 ok=False,
                 mensagem="Não há centros de custo cadastrados para escolher o destino. "
                 "Avise o almoxarifado.",
             )
-        if origem == AB:
-            v = validar_pedido_ab(envio, catalogo, lista_centros)
-        else:
-            v = validar_pedido_limpeza(envio, catalogo, lista_centros)
+        # A regra de quantidade é a do formulário, a mesma do carrinho dele.
+        v = validar_pedido(envio, catalogo, lista_centros, fluxo.regra_quantidade)
         tamanhos = erros_de_tamanho(
             {
                 "Nome completo": envio.solicitante,
@@ -382,9 +376,8 @@ def _gravar_linhas(atendimento: Atendimento, pares, lote: str) -> None:
 
 
 def _qtd_adicionada(qtds: dict[str, str], codigo: str) -> Decimal | None:
-    """Quantidade de um acrescentado: vírgula decimal (o inteiro do AB é conferido pela regra
-    do `validar_saida`, com a mensagem "deve ser inteira"); campo vazio ou ausente vale 0, que
-    pede a quantidade."""
+    """Quantidade de um acrescentado: vírgula decimal, em qualquer unidade (a equipe não segue a
+    regra por unidade); campo vazio ou ausente vale 0, que pede a quantidade."""
     return parse_qtd_br(texto(qtds.get(codigo)) or "0")
 
 
@@ -520,7 +513,6 @@ def _validar_atendimento(
             tipos=tipos,
             hoje=hoje,
             catalogo=catalogo,
-            regra_inteira=pedido.origem == AB,
         )
 
     catalogo = {c.codigo: c for c in catalogo_de(AVULSA) or []} if adicionados else {}
@@ -626,8 +618,8 @@ def confirmar_atendimento(
             return Resposta(ok=False, mensagem="Pedido não encontrado.")
         todos = list(pedido.itens.all())
         itens = [i for i in todos if i.origem == ItemPedido.Origem.PEDIDO]
-        conv = parse_inteiro if pedido.origem == AB else parse_qtd_br
-        parsed = {i.codigo: conv(qtds.get(i.codigo, "")) for i in itens}
+        # A equipe aceita fração em qualquer unidade e em pedido de qualquer origem.
+        parsed = {i.codigo: parse_qtd_br(qtds.get(i.codigo, "")) for i in itens}
         qtds_adicionadas = {a.codigo: _qtd_adicionada(qtds, a.codigo) for a in adicionados}
 
         anterior = pedido.atendimento_ou_none
@@ -851,8 +843,8 @@ def editar_atendimento(
         itens = [i for i in todos if i.origem == ItemPedido.Origem.PEDIDO]
         gravados = {i.codigo: i for i in todos if i.origem == ItemPedido.Origem.ALMOXARIFADO}
         por_id = {i.id: i for i in todos}
-        conv = parse_inteiro if pedido.origem == AB else parse_qtd_br
-        parsed = {i.codigo: conv(qtds.get(i.codigo, "")) for i in itens}
+        # A equipe aceita fração em qualquer unidade e em pedido de qualquer origem.
+        parsed = {i.codigo: parse_qtd_br(qtds.get(i.codigo, "")) for i in itens}
         qtds_adicionadas = {a.codigo: _qtd_adicionada(qtds, a.codigo) for a in adicionados}
 
         mantidos = {
@@ -943,13 +935,13 @@ def editar_atendimento(
 
 
 def _limites_de_estoque(catalogo: dict, gravados=(), base: dict | None = None) -> dict:
-    """Teto da quantidade de cada material da saída: o estoque do catálogo, ou a quantidade já
-    gravada se for maior (o SCPI pode ter abatido o saldo, ou o material ter saído do catálogo,
-    e quem já está na saída continua valendo). `base` é o catálogo de verdade, quando
-    `catalogo` já traz os gravados por cima."""
-    limites = {c: i.estoque for c, i in catalogo.items()}
+    """Teto da quantidade de cada material da saída: o saldo do catálogo truncado a 3 casas (o
+    mesmo número da lista e das mensagens), ou a quantidade já gravada se for maior (o SCPI pode
+    ter abatido o saldo, ou o material ter saído do catálogo, e quem já está na saída continua
+    valendo). `base` é o catálogo de verdade, quando `catalogo` já traz os gravados por cima."""
+    limites = {c: truncar_qtd(i.estoque) for c, i in catalogo.items()}
     for c, i in (base or {}).items():
-        limites[c] = max(limites.get(c, Decimal(0)), i.estoque)
+        limites[c] = max(limites.get(c, Decimal(0)), truncar_qtd(i.estoque))
     for item in gravados:
         limites[item.codigo] = max(limites.get(item.codigo, Decimal(0)), item.qtd_entregue or 0)
     return limites

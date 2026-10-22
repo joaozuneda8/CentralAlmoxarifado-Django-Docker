@@ -28,6 +28,10 @@ MATERIAIS = [
     ("000.000.900", "ITEM ANTIGO", "GERAL", "0", False),
     ("030.004.001", "CAPACETE", "EPI", "9", True),
 ]
+UNIDADES_FRACIONAVEIS = ("M", "MT", "MTS", "KM", "KG", "L", "LT", "M²", "M³", "T")
+# Unidade do SCPI de cada material (o resto é "UN", contado). O café é vendido a peso: é a
+# unidade de medida dos pedidos de limpeza com fração (1,5).
+UNIDADES = {"008.001.002": "KG"}
 SAIDAS = {
     "016.005.010": 3,
     "013.006.001": 2,
@@ -43,6 +47,9 @@ def montar_cenario(*, com_estoque: bool = True) -> None:
     opcoes = {
         Opcao.Lista.FUNCIONARIO: ["Ana Exemplo", "João Fictício", "Motorista Teste"],
         Opcao.Lista.CATEGORIA_LIMPEZA: ["Limpeza", "Copa/cozinha"],
+        # A migration carrega estas unidades, mas o teste com `transaction=True` esvazia as
+        # tabelas ao terminar: quem monta o cenário garante a lista (idempotente).
+        Opcao.Lista.UNIDADE_FRACIONAVEL: list(UNIDADES_FRACIONAVEIS),
     }
     for lista, valores in opcoes.items():
         for ordem, valor in enumerate(valores):
@@ -56,7 +63,7 @@ def montar_cenario(*, com_estoque: bool = True) -> None:
             codigo=codigo,
             defaults={
                 "nome": nome,
-                "unidade": "UN",
+                "unidade": UNIDADES.get(codigo, "UN"),
                 "grupo": grupo,
                 "subgrupo": "SUB",
                 "oculto": oculto,

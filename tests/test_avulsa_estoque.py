@@ -234,3 +234,37 @@ def test_adicionar_do_atendimento_recusa_acima_do_estoque(client, usuario, pedid
     assert "Quantidade acima do estoque. Estoque disponível: 10 UN." in r.text
     r = client.post(url, {"adicionar": FITA, f"qtd-{FITA}": "10"})
     assert "HX-Retarget" not in r and f'data-adicionado="{FITA}"' in r.text
+
+
+# --- O teto da equipe é o saldo truncado a 3 casas (spec 005) ---------------------------------
+
+
+def test_teto_da_avulsa_e_o_saldo_truncado_a_3_casas(usuario):
+    Material.objects.filter(codigo=FITA).update(estoque=Decimal("2.4996"))
+    assert registrar(usuario, (FITA, "2,499")).ok
+    r = registrar(usuario, (FITA, "2,5"))
+    # Antes a mensagem arredondava o saldo ("2,5") e contradizia a recusa.
+    assert textos(r) == [f"Saída de {FITA} maior que o estoque (2,499)."]
+
+
+def test_a_equipe_aceita_fracao_em_unidade_contada(usuario):
+    assert registrar(usuario, (PAPEL, "1,5")).ok  # papel higiênico é em UN
+
+
+def test_acrescimo_no_atendimento_tem_o_mesmo_teto_truncado(pedido, usuario):
+    Material.objects.filter(codigo=FITA).update(estoque=Decimal("2.4996"))
+    r = atender(pedido, usuario, {DETERGENTE: "2", FITA: "2,5"}, [Adicionado(FITA)])
+    assert textos(r) == [f"Saída de {FITA} maior que o estoque (2,499)."]
+    assert atender(pedido, usuario, {DETERGENTE: "2", FITA: "2,499"}, [Adicionado(FITA)]).ok
+
+
+def test_edicao_usa_o_teto_truncado_e_mantem_o_gravado(usuario):
+    pedido = registrar(usuario, (FITA, "2")).pedido
+    Material.objects.filter(codigo=FITA).update(estoque=Decimal("2.4996"))
+    assert textos(editar(pedido, usuario, (FITA, "2,5"))) == [
+        f"Saída de {FITA} maior que o estoque (2,499)."
+    ]
+    assert editar(pedido, usuario, (FITA, "2,499")).ok
+    # O que já está gravado continua valendo mesmo que o saldo caia abaixo dele.
+    Material.objects.filter(codigo=FITA).update(estoque=Decimal("0.5"))
+    assert editar(pedido, usuario, (FITA, "2,499"), dados=saida(recebedor="Ana")).ok

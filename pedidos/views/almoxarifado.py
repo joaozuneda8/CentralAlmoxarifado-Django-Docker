@@ -27,7 +27,6 @@ from pedidos.consultas import (
 from pedidos.fluxos import FLUXOS
 from pedidos.models import Atendimento, ExecucaoRobo, ItemPedido, Pedido
 from pedidos.regras import (
-    AB,
     AVULSA,
     ERRO,
     NAO_LANCAR,
@@ -138,8 +137,9 @@ def _saida_do_destino(destino: str, opcoes: dict) -> dict:
 
 
 def _formatar_qtd(pedido, q) -> str:
-    """Quantidade no campo da entrega: inteira no AB, pt-BR nos demais."""
-    return str(int(q)) if pedido.origem == AB else qtd_br(q)
+    """Quantidade no campo da entrega: pt-BR exata, sem zeros à direita, em qualquer origem (a
+    equipe aceita fração em qualquer unidade, também nos pedidos do AB)."""
+    return qtd_br(q)
 
 
 def _contexto_edicao(pedido) -> dict:
@@ -585,9 +585,9 @@ def atendimento_adicionar(request, numero):
         if len(depois) > len(antes):
             erro = depois[len(antes)].texto
     if not erro:
-        # A regra da quantidade é a da origem do pedido (AB só inteiros), maior que zero.
-        regra = FLUXOS["ab"] if pedido.origem == AB else FLUXOS["limpeza"]
-        qtd, erro = carrinho_mod.quantidade(regra, request.POST.get(f"qtd-{codigo}", ""))
+        # A equipe aceita fração em qualquer unidade e em pedido de qualquer origem: vale a regra
+        # da saída avulsa, maior que zero.
+        qtd, erro = carrinho_mod.quantidade(FLUXOS["avulsa"], request.POST.get(f"qtd-{codigo}", ""))
         # O material vem do catálogo da saída avulsa: o teto é o saldo dele, qualquer que seja
         # a origem do pedido.
         erro = erro or carrinho_mod.acima_do_estoque(FLUXOS["avulsa"], item, qtd)

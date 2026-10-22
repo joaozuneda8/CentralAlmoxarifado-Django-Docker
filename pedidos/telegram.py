@@ -25,8 +25,9 @@ def _esc(valor) -> str:
     return escape("" if valor is None else str(valor), quote=False)
 
 
-def _quantidade(pedido, qtd) -> str:
-    return str(int(qtd)) if pedido.origem == AB else qtd_br(qtd)
+def _quantidade(qtd) -> str:
+    """A quantidade exata, em pt-BR e sem zeros à direita, em qualquer origem."""
+    return qtd_br(qtd)
 
 
 def texto_aviso(pedido) -> str:
@@ -36,8 +37,7 @@ def texto_aviso(pedido) -> str:
     for i in itens[:MAX_ITENS_AVISO]:
         unidade = f" {_esc(i.unidade)}" if i.unidade else ""
         linhas.append(
-            f"• {_esc(i.material)} ({_esc(i.codigo)}) — "
-            f"<b>{_quantidade(pedido, i.qtd_pedida)}{unidade}</b>"
+            f"• {_esc(i.material)} ({_esc(i.codigo)}) — <b>{_quantidade(i.qtd_pedida)}{unidade}</b>"
         )
     if len(itens) > MAX_ITENS_AVISO:
         linhas.append(f"<i>e mais {len(itens) - MAX_ITENS_AVISO} itens</i>")

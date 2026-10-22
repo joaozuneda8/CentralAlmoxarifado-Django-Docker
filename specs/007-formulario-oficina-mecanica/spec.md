@@ -175,6 +175,9 @@ incluído aparecem e os do retirado não.
   nenhuma viatura, fica indisponível, e a saúde do catálogo diz o motivo.
 - **Viatura descadastrada entre abrir o formulário e enviar.** O envio é recusado como destino
   inválido, e o pedido é mantido.
+- **Material que sai da escolha da oficina (ou fica oculto) entre abrir o formulário e enviar.** O
+  envio é recusado com a mensagem de hoje ("O material … não está mais no catálogo."), e o pedido é
+  mantido para correção, como nos outros formulários. Pedidos já registrados não mudam.
 - **Viatura descadastrada depois do envio.** O pedido registrado não muda; o atendimento aceita
   qualquer centro de custo, como nos outros formulários.
 - **Reenvio, envio rápido demais, campo isca, limites por IP e por nome.** Iguais aos dos outros
@@ -242,7 +245,9 @@ incluído aparecem e os do retirado não.
   vez. Retirar um material avulso não o tira do formulário se o seu grupo for da oficina.
 - **FR-013**: A saúde do catálogo DEVE mostrar quantos materiais o formulário da oficina oferece,
   avisar quando ele estiver indisponível, com o motivo, e listar os grupos da escolha sem nenhum
-  material visível e os materiais avulsos que não aparecem por estarem ocultos no SCPI.
+  material visível e os materiais avulsos que não aparecem por estarem ocultos no SCPI. Sem o
+  centro OFICINA MECÂNICA no cadastro, mas com viaturas, o formulário continua disponível e a
+  saúde DEVE avisar que o destino da oficina não é oferecido.
 
 **Não regressão**
 

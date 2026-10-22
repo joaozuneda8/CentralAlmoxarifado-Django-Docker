@@ -3,7 +3,8 @@
 Traduz `montarCatalogos_` do `Catalogo.gs`: limpeza vem do `ItemLimpeza`; AB, das saídas do
 SCPI no período da curva ABC, consolidadas pelo de/para e ordenadas por número de ocorrências; a
 saída avulsa, de todo material não oculto e com saldo positivo; o de viaturas, da `PecaViatura`
-seguida do catálogo AB (spec 006). Em todos, o material `duplicado`
+seguida do catálogo AB (spec 006); o da oficina mecânica, dos grupos da lista `GRUPO_OFICINA` e dos
+`MaterialOficina` (spec 007). Em todos, o material `duplicado`
 aparece (bloqueado pelo formulário).
 """
 
@@ -11,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
+from django.db.models import Q
 from django.utils import timezone
 
 from catalogo.consultas_curva import consolidado
@@ -23,7 +25,7 @@ from catalogo.models import (
     Opcao,
     PecaViatura,
 )
-from pedidos.regras import Centro, estoque_inteiro, norm_u
+from pedidos.regras import CENTRO_OFICINA, Centro, estoque_inteiro, norm_u
 
 # Usados quando a lista GRUPO_OCULTO_AB está vazia (como `GRUPOS_OCULTOS_PADRAO_`).
 GRUPOS_OCULTOS_PADRAO = (
@@ -213,3 +215,43 @@ def centros_equipe_manutencao() -> list[Centro]:
     for c in CentroCusto.objects.filter(equipe_manutencao=True).order_by("descricao", "codigo"):
         centros.setdefault(c.descricao, Centro(c.descricao, c.codigo))
     return list(centros.values())
+
+
+def grupos_oficina() -> set[str]:
+    """Os grupos do formulário da oficina mecânica (spec 007), normalizados como os ocultos do AB.
+    Lista vazia: nenhum grupo (sem padrão)."""
+    return {_grupo(v) for v in Opcao.valores(Opcao.Lista.GRUPO_OFICINA)}
+
+
+def catalogo_oficina() -> list[ItemCatalogo]:
+    """Materiais do formulário da oficina: os não ocultos dos grupos da oficina e os avulsos
+    (`MaterialOficina`), uma vez cada, pelo nome; a unidade é a do SCPI."""
+    grupos = grupos_oficina()
+    visiveis = Material.objects.filter(oculto=False)
+    casados = [
+        g for g in visiveis.values_list("grupo", flat=True).distinct() if _grupo(g) in grupos
+    ]
+    materiais = visiveis.filter(Q(grupo__in=casados) | Q(material_oficina__isnull=False))
+    fracionaveis = unidades_fracionaveis()
+    return [_item(m, fracionaveis) for m in materiais.distinct().order_by("nome", "codigo")]
+
+
+def formulario_oficina() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário da oficina, ou None se ele está indisponível: o saldo nunca foi
+    importado ou a escolha da oficina não tem material visível."""
+    return (catalogo_oficina() if saldo_importado() else None) or None
+
+
+def centros_oficina() -> list[Centro]:
+    """Destinos do formulário da oficina: o centro OFICINA MECÂNICA (a linha sem placa) e cada
+    viatura (centro com placa), esta só como "centro — placa"."""
+    oficina = [
+        Centro(c.descricao, c.codigo)
+        for c in CentroCusto.objects.filter(placa__isnull=True).order_by("codigo")
+        if norm_u(c.descricao) == norm_u(CENTRO_OFICINA)
+    ][:1]
+    viaturas = [
+        Centro(c.descricao, c.codigo, c.placa, so_com_placa=True)
+        for c in CentroCusto.objects.filter(placa__isnull=False).order_by("descricao", "placa")
+    ]
+    return oficina + viaturas

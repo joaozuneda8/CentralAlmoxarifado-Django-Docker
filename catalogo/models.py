@@ -43,6 +43,8 @@ class Opcao(models.Model):
         FUNCIONARIO = "FUNCIONARIO", "Funcionários"
         # Unidades do SCPI em que a quantidade pode ter fração. Lista vazia = tudo inteiro.
         UNIDADE_FRACIONAVEL = "UNIDADE_FRACIONAVEL", "Unidades fracionáveis"
+        # Grupos do SCPI cujos materiais o formulário da oficina mecânica oferece (spec 007).
+        GRUPO_OFICINA = "GRUPO_OFICINA", "Grupos (oficina)"
 
     lista = models.CharField(max_length=30, choices=Lista.choices)
     valor = models.CharField(max_length=200)
@@ -158,6 +160,24 @@ class PecaViatura(models.Model):
 
     def __str__(self):
         return self.nome_exibido or str(self.material)
+
+
+class MaterialOficina(models.Model):
+    """Material avulso do formulário da oficina mecânica (spec 007), além dos grupos da lista
+    `GRUPO_OFICINA`: serve aos materiais de um grupo que não pode entrar inteiro (os óleos e
+    filtros do grupo `GERAL`)."""
+
+    material = models.OneToOneField(
+        Material, on_delete=models.PROTECT, related_name="material_oficina"
+    )
+
+    class Meta:
+        ordering = ["material__nome"]
+        verbose_name = "material da oficina"
+        verbose_name_plural = "materiais da oficina"
+
+    def __str__(self):
+        return str(self.material)
 
 
 class SaidaSCPI(models.Model):

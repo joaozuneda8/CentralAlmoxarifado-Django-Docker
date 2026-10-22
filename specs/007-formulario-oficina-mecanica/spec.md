@@ -230,7 +230,8 @@ incluído aparecem e os do retirado não.
 **Pedido e atendimento**
 
 - **FR-010**: O pedido DEVE ser registrado como os dos outros formulários públicos, com uma origem
-  própria que o identifique no painel, no filtro por origem, no detalhe e no aviso ao almoxarifado.
+  própria que o identifique na lista e no filtro por origem do painel e no aviso ao almoxarifado,
+  como as dos outros formulários.
 - **FR-011**: Atendimento, trocas e acréscimos pelo almoxarifado, edição do atendimento, recibo e
   lançamento no SCPI DEVEM funcionar para estes pedidos como para os dos outros formulários
   públicos, sem regra própria.

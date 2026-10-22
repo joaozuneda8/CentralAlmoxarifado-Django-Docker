@@ -322,11 +322,22 @@ def _sem_codigo(codigo: str) -> str:
     return codigo or "(sem código)"
 
 
-def validar_pedido(envio: EnvioPedido, catalogo, centros) -> Validacao:
+def aceita_fracao(regra: str, material) -> bool:
+    """Se a quantidade deste material pode ter fração numa regra de quantidade. A `livre` (a
+    equipe) aceita em qualquer unidade; na `por_unidade`, quem pede segue a unidade do material.
+    Material fora do catálogo (`None`) não decide nada aqui, o envio o recusa: vale a leitura com
+    fração. O carrinho e a validação do envio usam esta mesma conta."""
+    return regra == REGRA_LIVRE or material is None or material.fracionavel
+
+
+def validar_pedido(
+    envio: EnvioPedido, catalogo, centros, regra_quantidade: str = REGRA_POR_UNIDADE
+) -> Validacao:
     """Validação do envio dos formulários públicos de limpeza e AB (`validarPedidoLimpeza_` e
     `validarPedidoAB_`, hoje uma só, spec 005). A quantidade e o teto vêm da unidade do material
-    (`interpretar_quantidade` e `maximo_pedivel`) e os textos são os mesmos do carrinho. Dos
-    itens só lê código e quantidade: nome, unidade e categoria vêm do catálogo do servidor."""
+    (`interpretar_quantidade` e `maximo_pedivel`), pela `regra_quantidade` do `Fluxo` (a mesma que
+    o carrinho usa), e os textos são os mesmos do carrinho. Dos itens só lê código e quantidade:
+    nome, unidade e categoria vêm do catálogo do servidor."""
     v = Validacao()
 
     def campo(t, nome=None):
@@ -353,13 +364,14 @@ def validar_pedido(envio: EnvioPedido, catalogo, centros) -> Validacao:
     def maximo_do(m):
         if m.duplicado:
             return Decimal(0)
-        return maximo_pedivel(m.estoque, m.fracionavel, REGRA_POR_UNIDADE)
+        return maximo_pedivel(m.estoque, m.fracionavel, regra_quantidade)
 
     soma: dict[str, Decimal] = {}  # na ordem de chegada
     for item in envio.itens or ():
         codigo = texto(item.codigo)
         m = por_codigo.get(codigo)
-        q, causa = interpretar_quantidade(item.quantidade, m.fracionavel if m else True)
+        fracionavel = aceita_fracao(regra_quantidade, m)
+        q, causa = interpretar_quantidade(item.quantidade, fracionavel)
         if causa and m is None:
             fora_do_catalogo(codigo)
         elif causa:
@@ -367,7 +379,7 @@ def validar_pedido(envio: EnvioPedido, catalogo, centros) -> Validacao:
                 Erro(
                     codigo,
                     f"{m.nome} ({codigo}): "
-                    + texto_erro_quantidade(causa, fracionavel=m.fracionavel, unidade=m.unidade),
+                    + texto_erro_quantidade(causa, fracionavel=fracionavel, unidade=m.unidade),
                 )
             )
             v.estoque_atual[codigo] = maximo_do(m)

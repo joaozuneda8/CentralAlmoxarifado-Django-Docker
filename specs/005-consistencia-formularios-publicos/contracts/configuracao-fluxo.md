@@ -24,7 +24,9 @@ Cada formulário, atual ou novo, é uma entrada de `FLUXOS` em `pedidos/fluxos.p
    nenhum item); devolve lista não vazia caso contrário. As funções `formulario_*` ficam em
    `catalogo/catalogos.py`, e `servicos.catalogo_de(origem)` apenas consulta o `Fluxo` da origem.
 2. **Regra de quantidade.** O núcleo nunca pergunta pelo nome nem pela origem do formulário; só por
-   `regra_quantidade` e por `publico`.
+   `regra_quantidade` e por `publico`. A mesma regra vale no carrinho e na validação do envio
+   (`regras.aceita_fracao`, `validar_pedido(..., regra_quantidade)`): um formulário público com a
+   regra `livre` aceita fração em qualquer unidade nos dois (`tests/test_fluxo_configuravel.py`).
 3. **Texto.** Nenhum modelo de página escolhe texto por `fluxo.nome`; o que muda por formulário
    (título, exemplos, ícone, rótulos) está nesta entrada.
 4. **Cabeçalho.** Solicitante, destino (centro de custo cadastrado) e observação; igual para todos.

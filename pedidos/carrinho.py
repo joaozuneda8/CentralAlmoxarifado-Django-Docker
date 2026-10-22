@@ -14,8 +14,8 @@ from decimal import Decimal
 
 from catalogo.catalogos import ItemCatalogo
 from pedidos.regras import (
-    REGRA_LIVRE,
     ItemEnviado,
+    aceita_fracao,
     interpretar_quantidade,
     maximo_pedivel,
     qtd_br,
@@ -50,10 +50,9 @@ class Carrinho:
 
 
 def _fracionavel(fluxo, item: ItemCatalogo | None) -> bool:
-    """Se a quantidade deste material pode ter fração neste formulário. A equipe aceita em
-    qualquer unidade; quem pede segue a unidade do material. Material fora do catálogo não decide
-    nada aqui (o envio o recusa): vale a leitura com fração."""
-    return fluxo.regra_quantidade == REGRA_LIVRE or item is None or item.fracionavel
+    """Se a quantidade deste material pode ter fração neste formulário (`regras.aceita_fracao`,
+    a mesma conta da validação do envio)."""
+    return aceita_fracao(fluxo.regra_quantidade, item)
 
 
 def ler(dados, fluxo, catalogo, anteriores=None, manter_ilegiveis=False) -> list[LinhaCarrinho]:

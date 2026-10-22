@@ -211,6 +211,7 @@ def registrar_pedido(
     # A ordem das respostas abaixo não muda (reenvio, limite, indisponível, validação).
     catalogo = catalogo_de(origem)
     lista_centros = centros()
+    fluxo = fluxo_da_origem(origem)  # None só para origem desconhecida, que não tem catálogo
     with transaction.atomic():
         seq = travar_sequencia()
         anterior = Pedido.objects.filter(pk=envio_id).first()
@@ -231,7 +232,7 @@ def registrar_pedido(
         if limite:
             return Resposta(ok=False, mensagem=limite)
 
-        if catalogo is None:
+        if fluxo is None or catalogo is None:
             return Resposta(
                 ok=False,
                 mensagem="O catálogo deste formulário não está disponível agora. "
@@ -243,7 +244,8 @@ def registrar_pedido(
                 mensagem="Não há centros de custo cadastrados para escolher o destino. "
                 "Avise o almoxarifado.",
             )
-        v = validar_pedido(envio, catalogo, lista_centros)
+        # A regra de quantidade é a do formulário, a mesma do carrinho dele.
+        v = validar_pedido(envio, catalogo, lista_centros, fluxo.regra_quantidade)
         tamanhos = erros_de_tamanho(
             {
                 "Nome completo": envio.solicitante,

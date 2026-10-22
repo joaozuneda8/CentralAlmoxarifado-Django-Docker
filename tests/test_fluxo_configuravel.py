@@ -7,6 +7,7 @@ autopeças da oficina) seguem o mesmo caminho.
 
 import re
 import time
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
@@ -18,6 +19,7 @@ from pedidos import fluxos
 from pedidos.fluxos import Fluxo
 from pedidos.models import Pedido
 from pedidos.protecao import emitir
+from pedidos.regras import REGRA_LIVRE
 from pedidos.servicos import MENSAGEM_LIMITE_SOLICITANTE, catalogo_de
 from tests.cenario import montar_cenario
 
@@ -27,6 +29,7 @@ ORIGEM = "REPOSICAO_TESTE"
 TITULO = "Reposição de peças das viaturas"
 PARAFUSO = "T-001"
 CABO = "T-002"
+PORCA = "T-003"  # contada (UN), com saldo fracionado
 
 
 def catalogo_do_formulario_novo():
@@ -54,6 +57,18 @@ def catalogo_do_formulario_novo():
             disponivel=5,
             duplicado=False,
             fracionavel=True,
+        ),
+        ItemCatalogo(
+            codigo=PORCA,
+            nome="PORCA DE TESTE",
+            unidade="UN",
+            categoria="",
+            grupo="PEÇAS",
+            subgrupo="FIXAÇÃO",
+            estoque=Decimal("2.5"),
+            disponivel=2,
+            duplicado=False,
+            fracionavel=False,
         ),
     ]
 
@@ -160,3 +175,37 @@ def test_a_pagina_inicial_lista_os_formularios_publicos_a_partir_de_fluxos(clien
 def test_nome_desconhecido_e_formulario_interno_continuam_dando_404(client, novo):
     assert client.get(reverse("pedidos:formulario", args=["avulsa"])).status_code == 404
     assert client.get(reverse("pedidos:formulario", args=["xyz"])).status_code == 404
+
+
+# --- a regra de quantidade do Fluxo vale no carrinho e no envio ---------------------------------
+
+
+@pytest.mark.parametrize(
+    ("regra", "aceita_fracao", "maximo"),
+    [("por_unidade", False, "2"), (REGRA_LIVRE, True, "2,5")],
+    ids=["por_unidade", "livre"],
+)
+def test_a_regra_do_fluxo_vale_no_carrinho_e_no_envio(
+    client, novo, monkeypatch, regra, aceita_fracao, maximo
+):
+    """O carrinho e a validação do envio leem o mesmo `Fluxo.regra_quantidade`: um formulário
+    público com a regra `livre` aceita fração em unidade contada nos dois, e o teto é o saldo
+    truncado a 3 casas (não a parte inteira)."""
+    monkeypatch.setitem(fluxos.FLUXOS, "reposicao", replace(novo, regra_quantidade=regra))
+    url = reverse("pedidos:carrinho", args=["reposicao"])
+    recusa = "Este material só é pedido em quantidade inteira (unidade: UN)."
+
+    no_carrinho = client.post(url, {"adicionar": PORCA, f"qtd-{PORCA}": "1,5"}).text
+    assert (f'name="item_codigo" value="{PORCA}"' in no_carrinho) is aceita_fracao
+    assert (recusa not in no_carrinho) is aceita_fracao
+
+    acima = client.post(url, {"adicionar": PORCA, f"qtd-{PORCA}": "3"}).text
+    assert f"Estoque disponível: {maximo} UN." in acima
+
+    envio = enviar(client, [(PORCA, "1,5")])
+    assert ("Pedido registrado" in envio.text) is aceita_fracao
+    assert (recusa not in envio.text) is aceita_fracao
+    assert Pedido.objects.count() == int(aceita_fracao)
+    if aceita_fracao:
+        assert Pedido.objects.get().itens.get().qtd_pedida == Decimal("1.5")
+        assert f"Estoque disponível: {maximo} UN." in enviar(client, [(PORCA, "3")], "Bia").text

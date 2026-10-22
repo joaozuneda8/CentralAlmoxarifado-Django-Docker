@@ -110,6 +110,11 @@ importação termina.
       <p class="metrica">{{ situacao.viaturas|floatformat:"0g" }} {% if situacao.viaturas == 1 %}peça{% else %}peças{% endif %}</p>
       <p class="campo-dica">Da lista de peças; o resto do catálogo AB entra pela busca.</p>
     </div>
+    <div class="cartao cartao-sutil">
+      <p class="texto-secundario">Formulário da oficina mecânica</p>
+      <p class="metrica">{{ situacao.oficina|floatformat:"0g" }} {% if situacao.oficina == 1 %}material{% else %}materiais{% endif %}</p>
+      <p class="campo-dica">Dos grupos da oficina e dos materiais da oficina (Cadastros).</p>
+    </div>
   </div>
 
 </section>

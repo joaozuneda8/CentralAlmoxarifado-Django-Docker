@@ -56,12 +56,15 @@ e `deploy/atualizar.ps1`). Resumo que vale para todo agente que trabalha aqui (C
 
 ## O projeto
 
-Reescrita em Django do Central Almoxarifado (hoje Google Apps Script + Google Sheets), sem
-nenhuma dependência do Google. Fluxo: funcionários fazem pedidos em formulários públicos → o
+Central Almoxarifado em Django, sem nenhuma dependência do Google. Nasceu como reescrita do
+sistema em Google Apps Script + Google Sheets, que já foi substituído: o Apps Script é histórico,
+não referência nem requisito de compatibilidade (constituição, Princípio I). Fluxo: funcionários fazem pedidos em formulários públicos → o
 almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança no SCPI.
 
-- Spec (fonte de verdade): `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md`.
-  A seção 9 divide o trabalho em 5 subprojetos, cada um com plano próprio em
+- Spec original da reescrita: `docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md`.
+  O comportamento vigente é o do código, dos testes e das specs posteriores (`specs/`,
+  `docs/superpowers/specs/`); onde a spec original fala em manter o que o Apps Script fazia, é
+  registro da migração. A seção 9 divide o trabalho em 5 subprojetos, cada um com plano próprio em
   `docs/superpowers/plans/`. Os subprojetos 1 (Fundação), 2 (Catálogo e importadores), 3
   (Pedidos) e 4 (Lançamento no SCPI) estão feitos; o 5 (implantação e migração) também: o
   código (app `implantacao`, `deploy/`, `LANCAMENTO_REAL`) e a instalação no servidor, que já
@@ -71,8 +74,9 @@ almoxarifado atende → as saídas viram linhas que um robô (Playwright) lança
   Windows da spec principal; o ambiente confirmado é Windows 10 com Docker Desktop compartilhado
   (`deploy/INSTALACAO.md`, `deploy/AMBIENTES.md`). Do 4 ainda falta a
   simulação contra o SCPI real (João roda `lancar_saidas --dry-run --limite 1`).
-- Referências fora deste repositório: o Apps Script atual (`../CentralAlmoxarifado`,
-  com `Regras.gs`, `Catalogo.gs` e os testes em Node), o WMS-Almoxarifado
+- Origens fora deste repositório, só para consulta histórica: o Apps Script
+  (`../CentralAlmoxarifado`, com `Regras.gs`, `Catalogo.gs` e os testes em Node; nomes como
+  `normU_` nas docstrings apontam para ele), o WMS-Almoxarifado
   (`joaorighetto/WMS-Almoxarifado`), de onde veio a fundação visual, e o extrair-relatorio
   (`joaorighetto/extrair-relatorio`, privado), de onde veio o código do SCPI.
 
@@ -97,10 +101,7 @@ uv run python manage.py importar_estoque --arquivo tests/fixtures/scpi/estoque.c
 requisição pendente e a descarta sem salvar; **sem `--dry-run` lança de verdade no SCPI**, e só
 com `LANCAMENTO_REAL=1` no `.env` (sem ele, o comando recusa).
 
-Comandos da implantação (app `implantacao`): `importar_planilhas --arquivo <xlsx> [--dry-run]`
-importa o `.xlsx` exportado das planilhas do Apps Script (migração única; o `--dry-run` é um
-ensaio fiel: roda a gravação numa transação e a desfaz, com as travas e as restrições do banco);
-`backup_banco` faz o dump
+Comandos da implantação (app `implantacao`): `backup_banco` faz o dump
 comprimido em `BACKUP_DIR` e apaga os de mais de 60 dias (a senha vai num arquivo de opções
 temporário, `--defaults-extra-file`, nunca nos argumentos nem no ambiente); `robos_em_andamento` sai com erro se há
 lançamento ou importação em andamento (o `deploy/atualizar.ps1` o usa);
@@ -170,9 +171,10 @@ transações precisam se comportar como no servidor.
   acrescenta seus destinos (com ícone) a `ITENS_MENU` em `interface/navegacao.py`. Scripts
   ficam no `<head>` com `defer`, nunca no `<body>` (o HTMX re-executa scripts do corpo ao
   restaurar o histórico).
-- `pedidos/regras.py` recebe as regras de negócio de `Regras.gs`/`Util.gs`: funções puras, sem
-  ORM, traduzidas uma a uma com os mesmos resultados e textos de erro (só os que citavam abas
-  da planilha mudaram). Quantidades são `Decimal` (pt-BR estrito, "1.5" é recusado).
+- `pedidos/regras.py` guarda as regras de negócio: funções puras, sem ORM. Vieram de
+  `Regras.gs`/`Util.gs`, mas o módulo e os seus testes são a referência e mudam como qualquer
+  regra, sem compromisso de equivalência com o Apps Script. Quantidades são `Decimal` (pt-BR
+  estrito, "1.5" é recusado).
 - `pedidos/servicos.py` é o único lugar que grava pedidos: `registrar_pedido`,
   `confirmar_atendimento`, `registrar_saida_avulsa` e `marcar_recibos_impressos`, cada um numa
   transação. Todo registro trava a linha única da `Sequencia` (`select_for_update`), que numera
@@ -430,26 +432,18 @@ transações precisam se comportar como no servidor.
   alimentam o cartão do painel e a aba Lançamento no SCPI. O robô é o único lugar fora de `servicos.py` que grava em `pedidos`, e só
   mexe em `status`, `requisicao_scpi`, `lancado_em` e `mensagem` das `LinhaSaida` (o superusuário
   também edita esses quatro no admin).
-- `LANCAMENTO_REAL` (`.env`, padrão desligado) bloqueia o lançamento real no SCPI até a virada,
-  para o Django e o Apps Script não lançarem em dobro as mesmas saídas pendentes: o comando
+- `LANCAMENTO_REAL` (`.env`, padrão desligado) bloqueia o lançamento real no SCPI em todo
+  ambiente que não é o que lança de verdade (a produção): uma cópia de desenvolvimento ou de
+  teste com as mesmas saídas pendentes lançaria em dobro. Bloqueado, o comando
   `lancar_saidas` recusa sem `--dry-run`, a aba Lançamento no SCPI recusa o modo "Lançar" (só
   "Simular") e o painel avisa que está bloqueado. O `settings_test` o liga, porque os testes do
   robô lançam no SCPI simulado; os testes do bloqueio o desligam com o fixture `settings`.
-- `implantacao` (sem modelos nem migrations) é a migração única das planilhas do Apps Script e
-  pode ser apagada depois da virada, salvo o backup. `planilha.py` (puro) lê o `.xlsx` com as
-  colunas achadas pelo nome do cabeçalho; `conversao.py` (sem banco) vira registros não salvos e
-  junta todos os problemas (erro bloqueia, aviso não; saída pendente que se perderia é erro; texto
-  maior que o `max_length` do campo e `Atendimento_ID` repetido também são erro, conferidos por um
-  helper único sobre os modelos); `migracao.py` grava numa transação (travando a `Sequencia` antes
-  das travas), substituindo pedidos, centros de custo, opções e itens de limpeza, e recusa com
-  `LANCAMENTO_REAL` ligado, com pedido no banco que não está na planilha, com atendimento feito no
-  Django (`atendido_por` que não é o usuário `planilha`: a reimportação o apagaria) ou sem nenhum
-  material (o cadastro do SCPI vem antes). O `--dry-run` chama `gravar` dentro de uma transação e
-  a desfaz (`set_rollback`), e erro de banco vira `CommandError`. O status das linhas de saída vem da
-  requisição, das observações e do "Status SCPI", nessa ordem, e na dúvida fica `VERIFICAR`,
-  nunca `PENDENTE`. Atendimentos e saídas avulsas importados apontam para o usuário inativo
-  `planilha`; a aba "Almoxarifado" (e-mails) não é importada, as contas do painel são criadas
-  no admin. `backup.py` faz o dump (`MYSQLDUMP`, retenção de 60 dias pelo nome do arquivo, a
+- `implantacao` (sem modelos nem migrations) guarda o backup, o `robos_em_andamento` e a carga
+  do de/para. A migração única das planilhas do Apps Script (`importar_planilhas`, com
+  `conversao.py` e `migracao.py`) foi feita e removida; o código fica na tag `v1.0.1`. Do que ela
+  deixou no banco: atendimentos e saídas avulsas importados apontam para o usuário inativo
+  `planilha`, e o tipo de saída deles pode não ser BALCÃO. `planilha.py` (puro) lê o `.xlsx` com
+  as colunas achadas pelo nome do cabeçalho. `backup.py` faz o dump (`MYSQLDUMP`, retenção de 60 dias pelo nome do arquivo, a
   limpeza só depois de um backup completo). `depara.py` (sem banco) lê os pares do `.xlsx` da
   planilha MAPEAMENTO DE/PARA CONSOLIDADO: a primeira aba cujo nome começa por "Planilha de
   mapeamento" (o `.xlsx` não aceita "/" no nome de aba) com as regras do `DEPARA_MAP` (formato
@@ -483,7 +477,7 @@ transações precisam se comportar como no servidor.
   (`almoxarifado` e `almoxarifado-prod`); a porta fica fixa em `127.0.0.1` e `PORTA_WEB` só
   escolhe o número. O Compose força `DB_HOST`, `SCPI_HEADLESS=1`, `MYSQLDUMP=mariadb-dump` e as
   pastas (`/dados/logs`, `/dados/backups`, `/dados/perfil`) por cima do `.env`; `dados/` do
-  host guarda logs, backups e os `.xlsx` da virada. Os robôs da página são filhos do waitress
+  host guarda logs, backups e os `.xlsx` de carga (`dados/importacao`). Os robôs da página são filhos do waitress
   no container `web` (`disparo.py` abre sessão própria fora do Windows), então recriar o `web`
   os mata. Quem atualiza um ambiente é o `deploy/atualizar.ps1` (PowerShell 5.1+, com `-Ambiente`
   explícito): **planeja por padrão**, só altera com `-Aplicar`, não faz `pull`, `fetch`, `checkout`,

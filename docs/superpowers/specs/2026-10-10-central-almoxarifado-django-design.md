@@ -1,6 +1,11 @@
 # Central Almoxarifado em Django — design
 
-Data: 2026-10-10 · Situação: aguardando revisão
+Data: 2026-10-10 · Situação: executada (registro histórico da reescrita)
+
+> Esta spec descreve a migração do Apps Script. O que ela diz sobre manter os fluxos, as regras
+> e os textos do sistema antigo valia para a migração, já concluída, e não é requisito atual:
+> o comportamento vigente é o do código, dos testes e das specs posteriores (constituição,
+> Princípio I).
 
 ## 1. Objetivo
 

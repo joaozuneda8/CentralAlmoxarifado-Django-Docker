@@ -1,7 +1,8 @@
 """Regras de negócio do Central Almoxarifado.
 
-Funções puras, sem ORM, traduzidas uma a uma de `Regras.gs`/`Util.gs` do Apps Script, com os
-mesmos resultados e os mesmos textos de erro.
+Funções puras, sem ORM. Este módulo e os seus testes são a referência das regras: vieram de
+`Regras.gs`/`Util.gs` do Apps Script (os nomes entre crases nas docstrings, como `normU_`, são só
+a origem histórica), mas mudam como qualquer regra do sistema, sem compromisso de equivalência.
 """
 
 import math
@@ -587,7 +588,9 @@ def validar_saida(
 
 
 def marcado_nao_lancar(obs: object) -> bool:
-    """Observação que, no sistema antigo, fazia o robô ignorar a linha (`marcadoNaoLancar_`)."""
+    """Observação que pede para não lançar no SCPI (`marcadoNaoLancar_`). Quem decide é a opção
+    "Não lançar no SCPI"; a saída com esse texto e sem a opção é recusada, para a observação não
+    ser tomada como ordem e a saída ir para o SCPI por engano."""
     o = norm_u(obs)
     return "FORA DE ESTOQUE" in o or "NAO LANCAR" in o
 

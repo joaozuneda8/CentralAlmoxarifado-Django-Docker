@@ -318,8 +318,8 @@ transações precisam se comportar como no servidor.
   centros com alguma linha marcada `equipe_manutencao`, sem placa (`centros_equipe_manutencao`,
   pelo `Fluxo.centros`); sem nenhum marcado, o formulário fica indisponível. `Pedido.ocorrencia`
   (até 20 caracteres, opcional, só onde `Fluxo.pede_ocorrencia`) entra na conferência de reenvio
-  (`cabecalho_enviado` das origens públicas tem 4 campos), aparece no detalhe, no recibo e na lista
-  do painel e é achada pela busca do painel; não vai no Telegram nem muda na edição. A saúde do
+  (`cabecalho_enviado` das origens públicas tem 4 campos), aparece na tela de sucesso, no detalhe, no
+  recibo e na lista do painel e é achada pela busca do painel; não vai no Telegram nem muda na edição. A saúde do
   catálogo (`saude._viaturas`) diz quanto o formulário oferece ou por que está indisponível.
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,

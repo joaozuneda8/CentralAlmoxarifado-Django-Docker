@@ -67,6 +67,8 @@ seu próprio conjunto de materiais e os seus destinos; o restante do caminho do 
   almoxarifado no atendimento.
 - Q (checklist de operação, CHK003): onde mais o número da ocorrência aparece? → A: na lista do
   painel e na busca do painel, além do detalhe e do recibo; não no Telegram.
+- Ajuste da revisão do PR (2026-10-22, decidido pelo usuário): a tela de sucesso também mostra o
+  número da ocorrência, quando preenchido, para o encarregado conferir o que enviou.
 - Ajuste do planejamento (2026-10-22, aberto à revisão do usuário): a lista abre num diálogo, com um
   toque no passo dos materiais, como o usuário sugeriu ("quem sabe em um modal"), e é posta no pedido
   de uma vez, tudo ou nada (research R4). Cenário 1 da US1 e FR-003 ajustados.
@@ -218,8 +220,8 @@ o incluído aparece e o retirado não.
   o número da ocorrência da Ordem de Serviço em que as peças foram usadas: texto livre de até 20
   caracteres (os espaços nas pontas não contam); acima disso, o envio é recusado com um erro no
   próprio campo, como os demais erros de tamanho do cabeçalho. Preenchido, ele DEVE ser
-  gravado com o pedido e mostrado ao almoxarifado no detalhe do pedido, no recibo e na linha do
-  pedido na lista do painel, e a busca do painel DEVE achar o pedido por ele (além de número,
+  gravado com o pedido, mostrado ao encarregado na tela de sucesso e ao almoxarifado no detalhe
+  do pedido, no recibo e na linha do pedido na lista do painel, e a busca do painel DEVE achar o pedido por ele (além de número,
   solicitante e recebedor); em branco, o pedido segue normalmente. O aviso no Telegram não o mostra. Um reenvio só é o mesmo pedido se o número também for o mesmo. Como o
   resto do que vem do encarregado, o número não muda depois do envio (a edição do atendimento não o
   altera). Os outros formulários não ganham esse campo.

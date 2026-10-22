@@ -18,6 +18,7 @@ são os da spec 005 e não mudam.
 | Fechar o diálogo | Fechar |
 | Resumo de erros da folha | Corrija 1 linha para pôr no pedido. / Corrija N linhas para pôr no pedido. |
 | Anúncio depois de aplicar | Lista posta no pedido: N materiais. |
+| Tela de sucesso | Nº da ocorrência: o valor (só quando preenchido) |
 
 ## Almoxarifado
 

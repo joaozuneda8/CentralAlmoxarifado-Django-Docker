@@ -159,6 +159,7 @@ def test_pedido_com_folha_e_busca_registra_tudo(client):
 def test_o_envio_registra_o_pedido_de_viaturas(client):
     r = enviar(client, [(TUBO, "2,5"), (FITA, "2")], ocorrencia="1234/2026")
     assert "Pedido registrado" in r.text
+    assert "Nº da ocorrência: 1234/2026" in texto(r.text)  # o encarregado confere o que enviou
     pedido = Pedido.objects.get()
     assert pedido.origem == VIATURAS and pedido.numero.startswith("P-")
     assert pedido.destino == EQUIPE and pedido.ocorrencia == "1234/2026"
@@ -187,8 +188,8 @@ def test_painel_detalhe_recibo_e_aviso(client):
     assert "Reposição de peças das viaturas" in aviso and "1234" not in aviso
 
 
-def test_sem_ocorrencia_o_detalhe_nao_mostra_o_campo(client):
-    enviar(client, [(FITA, "1")])
+def test_sem_ocorrencia_o_sucesso_e_o_detalhe_nao_mostram_o_campo(client):
+    assert "Nº da ocorrência" not in enviar(client, [(FITA, "1")]).text
     pedido = Pedido.objects.get()
     client.force_login(get_user_model().objects.create_user(username="12345", password="x"))
     assert (

@@ -93,6 +93,17 @@ def test_quantidade_ilegivel_e_recusada_na_linha():
     assert no_pedido(r) == {} and set(r.erros_folha) == {"L"}
 
 
+def test_virgula_sem_numero_e_recusada_e_nao_tira_do_pedido():
+    antes = [linha(LUVA, "5"), linha(TUBO, "1")]
+    r = aplicar(antes, {"L": ",", "T": ",,"})
+    assert r.linhas == antes and set(r.erros_folha) == {"L", "T"}
+
+
+def test_zero_com_casas_tira_do_pedido():
+    r = aplicar([linha(LUVA, "5"), linha(TUBO, "1")], {"L": "00", "T": "0,000"})
+    assert no_pedido(r) == {}
+
+
 @override_settings(PEDIDOS_MAX_ITENS=2)
 def test_passar_do_limite_de_materiais_e_recusado():
     r = aplicar([linha(FITA, "1")], {"L": "1", "T": "1"})

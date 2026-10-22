@@ -14,6 +14,7 @@ from decimal import Decimal
 
 from catalogo.catalogos import ItemCatalogo
 from pedidos.regras import (
+    CAUSA_ZERO,
     ItemEnviado,
     aceita_fracao,
     interpretar_quantidade,
@@ -219,7 +220,8 @@ def aplicar_folha(linhas, fluxo, catalogo, quantidades: dict[str, str]) -> Carri
     erros: dict[str, str] = {}
     for codigo in da_folha:
         texto_qtd = (quantidades.get(codigo) or "").strip()
-        if not texto_qtd.strip("0,"):  # em branco ou zero ("0", "0,0"): fora do pedido
+        # Em branco ou zero ("0", "0,0"): fora do pedido. "," não é zero: cai no erro abaixo.
+        if not texto_qtd or interpretar_quantidade(texto_qtd, True)[1] == CAUSA_ZERO:
             continue
         item = por_codigo[codigo]
         if motivo := motivo_bloqueio(fluxo, item):

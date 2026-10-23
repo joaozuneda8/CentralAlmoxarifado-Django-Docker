@@ -71,8 +71,8 @@ def test_sem_o_centro_da_oficina_so_as_viaturas_e_aviso():
     CentroCusto.objects.filter(descricao=OFICINA).delete()
     assert texto_de(f"{FORMULARIO}: centro") == ItemSaude(
         "aviso",
-        f"{FORMULARIO}: centro OFICINA MECÂNICA não cadastrado; só as viaturas são oferecidas "
-        "como destino.",
+        f"{FORMULARIO}: centro OFICINA MECÂNICA não está habilitado como destino (ou não está "
+        "cadastrado); só as viaturas são oferecidas.",
     )
 
 

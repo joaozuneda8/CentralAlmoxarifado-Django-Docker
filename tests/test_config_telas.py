@@ -584,3 +584,27 @@ def test_ativar_so_aceita_post_e_exige_a_permissao(client):
     centro = criar_centro("SETOR NOVO", "90")
     r = client.post(ATIVO, {"formulario": "AB", "centro": [centro.pk], "ativo": "0"})
     assert r.status_code == 403 and CentroCusto.objects.get(pk=centro.pk).ativo is True
+
+
+def test_filtro_invalido_no_lote_e_erro_e_nao_alarga_o_alcance(admin):
+    """Na lista o filtro desconhecido some; no lote alargaria o alcance sem ninguém ver."""
+    assert previa(admin, grupo="GRUPO QUE NAO EXISTE").status_code == 400
+    r = admin.post(
+        LOTE,
+        {
+            "formulario": "AB",
+            "acao": "retirar",
+            "grupo": "GRUPO QUE NAO EXISTE",
+            "total": "1",
+            "ciente": "1",
+        },
+    )
+    assert r.status_code == 400 and not ExcecaoMaterial.objects.exists()
+
+
+def test_a_previa_diz_os_filtros_em_palavras(admin):
+    r = previa(admin, grupo="EPI", estado="disponivel", q="botina")
+    t = texto(r)
+    assert (
+        "Grupo EPI" in t and "No formulário Disponíveis no formulário" in t and "Busca botina" in t
+    )

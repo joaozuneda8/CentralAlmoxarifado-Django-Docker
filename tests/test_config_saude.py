@@ -1,0 +1,136 @@
+"""A saúde do catálogo com a configuração por formulário (spec 009, FR-039): formulário sem destino,
+centro ativo sem formulário e exceção sem efeito (formulário sem material já era avisado)."""
+
+import pytest
+
+from catalogo.models import CentroCusto, CentroFormulario, ExcecaoMaterial, Formulario, Material
+from catalogo.saude import ItemSaude, saude_do_catalogo, situacao_do_catalogo
+from tests.cenario import montar_cenario
+from tests.config_cenario import criar_centro, excecao, material
+
+pytestmark = pytest.mark.django_db
+
+FITA = "016.005.010"  # na regra do AB
+DETERGENTE = "023.001.002"  # na limpeza
+
+
+@pytest.fixture(autouse=True)
+def cenario():
+    montar_cenario()
+
+
+def textos():
+    return [(i.nivel, i.texto) for i in saude_do_catalogo()]
+
+
+def do_formulario(prefixo):
+    return [(n, t) for n, t in textos() if t.startswith(prefixo)]
+
+
+def test_com_destinos_nao_ha_aviso_de_destino():
+    for prefixo in ("Formulário de limpeza", "Formulário AB", "Formulário de EPIs"):
+        assert all("destino" not in t for _, t in do_formulario(prefixo))
+
+
+@pytest.mark.parametrize(
+    ("formulario", "prefixo"),
+    [
+        (Formulario.LIMPEZA, "Formulário de limpeza"),
+        (Formulario.AB, "Formulário AB"),
+        (Formulario.EPIS, "Formulário de EPIs"),
+    ],
+)
+def test_formulario_sem_destino_fica_indisponivel_e_a_saude_avisa(formulario, prefixo):
+    CentroFormulario.objects.filter(formulario=formulario).delete()
+    esperado = (
+        "erro",
+        f"{prefixo}: nenhum centro de custo habilitado como destino; o formulário fica "
+        "indisponível.",
+    )
+    assert esperado in textos()
+
+
+def test_sem_nenhum_centro_so_o_aviso_geral():
+    CentroCusto.objects.all().delete()
+    ts = [t for _, t in textos()]
+    assert any(t.startswith("Nenhum centro de custo cadastrado") for t in ts)
+    assert not any("habilitado como destino" in t for t in ts if "viaturas" not in t)
+
+
+def test_oficina_sem_a_linha_do_centro_da_oficina_diz_que_nao_esta_habilitado():
+    CentroFormulario.objects.filter(
+        formulario=Formulario.OFICINA, centro__descricao="OFICINA MECÂNICA"
+    ).delete()
+    texto = next(t for _, t in textos() if t.startswith("Formulário da oficina mecânica: centro"))
+    assert "OFICINA MECÂNICA não está habilitado como destino" in texto
+    assert "só as viaturas" in texto
+
+
+def test_centro_ativo_sem_nenhum_formulario_e_aviso():
+    criar_centro("SETOR NOVO", "90")
+    criar_centro("OUTRO NOVO", "91")
+    assert (
+        "aviso",
+        "Centros de custo ativos sem nenhum formulário (não são destino de nenhum): "
+        "OUTRO NOVO, SETOR NOVO.",
+    ) in textos()
+
+
+def test_centro_inativo_sem_formulario_nao_e_aviso_nem_o_habilitado():
+    criar_centro("PARADO", "92", ativo=False)
+    criar_centro("COM FORMULARIO", "93", formularios=[Formulario.AB])
+    assert not any("sem nenhum formulário" in t for _, t in textos())
+
+
+def test_o_aviso_e_por_linha_do_cadastro_com_a_placa_quando_ha():
+    criar_centro("DUAS LINHAS", "94", "AAA1A11", formularios=[Formulario.AB])
+    criar_centro("DUAS LINHAS", "94", "BBB2B22")
+    avisos = [t for _, t in textos() if "sem nenhum formulário" in t]
+    assert avisos and "DUAS LINHAS — BBB2B22" in avisos[0] and "AAA1A11" not in avisos[0]
+
+
+def test_sem_excecoes_nao_ha_aviso_de_excecao():
+    assert not any("sem efeito" in t for _, t in textos())
+
+
+def test_excecao_sem_efeito_e_aviso_por_formulario():
+    excecao(Formulario.AB, Material.objects.get(codigo=FITA), True)  # o AB já traz
+    excecao(Formulario.AB, material("900.000.001", "TESOURA", "ALMOX"), False)  # não traz
+    excecao(Formulario.LIMPEZA, Material.objects.get(codigo=DETERGENTE), True)  # a limpeza já traz
+    ts = [t for n, t in textos() if n == "aviso" and "sem efeito" in t]
+    assert (
+        "Exceções sem efeito em Ferramentas, peças e materiais (a regra já dá o resultado): "
+        "016.005.010, 900.000.001." in ts
+    )
+    assert (
+        "Exceções sem efeito em Limpeza, copa e escritório (a regra já dá o resultado): "
+        "023.001.002." in ts
+    )
+
+
+def test_excecao_com_efeito_nao_e_aviso():
+    excecao(Formulario.AB, Material.objects.get(codigo=FITA), False)  # retira o que o AB traz
+    excecao(Formulario.AB, material("900.000.001", "TESOURA", "ALMOX"), True)  # acrescenta
+    assert not any("sem efeito" in t for _, t in textos())
+
+
+def test_a_visao_geral_conta_o_catalogo_efetivo():
+    antes = situacao_do_catalogo()
+    excecao(Formulario.LIMPEZA, Material.objects.get(codigo=DETERGENTE), False)
+    excecao(Formulario.OFICINA, material("900.000.002", "ALICATE", "ALMOX"), True)
+    depois = situacao_do_catalogo()
+    assert depois.limpeza == antes.limpeza - 1
+    assert depois.oficina == antes.oficina + 1
+
+
+def test_formulario_sem_material_depois_das_excecoes_e_erro():
+    for codigo in ("023.001.002", "008.001.002", "023.004.001"):
+        excecao(Formulario.LIMPEZA, Material.objects.get(codigo=codigo), False)
+    assert (
+        ItemSaude(
+            "erro",
+            "Formulário de limpeza: nenhum item no catálogo; o formulário fica indisponível.",
+        )
+        in saude_do_catalogo()
+    )
+    assert ExcecaoMaterial.objects.count() == 3

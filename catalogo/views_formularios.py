@@ -37,7 +37,7 @@ from catalogo.disponibilidade import (
     materiais_da_tela,
     situacao_do_formulario,
 )
-from catalogo.forms import FiltrosMateriais
+from catalogo.forms import ESTADOS_DO_MATERIAL, FiltrosMateriais
 from catalogo.models import CentroCusto, CentroFormulario, Formulario, Material, ParDePara
 from pedidos.regras import qtd_br, texto, truncar_qtd
 
@@ -284,6 +284,25 @@ def _resumo_do_lote(mudaram: int, ja_estavam: int) -> str:
     return f"{mudaram} {mudou} e {ja_estavam} {estava}"
 
 
+def _filtros_em_texto(filtros: dict) -> list[tuple[str, str]]:
+    """Os filtros do lote como a tela os diz: (rótulo, valor legível)."""
+    estados = dict(ESTADOS_DO_MATERIAL)
+    rotulos = [
+        ("q", "Busca"),
+        ("grupo", "Grupo"),
+        ("subgrupo", "Subgrupo"),
+        ("estado", "No formulário"),
+    ]
+    return [
+        (
+            rotulo,
+            estados.get(filtros[chave], filtros[chave]) if chave == "estado" else filtros[chave],
+        )
+        for chave, rotulo in rotulos
+        if chave in filtros
+    ]
+
+
 @login_required
 def formularios_lote(request):
     """GET é a prévia (formulário, ação, número exato e uma amostra); POST confirma e aplica a
@@ -294,7 +313,12 @@ def formularios_lote(request):
     acao = dados.get("acao")
     if origem is None or acao not in (ACRESCENTAR, RETIRAR):
         return HttpResponseBadRequest("Pedido inválido.")
-    filtros = FiltrosMateriais(dados).filtros()
+    filtros_do_lote = FiltrosMateriais(dados)
+    if not filtros_do_lote.is_valid():
+        # Na lista da página um filtro desconhecido some; no lote ele alargaria o alcance da
+        # alteração sem ninguém ver: aqui é erro.
+        return HttpResponseBadRequest("Filtro inválido.")
+    filtros = filtros_do_lote.filtros()
     consulta = materiais_da_tela(origem, filtros, situacao_do_formulario(origem))
     total = consulta.count()
     parametros = {"formulario": origem, "acao": acao, **filtros}
@@ -331,7 +355,7 @@ def formularios_lote(request):
         "total": total,
         "amostra": list(consulta[:10]),
         "filtros_ativos": filtros,
-        "filtros_materiais": FiltrosMateriais(dados),
+        "filtros_em_texto": _filtros_em_texto(filtros),
         "sem_filtro": not filtros,
         "pode_alterar_materiais": pode_alterar_materiais(request.user),
         "voltar": _url_da_pagina({"formulario": origem, "aba": "materiais", **filtros}),

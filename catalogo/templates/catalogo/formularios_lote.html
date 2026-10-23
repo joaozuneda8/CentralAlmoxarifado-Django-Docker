@@ -20,8 +20,8 @@ tempo, a operação é recusada. Sem filtro (catálogo inteiro), pede o "ciente"
       <dt>Formulário</dt><dd>{{ formulario_nome }}</dd>
       <dt>Ação</dt><dd>{{ acao_texto }}</dd>
       <dt>Alcança</dt><dd><strong>{{ total|separador_milhar }} {% if total == 1 %}material{% else %}materiais{% endif %}</strong>{% if sem_filtro %} (o catálogo inteiro){% else %} do filtro{% endif %}</dd>
-      {% for nome, valor in filtros_ativos.items %}
-      <dt>{% if nome == "q" %}Busca{% elif nome == "grupo" %}Grupo{% elif nome == "subgrupo" %}Subgrupo{% else %}No formulário{% endif %}</dt><dd>{{ valor }}</dd>
+      {% for rotulo, valor in filtros_em_texto %}
+      <dt>{{ rotulo }}</dt><dd>{{ valor }}</dd>
       {% endfor %}
     </dl>
     <p class="texto-secundario">O material que já está como você pediu não muda. Nada é apagado do cadastro, do estoque nem dos pedidos já feitos, e os outros formulários continuam como estão.</p>

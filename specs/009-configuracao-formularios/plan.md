@@ -112,6 +112,11 @@ materiais da configuração; SC-010.)*
 41 ms, viaturas 40 ms, oficina 36 ms, EPIs 36 ms. Suíte de base: 1.697 passam, 1 pulado (flags do Windows),
 em 24 s.
 
+**Depois (T052, 2026-10-23, mesmo banco e método):** limpeza 13 ms, AB 45 ms, viaturas 48 ms, oficina 40 ms,
+EPIs 35 ms (no máximo +20%: o aumento é a consulta das exceções e dos destinos). A lista de materiais da
+página Formulários (7.322 visíveis, 50 por página, no servidor): 80 a 101 ms; a aba de centros (244
+linhas), 91 ms. Suíte: 1.895 passam, 1 pulado, em 35 s.
+
 ## Implantação
 
 A migration roda no `deploy/atualizar.ps1`, que já faz o backup antes de migrar; nada de especial além de

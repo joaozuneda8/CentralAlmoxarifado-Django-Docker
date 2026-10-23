@@ -164,7 +164,7 @@ def _com_catalogo(formulario, catalogo):
 
 def test_a_pagina_inicial_lista_os_formularios_publicos_a_partir_de_fluxos(client, novo):
     html = client.get(reverse("pedidos:inicio")).text
-    # Os cinco formulários públicos de `FLUXOS` (limpeza, AB, viaturas, oficina e EPIs) e o de teste.
+    # Os cinco formulários públicos de `FLUXOS` (limpeza, AB, viaturas, oficina, EPIs) e o de teste.
     assert html.count('class="cartao cartao-opcao"') == 6
     assert TITULO in html and "Ex.: parafuso, cabo, fusível" in html
     assert reverse("pedidos:formulario", args=["reposicao"]) in html

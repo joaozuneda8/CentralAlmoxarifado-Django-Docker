@@ -6,6 +6,7 @@ app_name = "pedidos"
 
 urlpatterns = [
     path("", publico.inicio, name="inicio"),
+    path("pedido/epis/consulta/", publico.consulta_epi, name="consulta_epi"),
     path("pedido/<str:fluxo>/", publico.formulario, name="formulario"),
     path("pedido/<str:fluxo>/materiais/", materiais.materiais, name="materiais"),
     path("pedido/<str:fluxo>/carrinho/", materiais.carrinho, name="carrinho"),

@@ -143,13 +143,13 @@ description: "Tarefas da funcionalidade 008: formulário de EPIs com autorizaç�
 
 ### Tests for User Story 4
 
-- [ ] T037 [P] [US4] Escrever `tests/test_epis_admin.py`: a lista "Grupos (EPIs)" nas Opções e o admin de `MaterialEpi` (autocomplete, um por material); mudança de grupo vale no próximo acesso do formulário; o grupo `Segurança do Trabalho` existe depois do `migrate` e o formulário de usuário do admin (`/admin/contas/usuario/<id>/change/`) permite marcá-lo e salva a participação, o que dá o acesso sem nova versão (FR-019)
-- [ ] T038 [P] [US4] Escrever `tests/test_epis_saude.py`: contagem de materiais, indisponível (sem item visível), grupos escolhidos sem material visível, avulsos ocultos no SCPI, e a linha na visão geral de Automações (FR-030)
+- [x] T037 [P] [US4] Escrever `tests/test_epis_admin.py`: a lista "Grupos (EPIs)" nas Opções e o admin de `MaterialEpi` (autocomplete, um por material); mudança de grupo vale no próximo acesso do formulário; o grupo `Segurança do Trabalho` existe depois do `migrate` e o formulário de usuário do admin (`/admin/contas/usuario/<id>/change/`) permite marcá-lo e salva a participação, o que dá o acesso sem nova versão (FR-019)
+- [x] T038 [P] [US4] Escrever `tests/test_epis_saude.py`: contagem de materiais, indisponível (sem item visível), grupos escolhidos sem material visível, avulsos ocultos no SCPI, e a linha na visão geral de Automações (FR-030)
 
 ### Implementation for User Story 4
 
-- [ ] T039 [US4] Em `catalogo/admin.py`, registrar `MaterialEpiAdmin` (espelho de `MaterialOficinaAdmin`); a lista `GRUPO_EPI` já aparece em `OpcaoAdmin` pelas `choices`
-- [ ] T040 [US4] Em `catalogo/saude.py`, acrescentar `FORMULARIO_EPIS`, `_epis()` (quanto oferece, ou o motivo de estar indisponível; grupos sem material visível; avulsos ocultos) chamada onde `_oficina()` é chamada, e `Situacao.epis` (contagem de `catalogo_epis()`); em `catalogo/templates/catalogo/_situacao.html`, o cartão do formulário de EPIs ao lado do da oficina
+- [x] T039 [US4] Em `catalogo/admin.py`, registrar `MaterialEpiAdmin` (espelho de `MaterialOficinaAdmin`); a lista `GRUPO_EPI` já aparece em `OpcaoAdmin` pelas `choices`
+- [x] T040 [US4] Em `catalogo/saude.py`, acrescentar `FORMULARIO_EPIS`, `_epis()` (quanto oferece, ou o motivo de estar indisponível; grupos sem material visível; avulsos ocultos) chamada onde `_oficina()` é chamada, e `Situacao.epis` (contagem de `catalogo_epis()`); em `catalogo/templates/catalogo/_situacao.html`, o cartão do formulário de EPIs ao lado do da oficina
 
 **Checkpoint**: a escolha dos EPIs é mantida só pelo admin e aparece na saúde.
 
@@ -163,13 +163,13 @@ description: "Tarefas da funcionalidade 008: formulário de EPIs com autorizaç�
 
 ### Tests for User Story 5
 
-- [ ] T041 [P] [US5] Escrever `tests/test_epis_consulta.py`: as três situações e o motivo da recusa; a resposta não contém nome, destino, observação nem materiais; número inexistente e número de pedido de outro formulário dão a mesma resposta; o limite por origem (`PEDIDOS_CONSULTA_LIMITE_IP_10_MIN`) recusa a consulta seguinte com a mensagem própria da consulta ([mensagens.md](contracts/mensagens.md)) e limpa o cache entre testes; só POST consulta (GET só mostra o formulário); CSRF; cabeçalho `Cache-Control: no-store` (FR-031, FR-031a)
+- [x] T041 [P] [US5] Escrever `tests/test_epis_consulta.py`: as três situações e o motivo da recusa; a resposta não contém nome, destino, observação nem materiais; número inexistente e número de pedido de outro formulário dão a mesma resposta; o limite por origem (`PEDIDOS_CONSULTA_LIMITE_IP_10_MIN`) recusa a consulta seguinte com a mensagem própria da consulta ([mensagens.md](contracts/mensagens.md)) e limpa o cache entre testes; só POST consulta (GET só mostra o formulário); CSRF; cabeçalho `Cache-Control: no-store` (FR-031, FR-031a)
 
 ### Implementation for User Story 5
 
-- [ ] T042 [US5] Em `pedidos/regras.py`, acrescentar `texto_situacao_consulta(autorizacao, motivo)` (função pura, textos de [mensagens.md](contracts/mensagens.md)); testar em `tests/test_regras_pedidos.py` só com casos novos
-- [ ] T043 [US5] Em `pedidos/views/publico.py`, acrescentar `consulta_epi` (GET mostra o formulário do número; POST: conta a tentativa por `REMOTE_ADDR` no cache do Django com janela de 10 minutos, recusa acima do limite com a mensagem própria da consulta (não a `MENSAGEM_LIMITE_IP`, que fala de pedidos enviados), busca o pedido por número só se `origem` exige autorização, e responde igual em qualquer outro caso); em `pedidos/urls.py`, registrar `pedidos:consulta_epi` em `pedido/epis/consulta/` e criar `pedidos/templates/pedidos/consulta_epi.html` (`base_publico.html`)
-- [ ] T044 [US5] Em `pedidos/templates/pedidos/_sucesso.html`, ligar o link da consulta da T019 à rota; conferir que o texto de sucesso continua igual para os outros formulários (FR-031b)
+- [x] T042 [US5] Em `pedidos/regras.py`, acrescentar `texto_situacao_consulta(autorizacao, motivo)` (função pura, textos de [mensagens.md](contracts/mensagens.md)); testar em `tests/test_regras_pedidos.py` só com casos novos
+- [x] T043 [US5] Em `pedidos/views/publico.py`, acrescentar `consulta_epi` (GET mostra o formulário do número; POST: conta a tentativa por `REMOTE_ADDR` no cache do Django com janela de 10 minutos, recusa acima do limite com a mensagem própria da consulta (não a `MENSAGEM_LIMITE_IP`, que fala de pedidos enviados), busca o pedido por número só se `origem` exige autorização, e responde igual em qualquer outro caso); em `pedidos/urls.py`, registrar `pedidos:consulta_epi` em `pedido/epis/consulta/` e criar `pedidos/templates/pedidos/consulta_epi.html` (`base_publico.html`)
+- [x] T044 [US5] Em `pedidos/templates/pedidos/_sucesso.html`, ligar o link da consulta da T019 à rota; conferir que o texto de sucesso continua igual para os outros formulários (FR-031b)
 
 **Checkpoint**: o servidor sabe o resultado sem login e a consulta não vaza dado pessoal.
 
@@ -183,13 +183,13 @@ description: "Tarefas da funcionalidade 008: formulário de EPIs com autorizaç�
 
 ### Tests for User Story 6
 
-- [ ] T045 [P] [US6] Escrever `tests/test_epis_acesso.py`: (a) teste puro de que `contas.acesso.ROTAS_SEGURANCA_TRABALHO` é exatamente a lista de [rotas-e-acesso.md](contracts/rotas-e-acesso.md); (b) enumerar os nomes de rota do projeto com `django.urls.get_resolver` (os `url_name` com namespace, incluindo os do admin), montar uma URL concreta de cada um com `reverse` e argumentos de teste e, com o usuário do grupo, em GET e POST, conferir que só os da lista passam (GET dos demais redireciona à fila, os outros métodos dão 403), e que um nome de rota não visto pelo teste falha o teste (a enumeração não pode ser silenciosamente incompleta); o administrador (`is_staff`) fora do grupo continua com tudo e é negado em decidir; o usuário comum e o anônimo não mudam; o login do usuário do grupo termina na fila; o menu do grupo só tem "Autorizações" e o dos demais não ganha o item (FR-017 a FR-020, SC-004)
+- [x] T045 [P] [US6] Escrever `tests/test_epis_acesso.py`: (a) teste puro de que `contas.acesso.ROTAS_SEGURANCA_TRABALHO` é exatamente a lista de [rotas-e-acesso.md](contracts/rotas-e-acesso.md); (b) enumerar os nomes de rota do projeto com `django.urls.get_resolver` (os `url_name` com namespace, incluindo os do admin), montar uma URL concreta de cada um com `reverse` e argumentos de teste e, com o usuário do grupo, em GET e POST, conferir que só os da lista passam (GET dos demais redireciona à fila, os outros métodos dão 403), e que um nome de rota não visto pelo teste falha o teste (a enumeração não pode ser silenciosamente incompleta); o administrador (`is_staff`) fora do grupo continua com tudo e é negado em decidir; o usuário comum e o anônimo não mudam; o login do usuário do grupo termina na fila; o menu do grupo só tem "Autorizações" e o dos demais não ganha o item (FR-017 a FR-020, SC-004)
 
 ### Implementation for User Story 6
 
-- [ ] T046 [US6] Em `contas/acesso.py`, acrescentar a constante pura `ROTAS_SEGURANCA_TRABALHO` (`frozenset` de nomes: `login`, `logout`, `pedidos:autorizacoes`, `pedidos:autorizacao`, `pedidos:decidir`, `pedidos:inicio`, `pedidos:formulario`, `pedidos:materiais`, `pedidos:carrinho`, `pedidos:consulta_epi`); criar `contas/middleware.py` com `RestringirSegurancaTrabalho`: para usuário autenticado e `da_seguranca_trabalho`, permite só os nomes dessa constante; GET e HEAD das demais redirecionam a `pedidos:autorizacoes`, os outros métodos dão 403; rota que não resolve segue ao 404; retorna cedo para quem não é do grupo. Registrar em `config/settings.py` `MIDDLEWARE` depois do `AuthenticationMiddleware`
-- [ ] T047 [US6] Em `interface/navegacao.py`, dar ao `ItemMenu` o perfil (`para`: almoxarifado por padrão) e acrescentar o item "Autorizações" (`pedidos:autorizacoes`) só para o grupo; o grupo vê só esse item e os demais mantêm o menu de hoje; nos templates do grupo, o bloco `voltar` não aponta ao painel (já vazio desde a T028)
-- [ ] T048 [US6] Rodar `tests/test_epis_acesso.py tests/test_acesso.py tests/test_rotas.py tests/test_prefixo.py` e conferir que as rotas e o prefixo seguem iguais (FR-018, FR-033)
+- [x] T046 [US6] Em `contas/acesso.py`, acrescentar a constante pura `ROTAS_SEGURANCA_TRABALHO` (`frozenset` de nomes: `login`, `logout`, `pedidos:autorizacoes`, `pedidos:autorizacao`, `pedidos:decidir`, `pedidos:inicio`, `pedidos:formulario`, `pedidos:materiais`, `pedidos:carrinho`, `pedidos:consulta_epi`); criar `contas/middleware.py` com `RestringirSegurancaTrabalho`: para usuário autenticado e `da_seguranca_trabalho`, permite só os nomes dessa constante; GET e HEAD das demais redirecionam a `pedidos:autorizacoes`, os outros métodos dão 403; rota que não resolve segue ao 404; retorna cedo para quem não é do grupo. Registrar em `config/settings.py` `MIDDLEWARE` depois do `AuthenticationMiddleware`
+- [x] T047 [US6] Em `interface/navegacao.py`, dar ao `ItemMenu` o perfil (`para`: almoxarifado por padrão) e acrescentar o item "Autorizações" (`pedidos:autorizacoes`) só para o grupo; o grupo vê só esse item e os demais mantêm o menu de hoje; nos templates do grupo, o bloco `voltar` não aponta ao painel (já vazio desde a T028)
+- [x] T048 [US6] Rodar `tests/test_epis_acesso.py tests/test_acesso.py tests/test_rotas.py tests/test_prefixo.py` e conferir que as rotas e o prefixo seguem iguais (FR-018, FR-033)
 
 **Checkpoint**: o acesso restrito está fechado por padrão; US1 + US2 + US3 + US6 formam o corte publicável.
 

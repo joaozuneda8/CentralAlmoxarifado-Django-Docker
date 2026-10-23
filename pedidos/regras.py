@@ -742,6 +742,32 @@ def situacao_pedido(origem: str, atendido: bool, itens, autorizacao: str | None 
     )
 
 
+_NUMERO_DE_PEDIDO = re.compile(r"^P-?(\d{1,9})$")
+
+
+def normalizar_numero_pedido(digitado: str) -> str:
+    """O número de pedido como a numeração o grava ("P-000123"), a partir do que o servidor
+    digita ("p-123", " P123 "). O que não parece um número de pedido volta só limpo e em
+    maiúsculas (a consulta não o acha)."""
+    limpo = "".join(str(digitado or "").split()).upper()
+    casou = _NUMERO_DE_PEDIDO.match(limpo)
+    return f"P-{int(casou.group(1)):06d}" if casou else limpo
+
+
+def texto_situacao_consulta(numero: str, autorizacao: str, motivo: str) -> tuple[str, str]:
+    """O que a consulta pública do pedido de EPI diz ao servidor (spec 008, FR-031): a situação
+    e, na recusa, o motivo. Nada além disso: nem nome, nem destino, nem materiais."""
+    if autorizacao == AUTORIZACAO_RECUSADA:
+        return f"Pedido {numero}: recusado pela Segurança do Trabalho.", motivo
+    if autorizacao == AUTORIZACAO_AUTORIZADA:
+        return (
+            f"Pedido {numero}: autorizado. O almoxarifado vai atendê-lo; procure o almoxarifado "
+            "para retirar.",
+            "",
+        )
+    return f"Pedido {numero}: aguardando autorização da Segurança do Trabalho.", ""
+
+
 # ---------------------------------------------------------------------------
 # Edição do atendimento: até quando se edita e o que mudou
 # ---------------------------------------------------------------------------

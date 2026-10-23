@@ -12,7 +12,7 @@
   {% elif resposta.telegram == "falhou" %}<p class="texto-secundario">O aviso {% if fluxo.exige_autorizacao %}à Segurança do Trabalho{% else %}ao almoxarifado{% endif %} pelo Telegram falhou, mas o pedido está gravado.</p>{% endif %}
   {% if fluxo.exige_autorizacao %}
   {# Pedido de EPI: ainda não é um pedido ao almoxarifado, e a entrega só vem depois da autorização (spec 008, FR-009). #}
-  <div class="aviso aviso-info"><p><strong>Aguardando a autorização da Segurança do Trabalho.</strong> Só depois dela o almoxarifado atende o pedido, e a entrega só acontece nesse atendimento. Guarde o número do pedido.</p></div>
+  <div class="aviso aviso-info"><p><strong>Aguardando a autorização da Segurança do Trabalho.</strong> Só depois dela o almoxarifado atende o pedido, e a entrega só acontece nesse atendimento. Guarde o número do pedido: para saber o resultado, <a href="{% url 'pedidos:consulta_epi' %}">consulte o resultado</a> com ele.</p></div>
   {% else %}
   <div class="aviso aviso-info"><p>Guarde o número. O almoxarifado vai conferir e separar os materiais; a saída só é registrada quando o atendimento for confirmado.</p></div>
   {% endif %}

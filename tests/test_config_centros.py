@@ -1,9 +1,11 @@
 """Os destinos de cada formulário a partir da configuração (spec 009, FR-005 a FR-013)."""
 
 import pytest
+from django.urls import reverse
 
 from catalogo.catalogos import MODO_DESTINO, centros_do_formulario
 from catalogo.models import CentroCusto, CentroFormulario, Formulario
+from pedidos.models import Pedido
 from pedidos.regras import (
     AB,
     EPIS,
@@ -14,7 +16,8 @@ from pedidos.regras import (
     opcoes_destino,
     resolver_destino,
 )
-from tests.config_cenario import criar_centro, habilitar
+from tests.cenario import montar_cenario
+from tests.config_cenario import criar_centro, enviar, habilitar, registrar
 
 pytestmark = pytest.mark.django_db
 
@@ -111,3 +114,69 @@ def test_habilitar_depois_aparece_sem_reiniciar():
     assert destinos(AB) == []
     habilitar(centro, AB)
     assert destinos(AB) == ["ETA I"]
+
+
+# --- O servidor recusa, não só a tela (FR-011) -------------------------------------------------
+
+
+class TestBackend:
+    """`registrar_pedido` valida o destino contra os centros ativos e habilitados **naquele**
+    formulário: esconder a opção na tela não basta."""
+
+    DETERGENTE = "023.001.002"  # limpeza e AB aceitam (o cenário o põe nos dois)
+    FITA = "016.005.010"
+
+    @pytest.fixture(autouse=True)
+    def cenario(self):
+        montar_cenario()
+        self.centro = criar_centro("SETOR X", "77", formularios=[LIMPEZA])
+
+    def erros(self, resposta) -> str:
+        return " ".join(e.texto for e in resposta.erros)
+
+    def test_destino_habilitado_no_formulario_e_aceito(self):
+        r = registrar(LIMPEZA, [(self.DETERGENTE, "1")], destino="SETOR X")
+        assert r.ok, self.erros(r)
+        assert Pedido.objects.get().destino == "SETOR X"
+
+    def test_destino_habilitado_so_em_outro_formulario_e_recusado(self):
+        r = registrar(AB, [(self.FITA, "1")], destino="SETOR X")
+        assert not r.ok
+        assert 'Destino "SETOR X" não está na lista de centros de custo.' in self.erros(r)
+        assert not Pedido.objects.exists()
+
+    def test_destino_de_centro_inativo_e_recusado_mesmo_habilitado(self):
+        CentroCusto.objects.filter(pk=self.centro.pk).update(ativo=False)
+        r = registrar(LIMPEZA, [(self.DETERGENTE, "1")], destino="SETOR X")
+        assert not r.ok and "não está na lista de centros de custo" in self.erros(r)
+        assert not Pedido.objects.exists()
+
+    def test_desabilitar_entre_abrir_e_enviar_recusa_e_nao_grava(self):
+        CentroFormulario.objects.filter(centro=self.centro).delete()
+        r = registrar(LIMPEZA, [(self.DETERGENTE, "1")], destino="SETOR X")
+        assert not r.ok and not Pedido.objects.exists()
+
+    def test_o_envio_pela_tela_tambem_recusa_e_mantem_o_pedido(self, client):
+        r = enviar(client, AB, [(self.FITA, "1")], destino="SETOR X")
+        assert "não está na lista de centros de custo" in r.text
+        assert f'name="item_codigo" value="{self.FITA}"' in r.text
+        assert not Pedido.objects.exists()
+
+    def test_o_formulario_sem_nenhum_destino_fica_indisponivel(self, client):
+        CentroFormulario.objects.filter(formulario=LIMPEZA).delete()
+        html = client.get(reverse("pedidos:formulario", args=["limpeza"])).text
+        assert "Este formulário está indisponível no momento. Avise o almoxarifado." in html
+        r = registrar(LIMPEZA, [(self.DETERGENTE, "1")], destino="SETOR X")
+        assert not r.ok and "Não há centros de custo cadastrados" in r.mensagem
+
+    def test_desabilitar_num_formulario_nao_muda_o_outro(self):
+        habilitar(self.centro, AB)
+        CentroFormulario.objects.filter(centro=self.centro, formulario=LIMPEZA).delete()
+        assert not registrar(LIMPEZA, [(self.DETERGENTE, "1")], destino="SETOR X").ok
+        assert registrar(AB, [(self.FITA, "1")], destino="SETOR X").ok
+
+    def test_o_pedido_antigo_continua_com_o_destino_depois_de_inativar(self):
+        assert registrar(LIMPEZA, [(self.DETERGENTE, "1")], destino="SETOR X").ok
+        CentroCusto.objects.filter(pk=self.centro.pk).update(ativo=False)
+        CentroFormulario.objects.all().delete()
+        assert Pedido.objects.get().destino == "SETOR X"

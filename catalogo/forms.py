@@ -160,3 +160,56 @@ ROBOS = [
     ),
 ]
 ROBOS_POR_CHAVE = {robo.chave: robo for robo in ROBOS}
+
+
+ESTADOS_DO_MATERIAL = [
+    ("", "Todos"),
+    ("disponivel", "Disponíveis no formulário"),
+    ("indisponivel", "Não disponíveis no formulário"),
+    ("excecao", "Com exceção do administrador"),
+]
+
+
+class FiltrosMateriais(forms.Form):
+    """Busca e filtros da lista de materiais da página Formulários (spec 009): texto (código e
+    nome), grupo, subgrupo e estado no formulário. Valor desconhecido some (`filtros`), a lista
+    não quebra."""
+
+    q = forms.CharField(
+        required=False,
+        label="Buscar",
+        widget=forms.TextInput(
+            attrs={"class": "campo-entrada", "type": "search", "placeholder": "Código ou nome"}
+        ),
+    )
+    grupo = forms.ChoiceField(
+        required=False, label="Grupo", widget=forms.Select(attrs={"class": "campo-entrada"})
+    )
+    subgrupo = forms.ChoiceField(
+        required=False, label="Subgrupo", widget=forms.Select(attrs={"class": "campo-entrada"})
+    )
+    estado = forms.ChoiceField(
+        required=False,
+        label="No formulário",
+        choices=ESTADOS_DO_MATERIAL,
+        widget=forms.Select(attrs={"class": "campo-entrada"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        pares = sorted(
+            Material.objects.filter(oculto=False).values_list("grupo", "subgrupo").distinct(),
+            key=lambda par: (par[0].upper(), par[1].upper()),
+        )
+        grupos = list(dict.fromkeys(g for g, _ in pares if g))
+        escolhido = (self.data.get("grupo") or "") if self.is_bound else ""
+        subgrupos = list(
+            dict.fromkeys(s for g, s in pares if s and (not escolhido or g == escolhido))
+        )
+        self.fields["grupo"].choices = [("", "Todos os grupos"), *((g, g) for g in grupos)]
+        self.fields["subgrupo"].choices = [("", "Todos os subgrupos"), *((s, s) for s in subgrupos)]
+
+    def filtros(self) -> dict:
+        """Só os filtros válidos e preenchidos."""
+        self.is_valid()
+        return {nome: valor for nome, valor in self.cleaned_data.items() if valor}

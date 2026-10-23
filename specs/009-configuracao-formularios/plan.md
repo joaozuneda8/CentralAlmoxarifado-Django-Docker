@@ -192,7 +192,7 @@ catalogo/
 ├── catalogos.py         # regra_de_origem, aplicar_excecoes, centros_do_formulario; formulario_*; só grupos
 ├── saude.py             # avisos novos; troca de centros_equipe_manutencao e centros_oficina
 ├── admin.py             # CentroCustoAdmin com ativo; fora MaterialOficinaAdmin e MaterialEpiAdmin
-├── views.py             # formularios, formularios_material, lote, excecao, centros, ativo
+├── views_formularios.py # NOVO: formularios, formularios_material, lote, excecao, centros, ativo
 ├── urls.py              # as rotas novas
 ├── forms.py             # filtros da tela e do lote
 ├── templates/catalogo/  # formularios.html, _formularios_centros.html, _formularios_materiais.html, _lote_previa.html, formularios_material.html

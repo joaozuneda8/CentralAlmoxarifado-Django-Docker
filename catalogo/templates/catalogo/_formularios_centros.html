@@ -1,0 +1,97 @@
+{% comment %}
+Aba Centros de custo: as linhas do cadastro de centros e se cada uma é destino de {{ formulario_nome }}.
+Nas viaturas (modo sem placa) a escolha é pela descrição, com todas as linhas juntas. Criar e editar
+centro é no admin. Estado sempre em texto (selos), nunca só por cor.
+{% endcomment %}
+<div class="cartao pilha">
+  <h2 class="cartao-titulo">Destinos de {{ formulario_nome }}</h2>
+  <p class="texto-secundario">{{ explicacao_do_modo }} Um centro inativo não é oferecido em nenhum formulário, mas a escolha de cada formulário fica guardada.</p>
+
+  <form class="filtros" method="get" action="{% url 'catalogo:formularios' %}">
+    <input type="hidden" name="formulario" value="{{ formulario }}">
+    <input type="hidden" name="aba" value="centros">
+    <div class="campo filtros-campo">
+      <label class="campo-rotulo" for="campo-qc">Buscar centro</label>
+      <div class="campo-busca">
+        {% include "interface/_icone.html" with nome="busca" %}
+        <input class="campo-entrada" type="search" id="campo-qc" name="qc" value="{{ termo }}" placeholder="Descrição, código ou placa">
+      </div>
+    </div>
+    <div class="filtros-acoes"><button type="submit" class="botao botao-secundario">Buscar</button></div>
+  </form>
+
+  <p class="texto-secundario" role="status">{{ total_habilitadas }} de {{ total_linhas }} {% if total_linhas == 1 %}linha é destino{% else %}linhas são destino{% endif %} deste formulário{% if termo %} (na busca){% endif %}.</p>
+
+  {% if sem_centros %}
+  <p class="aviso aviso-atencao">Nenhum centro de custo cadastrado. Cadastre no admin para poder escolher os destinos.</p>
+  {% endif %}
+
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <caption class="visually-hidden">Centros de custo e se são destino de {{ formulario_nome }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Centro de custo</th>
+          <th scope="col">{% if por_descricao %}Linhas{% else %}Placa{% endif %}</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Neste formulário</th>
+          {% if pode_alterar_centros %}<th scope="col"><span class="visually-hidden">Ação</span></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if por_descricao %}
+          {% for g in grupos %}
+          <tr>
+            <td>{{ g.descricao }} <span class="mono texto-suave">{{ g.codigos|join:", " }}</span></td>
+            <td>{{ g.linhas|length }}</td>
+            <td>{% if g.n_inativas == g.linhas|length %}<span class="selo selo-neutro">Inativo</span>{% elif g.n_inativas %}<span class="selo selo-aviso">{{ g.n_inativas }} inativa{{ g.n_inativas|pluralize }}</span>{% else %}<span class="selo selo-ok">Ativo</span>{% endif %}</td>
+            <td>{% if g.n_habilitadas %}<span class="selo selo-ok">Destino{% if g.n_habilitadas != g.linhas|length %} ({{ g.n_habilitadas }} de {{ g.linhas|length }}){% endif %}</span>{% else %}<span class="selo selo-neutro">Não é destino</span>{% endif %}</td>
+            {% if pode_alterar_centros %}
+            <td>
+              <form method="post" action="{% url 'catalogo:formularios_centros' %}" class="acoes">
+                {% csrf_token %}
+                <input type="hidden" name="formulario" value="{{ formulario }}">
+                <input type="hidden" name="qc" value="{{ termo }}">
+                {% for pk in g.ids %}<input type="hidden" name="centro" value="{{ pk }}">{% endfor %}
+                {% if g.n_habilitadas == g.linhas|length %}
+                <input type="hidden" name="habilitado" value="0">
+                <button type="submit" class="botao botao-secundario">Desabilitar</button>
+                {% else %}
+                <input type="hidden" name="habilitado" value="1">
+                <button type="submit" class="botao botao-secundario">Habilitar{% if g.n_habilitadas %} todas{% endif %}</button>
+                {% endif %}
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr class="tabela-vazia"><td colspan="{% if pode_alterar_centros %}5{% else %}4{% endif %}">Nenhum centro de custo encontrado.</td></tr>
+          {% endfor %}
+        {% else %}
+          {% for g in grupos %}{% for l in g.linhas %}
+          <tr>
+            <td>{{ l.centro.descricao }} <span class="mono texto-suave">{{ l.centro.codigo }}</span></td>
+            <td>{% if l.centro.placa %}<span class="mono">{{ l.centro.placa }}</span>{% else %}<span class="texto-suave">sem placa</span>{% endif %}</td>
+            <td>{% if l.centro.ativo %}<span class="selo selo-ok">Ativo</span>{% else %}<span class="selo selo-neutro">Inativo</span>{% endif %}</td>
+            <td>{% if l.habilitada %}<span class="selo selo-ok">Destino</span>{% if not l.centro.ativo %} <span class="selo selo-aviso">sem efeito: inativo</span>{% endif %}{% else %}<span class="selo selo-neutro">Não é destino</span>{% endif %}</td>
+            {% if pode_alterar_centros %}
+            <td>
+              <form method="post" action="{% url 'catalogo:formularios_centros' %}" class="acoes">
+                {% csrf_token %}
+                <input type="hidden" name="formulario" value="{{ formulario }}">
+                <input type="hidden" name="qc" value="{{ termo }}">
+                <input type="hidden" name="centro" value="{{ l.centro.pk }}">
+                <input type="hidden" name="habilitado" value="{% if l.habilitada %}0{% else %}1{% endif %}">
+                <button type="submit" class="botao botao-secundario">{% if l.habilitada %}Desabilitar{% else %}Habilitar{% endif %}</button>
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}{% empty %}
+          <tr class="tabela-vazia"><td colspan="{% if pode_alterar_centros %}5{% else %}4{% endif %}">Nenhum centro de custo encontrado.</td></tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -120,3 +120,12 @@
 .opcao-modo .campo-dica { display: block; margin-top: 2px; }
 .aviso .campo-dica { display: block; margin-top: 2px; }
 .aviso[hidden] { display: none; }
+
+/* Formulários (spec 009): o seletor de formulário em botões que quebram de linha, e a tabela de
+   materiais com a informação do material embaixo do nome. */
+.formularios-seletor { display: grid; gap: var(--esp-2); }
+.formularios-seletor .rotulo-secao { margin: 0; }
+.formularios-seletor-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--esp-1); }
+.formularios-seletor .aviso { margin: 0; }
+.tabela td .material-info { margin-top: var(--esp-meio); }
+.tabela td .acoes { flex-wrap: nowrap; gap: var(--esp-1); }

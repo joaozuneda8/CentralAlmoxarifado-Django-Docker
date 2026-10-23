@@ -1,0 +1,100 @@
+{% load interface_extras %}
+{% comment %}
+Aba Materiais: os materiais visíveis do catálogo (o cadastro do SCPI não muda) e se cada um é oferecido
+por {{ formulario_nome }}, com a origem em texto: pela regra do formulário, acrescentado ou retirado
+pelo administrador. "Disponível no formulário" não é "em estoque": o saldo aparece só como
+informação, e o formulário continua bloqueando o que está sem estoque. Busca, filtros e paginação
+no servidor; cada botão é um formulário POST com CSRF.
+{% endcomment %}
+<div class="cartao pilha">
+  <h2 class="cartao-titulo">Materiais de {{ formulario_nome }}</h2>
+  <p class="texto-secundario">Sem alteração, vale a regra do formulário (a lista, os grupos ou as saídas do SCPI). Acrescentar ou retirar um material muda só este formulário e não mexe no cadastro, no estoque nem nos pedidos já feitos.</p>
+
+  <form class="filtros" method="get" action="{% url 'catalogo:formularios' %}">
+    <input type="hidden" name="formulario" value="{{ formulario }}">
+    <input type="hidden" name="aba" value="materiais">
+    <div class="campo filtros-campo">
+      <label class="campo-rotulo" for="{{ filtros_materiais.q.id_for_label }}">{{ filtros_materiais.q.label }}</label>
+      <div class="campo-busca">
+        {% include "interface/_icone.html" with nome="busca" %}
+        {{ filtros_materiais.q }}
+      </div>
+    </div>
+    <div class="campo filtros-campo">
+      <label class="campo-rotulo" for="{{ filtros_materiais.grupo.id_for_label }}">{{ filtros_materiais.grupo.label }}</label>
+      {{ filtros_materiais.grupo }}
+    </div>
+    <div class="campo filtros-campo">
+      <label class="campo-rotulo" for="{{ filtros_materiais.subgrupo.id_for_label }}">{{ filtros_materiais.subgrupo.label }}</label>
+      {{ filtros_materiais.subgrupo }}
+    </div>
+    <div class="campo filtros-campo">
+      <label class="campo-rotulo" for="{{ filtros_materiais.estado.id_for_label }}">{{ filtros_materiais.estado.label }}</label>
+      {{ filtros_materiais.estado }}
+    </div>
+    <div class="filtros-acoes">
+      <button type="submit" class="botao botao-secundario">Filtrar</button>
+      {% if filtros_ativos %}<a class="botao botao-texto" href="{% url 'catalogo:formularios' %}?formulario={{ formulario }}&aba=materiais">Limpar filtros</a>{% endif %}
+    </div>
+  </form>
+
+  <p class="texto-secundario" role="status">{{ total_materiais|separador_milhar }} {% if total_materiais == 1 %}material{% else %}materiais{% endif %}{% if filtros_ativos %} no filtro{% endif %}.</p>
+
+  <div class="tabela-rolagem">
+    <table class="tabela">
+      <caption class="visually-hidden">Materiais do catálogo e se são oferecidos por {{ formulario_nome }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Material</th>
+          <th scope="col">Neste formulário</th>
+          {% if pode_alterar_materiais %}<th scope="col"><span class="visually-hidden">Ação</span></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in linhas %}
+        <tr>
+          <td>
+            <strong>{{ l.material.nome }}</strong>
+            <span class="material-info texto-suave">
+              <span class="mono">{{ l.material.codigo }}</span>
+              {% if l.material.unidade %}· {{ l.material.unidade }}{% endif %}
+              {% if l.material.grupo %}· {{ l.material.grupo }}{% if l.material.subgrupo %} › {{ l.material.subgrupo }}{% endif %}{% endif %}
+              · saldo {{ l.saldo }}
+            </span>
+            {% if l.canonico %}<span class="material-info texto-suave">Código antigo: o canônico é <span class="mono">{{ l.canonico }}</span>.</span>{% endif %}
+            {% if l.material.duplicado %}<span class="material-info"><span class="selo selo-aviso">Cadastro duplicado</span> o formulário o mostra bloqueado.</span>{% endif %}
+          </td>
+          <td>
+            <span class="selo selo-{{ l.texto.nivel }}">{{ l.texto.selo }}</span>
+            <span class="material-info texto-suave">{{ l.texto.origem }}</span>
+            {% if l.estado.sem_efeito %}<span class="material-info"><span class="selo selo-neutro">Exceção sem efeito</span> a regra já dá este resultado.</span>{% endif %}
+          </td>
+          {% if pode_alterar_materiais %}
+          <td>
+            <form method="post" action="{% url 'catalogo:formularios_excecao' %}" class="acoes">
+              {% csrf_token %}
+              <input type="hidden" name="formulario" value="{{ formulario }}">
+              <input type="hidden" name="codigo" value="{{ l.material.codigo }}">
+              <input type="hidden" name="q" value="{{ request.GET.q }}">
+              <input type="hidden" name="grupo" value="{{ request.GET.grupo }}">
+              <input type="hidden" name="subgrupo" value="{{ request.GET.subgrupo }}">
+              <input type="hidden" name="estado" value="{{ request.GET.estado }}">
+              <input type="hidden" name="pagina" value="{{ pagina.number }}">
+              {% if l.estado.disponivel %}
+              <button type="submit" name="acao" value="retirar" class="botao botao-secundario">Retirar</button>
+              {% else %}
+              <button type="submit" name="acao" value="acrescentar" class="botao botao-secundario">Acrescentar</button>
+              {% endif %}
+              {% if l.tem_excecao %}<button type="submit" name="acao" value="restaurar" class="botao botao-texto">Voltar à regra</button>{% endif %}
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr class="tabela-vazia"><td colspan="{% if pode_alterar_materiais %}3{% else %}2{% endif %}">Nenhum material encontrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "interface/_paginacao.html" with pagina=pagina parametro="pagina" rotulo="Paginação dos materiais" rotulo_item="material" rotulo_item_plural="materiais" %}
+</div>

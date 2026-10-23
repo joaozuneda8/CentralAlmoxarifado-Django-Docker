@@ -103,6 +103,18 @@ coberto por teste de equivalência e pela adaptação planejada de `tests/cenari
 - **Saúde**: as mensagens existentes dos formulários seguem as mesmas; só a origem do dado muda.
 - **Admin**: `CentroCustoAdmin` perde `equipe_manutencao`; `test_cadastros.py` é a rede.
 
+## Medições
+
+*(preenchidas por T001 e T052: tempo de abertura dos cinco formulários antes e depois, e da lista de
+materiais da configuração; SC-010.)*
+
+## Implantação
+
+A migration roda no `deploy/atualizar.ps1`, que já faz o backup antes de migrar; nada de especial além de
+conferir o quickstart (passo 1: os formulários oferecem o mesmo de antes). Em produção, só a pedido do
+usuário (CLAUDE.md). A reversão do código é a volta à tag anterior com o banco restaurado do backup; as
+tabelas novas são aditivas e inertes para o código antigo.
+
 ## Testes
 
 - `tests/test_config_estado.py`: a tabela do data-model inteira (oculto, regra, exceção) e "sem efeito".
@@ -172,6 +184,7 @@ specs/009-configuracao-formularios/
 catalogo/
 ├── models.py            # Formulario; CentroCusto.ativo; CentroFormulario; ExcecaoMaterial
 ├── disponibilidade.py   # NOVO: estado (pura), serviços de exceção, lote, centros e ativo
+├── acesso.py            # NOVO: pode_alterar_centros, pode_alterar_materiais, decorador exige (403)
 ├── catalogos.py         # regra_de_origem, aplicar_excecoes, centros_do_formulario; formulario_*; só grupos
 ├── saude.py             # avisos novos; troca de centros_equipe_manutencao e centros_oficina
 ├── admin.py             # CentroCustoAdmin com ativo; fora MaterialOficinaAdmin e MaterialEpiAdmin

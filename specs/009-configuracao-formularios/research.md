@@ -176,7 +176,8 @@ materiais); permissão personalizada (rejeitada: o Django já gera as `change_*`
 - **Por material**: `/painel/catalogo/formularios/material/<código>/` mostra os cinco formulários com
   estado e origem (história 4).
 - **Centros**: tabela agrupada por descrição, uma linha por placa, com a marca "neste formulário" e o
-  estado global; criar e editar centro leva ao admin (já existente). Sem HTMX obrigatório: PRG (POST,
+  estado global; nas **viaturas** (modo `sem_placa`) a marca é da descrição (todas as linhas juntas,
+  FR-007a); criar e editar centro leva ao admin (já existente). Sem HTMX obrigatório: PRG (POST,
   mensagem, redirecionamento), como as ações de Automações.
 
 **Justificativa**: o catálogo é grande; busca, filtro e paginação no servidor evitam carregar 7.322 itens;

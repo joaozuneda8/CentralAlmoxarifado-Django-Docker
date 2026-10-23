@@ -217,6 +217,9 @@ continuam resolvendo o centro; reativar devolve as três associações.
 5. **Given** um centro novo criado pelo administrador, **When** ele é salvo, **Then** a tela de
    configuração o mostra sem formulário habilitado até o administrador escolher onde ele vale, e a saúde
    do cadastro avisa que há centro sem formulário.
+6. **Given** um centro inativo que está habilitado em formulários, **When** o almoxarifado abre a saída
+   avulsa **nova**, **Then** o centro não é oferecido nem aceito; e **When** abre a **edição** de uma saída
+   avulsa já registrada com esse centro, **Then** ela o mantém e salva normalmente.
 
 ---
 
@@ -276,6 +279,11 @@ Segurança do Trabalho, a rota nem abre.
   hoje, qualquer que seja a configuração.
 - **Origem sem formulário** (pedido antigo cuja origem não existe mais): não aparece na configuração e não
   é afetada.
+- **Código antigo de um par de/para** acrescentado a um formulário: o formulário passa a oferecer esse
+  código com o saldo dele (o AB oferece o canônico); a tela avisa que é um código antigo e sugere o
+  canônico, sem impedir.
+- **Habilitar um centro de formulário que só usa a descrição** (viaturas): ver FR-007a; habilitar a
+  descrição vale para todas as suas linhas.
 
 ## Requirements *(mandatory)*
 
@@ -300,6 +308,12 @@ Segurança do Trabalho, a rota nem abre.
   formulário**, e um mesmo centro DEVE poder estar em vários formulários.
 - **FR-007**: A disponibilidade DEVE ser por **linha do cadastro de centros** (um centro com várias
   placas tem uma linha por placa); a tela DEVE agrupar as linhas pela descrição.
+- **FR-007a**: O **modo de apresentação do destino** é característica de cada formulário e não é
+  configurável: limpeza, AB e EPIs oferecem a descrição e, para a linha com placa, "descrição — placa";
+  viaturas oferecem só a descrição, uma por centro; a oficina oferece a linha com placa só como "descrição
+  — placa" e a linha sem placa como a descrição. Nas viaturas, como a placa não importa, a tela DEVE
+  habilitar e desabilitar **pela descrição** (todas as linhas juntas) e mostrar como habilitada a descrição
+  com alguma linha habilitada.
 - **FR-008**: Cada centro de custo DEVE ter um estado **ativo/inativo global**. O centro inativo NÃO DEVE
   ser oferecido nem aceito em pedido novo de nenhum formulário público, nem oferecido numa saída avulsa
   nova, qualquer que seja a configuração por formulário, e as associações por formulário DEVEM ser
@@ -358,7 +372,9 @@ Segurança do Trabalho, a rota nem abre.
   de materiais alcançados, e DEVE exigir confirmação explícita; com o catálogo inteiro (sem filtro), a
   confirmação DEVE ser reforçada.
 - **FR-026**: A operação em lote DEVE valer para **todos** os materiais do filtro (não só os da página
-  visível), nenhum fora dele, e DEVE ser **atômica** (vale inteira ou não vale).
+  visível), nenhum fora dele, e DEVE ser **atômica** (vale inteira ou não vale). Se o número de
+  materiais do filtro mudou entre a prévia e a confirmação, a operação DEVE ser recusada, sem mudar
+  nada, e a tela DEVE voltar à prévia com o número atual.
 - **FR-027**: Concluída a operação, o sistema DEVE mostrar o resultado (quantos mudaram e quantos já
   estavam no estado pedido).
 
@@ -388,10 +404,12 @@ Segurança do Trabalho, a rota nem abre.
   que nenhum formulário oferece**: os destinos de cada formulário (todos, as marcas de equipe de
   manutenção, o centro da oficina e as viaturas) e os avulsos da oficina e dos EPIs.
 - **FR-037**: A migração NÃO DEVE ser destrutiva: nada é apagado nem alterado no cadastro de materiais, nos
-  pedidos nem nos cadastros de origem; a transcrição DEVE ser verificável (os formulários oferecem o mesmo
-  conjunto antes e depois).
-- **FR-038**: Quando uma associação não puder ser determinada com segurança a partir do que existe, a
-  migração DEVE parar e registrar a necessidade de decisão, em vez de adivinhar.
+  pedidos nem nos cadastros de origem; DEVE ser **reversível** (desfazê-la apaga só o que ela criou); a
+  transcrição DEVE ser verificável (os formulários oferecem o mesmo conjunto antes e depois).
+- **FR-038**: Quando a transcrição não reproduzir com segurança o que um formulário oferece hoje, a
+  migração DEVE parar e registrar a necessidade de decisão, em vez de adivinhar. Uma regra antiga que já
+  resulta em lista vazia (a oficina sem o centro "OFICINA MECÂNICA", EPIs sem grupos) é transcrita como
+  vazia, e a saúde do cadastro avisa.
 - **FR-039**: A saúde do cadastro DEVE avisar: formulário sem destino, formulário sem material,
   centro ativo sem formulário, e exceção sem efeito.
 
@@ -399,6 +417,13 @@ Segurança do Trabalho, a rota nem abre.
 
 - **FR-040**: Os cinco formulários, a saída avulsa, o atendimento, o painel, o recibo, o robô e as
   especificações 005 a 008 NÃO DEVEM mudar de comportamento além do que esta especificação define.
+
+**Uso da tela**
+
+- **FR-041**: A tela DEVE mostrar todo estado (disponível, retirado, acrescentado, inativo, sem efeito)
+  **com texto**, nunca só por cor; DEVE funcionar sem JavaScript (formulários comuns, confirmação do lote
+  em duas telas) e no tablet; e os códigos (CADPRO, placa) DEVEM aparecer em fonte mono, como no resto do
+  sistema.
 
 ### Key Entities
 
@@ -438,6 +463,9 @@ Segurança do Trabalho, a rota nem abre.
   segundos, pela consulta por material.
 - **SC-009**: Os testes automatizados dos cinco formulários, da saída avulsa e do atendimento continuam
   passando sem alteração de comportamento.
+- **SC-010**: A lista de materiais da configuração (catálogo de mais de 7.000 materiais visíveis) abre,
+  filtra e pagina em até 2 segundos, e a abertura de qualquer formulário público não fica mais de 20%
+  mais lenta que antes da configuração.
 
 ## Assumptions
 

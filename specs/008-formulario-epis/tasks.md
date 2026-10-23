@@ -293,3 +293,11 @@ perguntar** ao usuário em vez de presumir.
 | SC-005, SC-006 | T022, T028 (a fila independe do aviso) |
 | SC-007 | T041 |
 | SC-008 | T001, T053 |
+
+## Phase 10: Convergence
+
+**Purpose**: o que o `/speckit-converge` achou entre o código e a spec, o plano e as tarefas (2026-10-23). Nenhum requisito ficou sem implementação; o que resta é conferência.
+
+- [ ] T056 Revisar as telas novas (`pedidos/templates/pedidos/autorizacoes.html`, `autorizacao.html`, `consulta_epi.html`, `_autorizacao.html` e o bloco de `_sucesso.html`) com as três skills de UI do projeto, `clean-design` com `docs/DESIGN.md`, `ui-ux-pro-max` e `frontend-design`, no celular **e** na largura de computador (só o celular foi visto), e corrigir o que divergir, per CLAUDE.md "Convenções" e Constitution VI (partial)
+- [ ] T057 Rodar `deploy/tests/atualizar.Tests.ps1` com o Pester numa máquina com PowerShell 5.1+ (`pwsh` não existe nesta) e registrar o resultado, per T050 (partial)
+- [ ] T058 Enviar um pedido de EPIs pelo navegador no celular e conferir os dois avisos do Telegram com token e chats de teste (ao registrar só o da Segurança do Trabalho; ao autorizar só o do almoxarifado), per quickstart §3 passo 1 e §4, FR-026 e FR-027 (partial)

@@ -195,3 +195,25 @@ def test_o_recibo_impresso_nao_muda(client, quem):
     r = client.get(reverse("pedidos:detalhe", args=[pedido.numero]))
     recibo = r.text.partition('<article class="folha-recibo">')[2]
     assert "Autorizado por" not in recibo.partition("</article>")[0]
+
+
+def test_a_edicao_nao_abre_caminho_para_atender_o_nao_autorizado(client, quem):
+    """POST em `editar` não pode virar atendimento de pedido aguardando ou recusado (FR-023)."""
+    client.force_login(quem["almox"])
+    aguardando = registrar()
+    recusado = registrar(solicitante="Bia Recusada")
+    recusar(recusado, quem)
+    for pedido in (aguardando, recusado):
+        r = client.post(
+            reverse("pedidos:editar", args=[pedido.numero]),
+            {
+                "versao": "0",
+                "data": date.today().isoformat(),
+                "recebedor": "Marcos Pereira",
+                "centro_custo": "ETA II",
+                "tipo": "BALCÃO",
+                f"entregue-{LUVA}": "2",
+            },
+        )
+        assert r.status_code in (200, 302), pedido.numero
+    nada_foi_gravado()

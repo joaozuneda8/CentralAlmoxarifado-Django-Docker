@@ -14,12 +14,23 @@ from django.utils.formats import number_format
 
 from catalogo.catalogos import (
     CatalogoAB,
+    _grupo,
     catalogo_ab,
     catalogo_limpeza,
+    catalogo_oficina,
     catalogo_viaturas,
     centros_equipe_manutencao,
+    centros_oficina,
 )
-from catalogo.models import CentroCusto, Importacao, ItemLimpeza, Material, PecaViatura
+from catalogo.models import (
+    CentroCusto,
+    Importacao,
+    ItemLimpeza,
+    Material,
+    MaterialOficina,
+    Opcao,
+    PecaViatura,
+)
 from scpi.gravacao import lista_curta
 
 # Importações que o catálogo precisa sempre; a carga dos pares de/para (DEPARA) é única e só
@@ -206,6 +217,71 @@ def _viaturas(ab: CatalogoAB) -> list[ItemSaude]:
     return saude
 
 
+FORMULARIO_OFICINA = "Formulário da oficina mecânica"
+
+
+def _oficina() -> list[ItemSaude]:
+    """O formulário da oficina mecânica (spec 007): quanto oferece ou por que está indisponível,
+    os grupos da lista sem material visível, os avulsos ocultos e a falta do centro da oficina
+    (o saldo já foi importado)."""
+    saude = []
+    centros = centros_oficina()
+    n = len(catalogo_oficina())
+    if not centros:
+        saude.append(
+            ItemSaude(
+                "erro",
+                f"{FORMULARIO_OFICINA}: nenhum destino (nem o centro OFICINA MECÂNICA nem centro "
+                "com placa); o formulário fica indisponível.",
+            )
+        )
+    elif not n:
+        saude.append(
+            ItemSaude(
+                "erro",
+                f"{FORMULARIO_OFICINA}: nenhum material nos grupos nem entre os materiais da "
+                "oficina; o formulário fica indisponível.",
+            )
+        )
+    else:
+        materiais = "1 material" if n == 1 else f"{numero(n)} materiais"
+        saude.append(ItemSaude("ok", f"{FORMULARIO_OFICINA}: {materiais}."))
+    if centros and all(c.so_com_placa for c in centros):
+        saude.append(
+            ItemSaude(
+                "aviso",
+                f"{FORMULARIO_OFICINA}: centro OFICINA MECÂNICA não cadastrado; só as viaturas "
+                "são oferecidas como destino.",
+            )
+        )
+    visiveis = {
+        _grupo(g)
+        for g in Material.objects.filter(oculto=False).values_list("grupo", flat=True).distinct()
+    }
+    sem_material = [
+        v for v in Opcao.valores(Opcao.Lista.GRUPO_OFICINA) if _grupo(v) not in visiveis
+    ]
+    if sem_material:
+        saude.append(
+            ItemSaude(
+                "aviso", f"Grupos da oficina sem material visível: {lista_curta(sem_material)}."
+            )
+        )
+    ocultos = list(
+        MaterialOficina.objects.filter(material__oculto=True).values_list(
+            "material__codigo", flat=True
+        )
+    )
+    if ocultos:
+        saude.append(
+            ItemSaude(
+                "aviso",
+                f"Materiais da oficina ocultos no SCPI (não aparecem): {lista_curta(ocultos)}.",
+            )
+        )
+    return saude
+
+
 def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) -> list[ItemSaude]:
     """Tudo o que não é a situação de uma importação: cadastro, saldo e formulários."""
     saude = []
@@ -297,6 +373,7 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
 
     if ab is not None:
         saude += _viaturas(ab)
+        saude += _oficina()
 
     if not CentroCusto.objects.exists():
         saude.append(
@@ -416,6 +493,7 @@ class Situacao:
     limpeza: int
     ab: CatalogoAB | None
     viaturas: int = 0  # peças visíveis na lista do formulário de viaturas (spec 006)
+    oficina: int = 0  # materiais do formulário da oficina mecânica (spec 007)
 
     @property
     def tem_avisos(self) -> bool:
@@ -452,4 +530,5 @@ def situacao_do_catalogo(agora: datetime | None = None) -> Situacao:
         limpeza=len(catalogo_limpeza()),
         ab=ab,
         viaturas=len(catalogo_viaturas()),
+        oficina=len(catalogo_oficina()),
     )

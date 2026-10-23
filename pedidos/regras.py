@@ -59,7 +59,12 @@ def estoque_inteiro(valor: object) -> int:
 LIMPEZA = "LIMPEZA"
 AB = "AB"
 VIATURAS = "VIATURAS"
+OFICINA = "OFICINA"
 AVULSA = "AVULSA"
+
+# O centro de custo da oficina mecânica: destino do formulário da oficina (spec 007) e o da
+# saída com placa sem centro próprio (`resolver_centro_custo`).
+CENTRO_OFICINA = "OFICINA MECÂNICA"
 
 # Acima disto a quantidade é inválida: protege a coluna decimal (12,3) do banco.
 QTD_MAXIMA = Decimal("999999")
@@ -284,9 +289,10 @@ def somar_por_codigo(itens: Iterable[ItemEnviado], conv: Callable[[object], Any]
 
 def opcoes_destino(centros) -> list[str]:
     """O que o formulário oferece como destino: cada centro de custo (uma vez, mesmo com
-    várias placas) e, para cada placa cadastrada, "centro — placa"."""
+    várias placas) e, para cada placa cadastrada, "centro — placa". O centro cujas linhas são
+    todas `so_com_placa` (as viaturas do formulário da oficina) só sai como "centro — placa"."""
     centros = list(centros or ())
-    descricoes = dict.fromkeys(c.descricao for c in centros)
+    descricoes = dict.fromkeys(c.descricao for c in centros if not c.so_com_placa)
     com_placa = dict.fromkeys(f"{c.descricao} — {c.placa}" for c in centros if c.placa)
     return [*descricoes, *com_placa]
 
@@ -462,6 +468,8 @@ class Centro:
     descricao: str
     codigo: str
     placa: str = ""
+    # Destino só como "centro — placa", nunca a descrição sozinha (`opcoes_destino`).
+    so_com_placa: bool = False
 
 
 @dataclass(frozen=True)
@@ -523,7 +531,7 @@ def resolver_centro_custo(cc_nome: object, placa: object, centros) -> CentroReso
             return CentroResolvido(erro=f"placa '{p}' cadastrada em mais de um centro de custo")
         if len(codigos) == 1:
             return CentroResolvido(codigos[0], da_placa[0].descricao, via_placa=True)
-    nome = texto(cc_nome) or ("OFICINA MECÂNICA" if p else "")
+    nome = texto(cc_nome) or (CENTRO_OFICINA if p else "")
     if not nome:
         return CentroResolvido(erro="'Centro de Custo' vazio")
     c = next((x for x in centros if norm_u(x.descricao) == norm_u(nome)), None)

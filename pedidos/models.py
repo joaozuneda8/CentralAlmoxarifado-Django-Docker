@@ -20,6 +20,7 @@ class Pedido(models.Model):
         LIMPEZA = regras.LIMPEZA, "Limpeza, copa/cozinha e escritório"
         AB = regras.AB, "Materiais AB"
         VIATURAS = regras.VIATURAS, "Reposição de peças das viaturas"
+        OFICINA = regras.OFICINA, "Oficina mecânica"
         AVULSA = regras.AVULSA, "Saída avulsa"
 
     id = models.UUIDField(primary_key=True, editable=False)

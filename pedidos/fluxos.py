@@ -17,16 +17,19 @@ from django.http import Http404
 from catalogo.catalogos import (
     ItemCatalogo,
     centros_equipe_manutencao,
+    centros_oficina,
     folha_viaturas,
     formulario_ab,
     formulario_avulsa,
     formulario_limpeza,
+    formulario_oficina,
     formulario_viaturas,
 )
 from pedidos.regras import (
     AB,
     AVULSA,
     LIMPEZA,
+    OFICINA,
     REGRA_LIVRE,
     REGRA_POR_UNIDADE,
     VIATURAS,
@@ -50,6 +53,7 @@ class Fluxo:
     exemplo_busca: str  # o exemplo no campo de busca
     exemplo_inicio: str = ""  # o exemplo no cartão da página inicial
     icone: str = "caixa"  # o ícone do cartão da página inicial
+    exemplo_destino: str = "Posto de trabalho, placa do veículo ou setor"  # no campo de destino
     publico: bool = True
     # Quem pede segue a unidade do material (`por_unidade`); a equipe aceita fração em qualquer
     # unidade (`livre`).
@@ -110,9 +114,21 @@ FLUXOS: dict[str, Fluxo] = {
         exemplo_busca="Ex.: luva, tubo, registro",
         exemplo_inicio="Ex.: cotovelo, luva, tee, registro, tubo",
         icone="atualizar",
+        exemplo_destino="Centro de custo da equipe",
         folha=folha_viaturas,
         centros=centros_equipe_manutencao,
         pede_ocorrencia=True,
+    ),
+    "oficina": Fluxo(
+        nome="oficina",
+        origem=OFICINA,
+        titulo="Oficina mecânica",
+        catalogo=formulario_oficina,
+        exemplo_busca="Ex.: filtro de óleo, pneu",
+        exemplo_inicio="Ex.: filtro, óleo, pneu, aditivo, lâmpada",
+        icone="caixa-check",
+        exemplo_destino="Oficina mecânica ou placa da viatura",
+        centros=centros_oficina,
     ),
     "avulsa": Fluxo(
         nome="avulsa",

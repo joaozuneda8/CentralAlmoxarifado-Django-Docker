@@ -210,15 +210,16 @@ transações precisam se comportar como no servidor.
   a mesma mensagem nos dois, e vira aviso de saúde (`saude._demais`); com itens e todos sem estoque,
   abre com o aviso `sem_estoque_agora` no topo. Recusa por item devolve o pedido inteiro, com a linha
   ilegível mantida e marcada "Corrigir" (`carrinho.ler(manter_ilegiveis=True)`). Cada formulário é
-  uma entrada de `FLUXOS` (`Fluxo`: `catalogo`, `exemplo_busca`, `exemplo_inicio`, `icone`,
-  `publico`, `regra_quantidade` e, opcionais, `folha`, `centros` e `pede_ocorrencia`; contratos em
+  uma entrada de `FLUXOS` (`Fluxo`: `catalogo`, `exemplo_busca`, `exemplo_inicio`,
+  `exemplo_destino`, `icone`, `publico`, `regra_quantidade` e, opcionais, `folha`, `centros` e
+  `pede_ocorrencia`; contratos em
   `specs/005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md` e
   `specs/006-reposicao-pecas-viaturas/contracts/configuracao-fluxo.md`): um formulário novo é uma
   entrada, uma função `formulario_*` em `catalogos.py` e um valor em `Pedido.Origem` (migration de
   `choices`), sem mexer no núcleo. `registrar_pedido` lê o catálogo e os centros
   (`servicos.centros_do_fluxo`) antes de travar a `Sequencia`. Para o funcionário, os formulários
-  se chamam "Limpeza, copa e escritório", "Ferramentas, peças e materiais" e "Reposição de peças das
-  viaturas" (`Fluxo.titulo`); o nome interno (painel, Telegram, `Pedido.Origem`) do segundo continua
+  se chamam "Limpeza, copa e escritório", "Ferramentas, peças e materiais", "Reposição de peças das
+  viaturas" e "Oficina mecânica" (`Fluxo.titulo`); o nome interno (painel, Telegram, `Pedido.Origem`) do segundo continua
   "Materiais AB", e o rótulo do Telegram é o da origem (`get_origem_display`). `regras.Erro` tem
   `campo` (`solicitante`, `destino`, `obs`, `ocorrencia`) nos erros de um campo:
   a view monta `erros_por_campo`, e o formulário mostra o resumo no topo (focado pelo `pedidos.js`,
@@ -321,9 +322,25 @@ transações precisam se comportar como no servidor.
   (`cabecalho_enviado` das origens públicas tem 4 campos), aparece na tela de sucesso, no detalhe, no
   recibo e na lista do painel e é achada pela busca do painel; não vai no Telegram nem muda na edição. A saúde do
   catálogo (`saude._viaturas`) diz quanto o formulário oferece ou por que está indisponível.
+- Formulário da oficina mecânica (spec `specs/007-formulario-oficina-mecanica/`): o formulário
+  público `FLUXOS["oficina"]` (origem `OFICINA`, `/pedido/oficina/`), pedido de autopeças e insumos
+  da oficina, sem folha nem ocorrência; o único campo novo no `Fluxo` é `exemplo_destino`, o
+  placeholder do destino (antes deduzido de `fluxo.centros`). O catálogo
+  (`catalogos.formulario_oficina`) são os materiais visíveis dos grupos da lista `Opcao`
+  `GRUPO_OFICINA` ("Grupos (oficina)", comparados por `_grupo`, como os ocultos do AB; lista vazia =
+  nenhum grupo) mais os avulsos de `MaterialOficina` (um por material, `OneToOne` com `PROTECT`; para
+  os óleos e filtros do grupo `GERAL`, que não entra inteiro), uma vez cada, pelo nome, com a regra
+  de quantidade e de estoque dos formulários públicos. Os destinos (`catalogos.centros_oficina`) são
+  o centro `OFICINA MECÂNICA` (`regras.CENTRO_OFICINA`, o mesmo de `resolver_centro_custo`) e cada
+  centro com placa, este só como "centro — placa": `regras.Centro.so_com_placa` tira a descrição
+  sozinha de `opcoes_destino` (padrão `False`, os outros formulários não mudam). O atendimento já
+  sugere centro e placa pelo destino (`_saida_do_destino`). A saúde (`saude._oficina`) diz quanto o
+  formulário oferece, por que está indisponível, os grupos sem material visível, os avulsos ocultos
+  e a falta do centro da oficina; a visão geral de Automações mostra a contagem
+  (`Situacao.oficina`).
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,
-  `PecaViatura`, `CentroCusto` (com a marca `equipe_manutencao`) e `Opcao` são mantidos à mão no
+  `PecaViatura`, `MaterialOficina`, `CentroCusto` (com a marca `equipe_manutencao`) e `Opcao` são mantidos à mão no
   admin. A placa do `CentroCusto` é normalizada
   (`norm_placa`), única no banco, e vazia vira NULL. `catalogos.py` monta os catálogos dos
   formulários (limpeza, AB pelo número de saídas consolidadas pelo de/para, avulsa) direto do

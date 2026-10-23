@@ -12,7 +12,7 @@ O que muda e o que não muda para quem usa os formulários e para os testes que 
 | POST | `/pedido/<fluxo>/carrinho/` | Trecho `_carrinho.html`, com `adicionar`, `alterar` ou `remover` |
 
 `<fluxo>` é o nome de um formulário público de `FLUXOS` (`fluxos.fluxo_publico`): `limpeza` e `ab`
-e, desde a spec 006, `viaturas`; nome desconhecido ou de fluxo não público dá 404. Os nomes das rotas
+e, desde as specs 006 e 007, `viaturas` e `oficina`; nome desconhecido ou de fluxo não público dá 404. Os nomes das rotas
 (`pedidos:formulario`, `pedidos:materiais`, `pedidos:carrinho`) não mudam. Os códigos HTTP também não:
 recusas de negócio voltam com 200 (o `htmx-config` não troca 4xx/5xx).
 

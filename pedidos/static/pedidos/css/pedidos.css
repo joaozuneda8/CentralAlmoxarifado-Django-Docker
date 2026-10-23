@@ -503,7 +503,7 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
 /* Lista do painel. A linha inteira leva ao detalhe (o link do Nº se estende sobre ela, selos
    incluídos: nenhum deles tem ação própria). As colunas de texto têm largura mínima, para o
    nome não quebrar palavra por palavra. */
-#lista-pedidos { container-type: inline-size; }
+#lista-pedidos, .lista-autorizacoes { container-type: inline-size; }
 .tabela-pedidos tbody tr { position: relative; }
 .tabela-pedidos .col-numero a::after { content: ""; position: absolute; inset: 0; }
 .tabela-pedidos .col-numero a:focus-visible { outline: none; }
@@ -527,6 +527,8 @@ tr[data-trocado] .entrega-alterar, tr[data-em-troca] .entrega-alterar { visibili
   .tabela-pedidos .col-destino { order: 4; flex-basis: 100%; font-size: 0.875em; color: var(--texto-secundario); }
   .tabela-pedidos .col-origem { order: 5; }
   .tabela-pedidos .col-situacao { order: 6; }
+  /* O que complementa a linha (materiais, quem decidiu, motivo): embaixo, em texto menor. */
+  .tabela-pedidos .col-extra { order: 7; flex-basis: 100%; font-size: 0.875em; color: var(--texto-secundario); }
   /* No cartão, os dois selos voltam a ficar lado a lado, quebrando linha se faltar largura. */
   .situacao-selos { flex-direction: row; flex-wrap: wrap; gap: 6px var(--esp-1); }
 }

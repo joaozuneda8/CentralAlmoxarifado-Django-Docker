@@ -94,3 +94,21 @@ das tarefas.
 - CHK015: a consulta pública contraria a decisão de desenho de a tela de sucesso não ter URL própria;
   a exceção foi pedida pelo usuário e é limitada (Plan §R6). O endurecimento com o nome completo é
   proposta ao usuário, não requisito.
+
+## Verificação da implementação (2026-10-23)
+
+Anotação do autor, sem marcar itens (a revisão dos requisitos é do revisor):
+
+- Portões: `ruff check` e `ruff format --check` limpos, `makemigrations --check` sem pendência,
+  `check --deploy --fail-level WARNING` sem avisos e `pytest` com 1696 passando e 1 pulado (o pulado é
+  de antes: flags do Windows). Linha de base antes da feature: 1534 passando e 1 pulado.
+- Roteiro manual (quickstart) num banco descartável local, no navegador embutido, com os dados do
+  cenário de teste: consulta pública, login do usuário do grupo caindo na fila, fila em cartões no
+  celular, detalhe só de leitura, recusa sem motivo negada, recusa com motivo gravada, tentativa de
+  abrir a saída avulsa e o admin redirecionada à fila, painel do almoxarifado com "Aguardando
+  autorização" e "Recusado" e atalho "Atender" em 0, detalhe do aguardando sem o formulário de
+  atendimento. **Não conferido à mão**: o envio do formulário de EPIs pelo navegador (os campos usam
+  controles customizados que a automação não digitou; o envio tem teste automatizado), o Telegram real
+  (os testes simulam o envio) e o Pester (`pwsh` não está instalado nesta máquina).
+- Achados da verificação, já corrigidos: o `select_related("autorizacao")` que faltava no painel (o
+  teste de consultas limitadas o pegou) e a fila de autorização que não virava cartões no celular.

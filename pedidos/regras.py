@@ -60,7 +60,14 @@ LIMPEZA = "LIMPEZA"
 AB = "AB"
 VIATURAS = "VIATURAS"
 OFICINA = "OFICINA"
+EPIS = "EPIS"
 AVULSA = "AVULSA"
+
+# Situações da autorização da Segurança do Trabalho (spec 008), as mesmas gravadas em
+# `AutorizacaoPedido.situacao`. O pedido de um formulário que não exige autorização não tem nenhuma.
+AUTORIZACAO_AGUARDANDO = "AGUARDANDO"
+AUTORIZACAO_AUTORIZADA = "AUTORIZADO"
+AUTORIZACAO_RECUSADA = "RECUSADO"
 
 # O centro de custo da oficina mecânica: destino do formulário da oficina (spec 007) e o da
 # saída com placa sem centro próprio (`resolver_centro_custo`).
@@ -688,9 +695,23 @@ def situacao_scpi(linhas) -> Situacao:
     )
 
 
-def situacao_pedido(origem: str, atendido: bool, itens) -> Situacao:
+def situacao_pedido(origem: str, atendido: bool, itens, autorizacao: str | None = None) -> Situacao:
     """Situação do pedido (`situacaoPedido_`, sem o estado "conferir", que existia por causa
-    de gravação parcial na planilha)."""
+    de gravação parcial na planilha).
+
+    `autorizacao` é a situação da autorização da Segurança do Trabalho (spec 008), ou None para o
+    pedido de um formulário que não exige: aguardando ou recusada vale por cima de tudo (o pedido
+    ainda não pode ser atendido, ou nunca mais), e autorizada segue a regra do atendimento."""
+    if autorizacao == AUTORIZACAO_AGUARDANDO:
+        return Situacao(
+            "aguardando_autorizacao",
+            "Aguardando autorização",
+            "A Segurança do Trabalho ainda não autorizou; o pedido não pode ser atendido.",
+        )
+    if autorizacao == AUTORIZACAO_RECUSADA:
+        return Situacao(
+            "recusado", "Recusado", "A Segurança do Trabalho recusou o pedido; ele está encerrado."
+        )
     if origem == AVULSA:
         # Já nasce atendida: a saída é registrada direto pelo almoxarifado.
         return Situacao("atendido", "Atendido", "Atendimento confirmado e saída registrada.")

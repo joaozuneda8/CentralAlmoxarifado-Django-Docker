@@ -64,6 +64,9 @@ class Fluxo:
     centros: Callable[[], list[Centro]] | None = None
     # Mostra, grava e compara no reenvio o "Nº da ocorrência" (opcional para quem pede).
     pede_ocorrencia: bool = False
+    # O pedido passa por autorização da Segurança do Trabalho antes do atendimento (spec 008): o
+    # registro cria a `AutorizacaoPedido` e o aviso ao almoxarifado só sai depois de autorizado.
+    exige_autorizacao: bool = False
 
     @property
     def max_itens(self) -> int | None:

@@ -219,3 +219,10 @@ def test_folha_destinos_e_ocorrencia_sao_opcionais_e_desligados_nos_fluxos_antig
     for nome in ("limpeza", "ab", "avulsa"):
         fluxo = fluxos.FLUXOS[nome]
         assert fluxo.folha is None and fluxo.centros is None and not fluxo.pede_ocorrencia
+
+
+def test_a_autorizacao_e_so_do_formulario_que_a_exige():
+    """`exige_autorizacao` (spec 008) tem padrão falso: os formulários anteriores não mudam."""
+    assert Fluxo.__dataclass_fields__["exige_autorizacao"].default is False
+    anteriores = [f for f in fluxos.FLUXOS.values() if f.nome != "epis"]
+    assert anteriores and not any(f.exige_autorizacao for f in anteriores)

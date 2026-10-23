@@ -140,7 +140,7 @@ def inicio_do_dia(dia: date) -> datetime:
 
 def pedidos_do_painel(filtros: dict) -> QuerySet:
     qs = (
-        Pedido.objects.select_related("atendimento")
+        Pedido.objects.select_related("atendimento", "autorizacao")
         .prefetch_related("itens", "atendimento__linhas")
         .order_by("-criado_em", "-numero")
     )

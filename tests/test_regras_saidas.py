@@ -250,3 +250,20 @@ def test_marcado_nao_lancar():
     assert marcado_nao_lancar("Fora de estoque")
     assert marcado_nao_lancar("não lançar")
     assert not marcado_nao_lancar("lançar amanhã")
+
+
+def test_situacao_pedido_com_autorizacao_da_seguranca_do_trabalho():
+    # Aguardando ou recusada vale por cima de tudo; sem autorização, a regra de sempre.
+    aguardando = situacao_pedido("EPIS", False, [I(2, None)], "AGUARDANDO")
+    assert (aguardando.chave, aguardando.rotulo) == (
+        "aguardando_autorizacao",
+        "Aguardando autorização",
+    )
+    recusado = situacao_pedido("EPIS", False, [I(2, None)], "RECUSADO")
+    assert (recusado.chave, recusado.rotulo) == ("recusado", "Recusado")
+    # Autorizado segue a regra do atendimento.
+    assert situacao_pedido("EPIS", False, [I(2, None)], "AUTORIZADO").chave == "aguardando"
+    assert situacao_pedido("EPIS", True, [I(2, Decimal(2))], "AUTORIZADO").chave == "atendido"
+    assert situacao_pedido("EPIS", True, [I(2, Decimal(1))], "AUTORIZADO").chave == "parcial"
+    # None (formulário sem autorização) não muda nada.
+    assert situacao_pedido(AB, False, [I(2, None)], None).chave == "aguardando"

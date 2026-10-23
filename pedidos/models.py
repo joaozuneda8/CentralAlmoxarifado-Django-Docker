@@ -21,6 +21,7 @@ class Pedido(models.Model):
         AB = regras.AB, "Materiais AB"
         VIATURAS = regras.VIATURAS, "Reposição de peças das viaturas"
         OFICINA = regras.OFICINA, "Oficina mecânica"
+        EPIS = regras.EPIS, "Pedido de EPIs"
         AVULSA = regras.AVULSA, "Saída avulsa"
 
     id = models.UUIDField(primary_key=True, editable=False)
@@ -59,14 +60,27 @@ class Pedido(models.Model):
             return None
 
     @property
+    def autorizacao_ou_none(self):
+        """A autorização da Segurança do Trabalho, ou None: o pedido de um formulário que não
+        exige autorização não tem."""
+        try:
+            return self.autorizacao
+        except AutorizacaoPedido.DoesNotExist:
+            return None
+
+    @property
     def linhas(self) -> list:
         atendimento = self.atendimento_ou_none
         return list(atendimento.linhas.all()) if atendimento else []
 
     @property
     def situacao(self) -> regras.Situacao:
+        autorizacao = self.autorizacao_ou_none
         return regras.situacao_pedido(
-            self.origem, self.atendimento_ou_none is not None, self.itens.all()
+            self.origem,
+            self.atendimento_ou_none is not None,
+            self.itens.all(),
+            autorizacao.situacao if autorizacao else None,
         )
 
     @property
@@ -188,6 +202,67 @@ class Atendimento(models.Model):
 
     def __str__(self):
         return f"Atendimento de {self.pedido.numero}"
+
+
+class AutorizacaoPedido(models.Model):
+    """Autorização da Segurança do Trabalho sobre um pedido de EPI (spec 008): uma linha por
+    pedido de formulário com `Fluxo.exige_autorizacao`, criada junto com o pedido. A decisão é
+    definitiva (autorizado ou recusado, sem volta) e só o atendimento de pedido autorizado é aceito.
+    Os pedidos dos outros formulários não têm esta linha."""
+
+    class Situacao(models.TextChoices):
+        AGUARDANDO = regras.AUTORIZACAO_AGUARDANDO, "Aguardando autorização"
+        AUTORIZADO = regras.AUTORIZACAO_AUTORIZADA, "Autorizado"
+        RECUSADO = regras.AUTORIZACAO_RECUSADA, "Recusado"
+
+    pedido = models.OneToOneField(Pedido, on_delete=models.CASCADE, related_name="autorizacao")
+    situacao = models.CharField(
+        max_length=12, choices=Situacao.choices, default=Situacao.AGUARDANDO, db_index=True
+    )
+    decidido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name="decidido por",
+    )
+    decidido_em = models.DateTimeField("decidido em", null=True, blank=True)
+    motivo = models.CharField("motivo da recusa", max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "autorização do pedido"
+        verbose_name_plural = "autorizações dos pedidos"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        situacao="AGUARDANDO",
+                        decidido_por__isnull=True,
+                        decidido_em__isnull=True,
+                        motivo="",
+                    )
+                    | models.Q(
+                        situacao="AUTORIZADO",
+                        decidido_por__isnull=False,
+                        decidido_em__isnull=False,
+                        motivo="",
+                    )
+                    | (
+                        models.Q(
+                            situacao="RECUSADO",
+                            decidido_por__isnull=False,
+                            decidido_em__isnull=False,
+                        )
+                        & ~models.Q(motivo="")
+                    )
+                ),
+                name="autorizacao_pedido_estado_coerente",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Autorização de {self.pedido.numero}: {self.get_situacao_display()}"
 
 
 class AlteracaoPedido(models.Model):

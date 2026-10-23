@@ -40,6 +40,8 @@
   {% endif %}
   {% endwith %}
 
+  {% include "pedidos/_autorizacao.html" %}
+
   <article class="folha-recibo">{% include "pedidos/_recibo.html" %}</article>
 
   {% if pedido.atendimento_ou_none and not editando %}{% include "pedidos/_alteracoes.html" %}{% endif %}

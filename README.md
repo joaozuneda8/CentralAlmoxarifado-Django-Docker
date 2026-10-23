@@ -11,6 +11,8 @@ Design: [docs/superpowers/specs/2026-10-10-central-almoxarifado-django-design.md
 - **Formulários públicos** (`/`, sem login): pedido de limpeza, copa/cozinha e escritório e
   pedido de materiais AB (limitado ao estoque do SCPI). Cada pedido novo avisa no Telegram
   (`TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` no `.env`).
+  O formulário de EPIs passa antes pela autorização da Segurança do Trabalho (grupo
+  `Segurança do Trabalho` no admin; `TELEGRAM_CHAT_ID_SEGURANCA` no `.env` avisa a fila dela).
 - **Área do almoxarifado** (`/painel/`, login por matrícula): painel com filtros,
   atendimento dos pedidos, saída avulsa, recibo impresso do detalhe do pedido e a página Automações, com as
   importações e o lançamento no SCPI. Cada saída vira linhas que o robô do SCPI lança depois.

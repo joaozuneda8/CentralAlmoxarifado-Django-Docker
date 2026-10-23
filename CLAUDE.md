@@ -338,6 +338,37 @@ transações precisam se comportar como no servidor.
   formulário oferece, por que está indisponível, os grupos sem material visível, os avulsos ocultos
   e a falta do centro da oficina; a visão geral de Automações mostra a contagem
   (`Situacao.oficina`).
+- Formulário de EPIs, com autorização da Segurança do Trabalho (spec `specs/008-formulario-epis/`):
+  `FLUXOS["epis"]` (origem `EPIS`, `/pedido/epis/`, ícone `escudo`) é o primeiro com
+  `Fluxo.exige_autorizacao`. O pedido nasce com uma `AutorizacaoPedido` (`AGUARDANDO`, na mesma
+  transação; os outros formulários não têm a linha) e só quem é da Segurança do Trabalho a decide,
+  uma vez e para sempre: `AUTORIZADO`, ou `RECUSADO` com motivo (`servicos.decidir_autorizacao`: trava
+  o pedido, a primeira decisão vale, a segunda devolve quem decidiu e quando; `CheckConstraint` no
+  banco). **Solicitar não é fornecer**: o sistema nunca baixa estoque, e `confirmar_atendimento`
+  recusa o pedido não autorizado antes de gravar (nenhum `Atendimento` nem `LinhaSaida`, logo o robô
+  nunca o vê); a tela do detalhe e os endpoints de busca e acréscimo do atendimento espelham. Nenhum
+  dado extra de EPI (CA, tamanho, motivo) no pedido: está fora do escopo. `regras.situacao_pedido(...,
+  autorizacao)` ganha `aguardando_autorizacao` e `recusado`; `filtrar_situacao("aguardando")` exclui
+  os dois (o atalho "Atender" só conta o atendível) e o painel tem o filtro Autorização, à parte da
+  situação; o recibo não muda. O catálogo é `Opcao.Lista.GRUPO_EPI` + `MaterialEpi`, como o da
+  oficina, que não foi tocada (`catalogos.catalogo_epis`, `saude._epis`, `Situacao.epis`).
+  **Acesso**: o grupo `Segurança do Trabalho` (criado por migration de dados de `contas`; o acesso é
+  participar do grupo, nunca `is_staff`, e o administrador o dá no formulário do usuário no admin) e o
+  `contas.middleware.RestringirSegurancaTrabalho`, que em `process_view` **nega por padrão** tudo o
+  que não está em `contas.acesso.ROTAS_SEGURANCA_TRABALHO` (GET redireciona à fila; os outros métodos
+  dão 403); as views existentes não mudam, e `tests/test_epis_acesso.py` percorre todas as rotas
+  nomeadas do projeto. Rota nova que o grupo deva abrir entra nessa constante. O menu (`ItemMenu.para`)
+  e a marca mudam para ele. Telas em `views/autorizacao.py`: `/painel/autorizacoes/` (fila e já
+  decididos), `<numero>/` (leitura e decisão) e `<numero>/decidir/`, com 403 para quem não é do grupo
+  também sem o middleware. **Avisos**: ao registrar, só o chat `TELEGRAM_CHAT_ID_SEGURANCA` (botão
+  "Abrir fila"; `telegram.notificar_autorizacao_pendente`); ao autorizar, o `TELEGRAM_CHAT_ID` de
+  sempre; recusa e pedido aguardando não avisam o almoxarifado; falha nunca desfaz nada. **Consulta
+  pública** `/pedido/epis/consulta/` (`publico.consulta_epi`, POST com CSRF, `never_cache`): mostra só a
+  situação e o motivo da recusa, responde igual a número inexistente e a número de outro formulário e
+  limita por origem no cache do Django (`PEDIDOS_CONSULTA_LIMITE_IP_10_MIN`, zera ao reiniciar). É a
+  exceção ao desenho de o número do pedido não virar página pública; exigir também o nome completo
+  foi proposto e **não adotado** (decisão do usuário). A spec lista as pendências de validação
+  normativa (NR-6) que o sistema não resolve.
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,
   `PecaViatura`, `MaterialOficina`, `CentroCusto` (com a marca `equipe_manutencao`) e `Opcao` são mantidos à mão no

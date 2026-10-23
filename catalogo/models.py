@@ -45,6 +45,8 @@ class Opcao(models.Model):
         UNIDADE_FRACIONAVEL = "UNIDADE_FRACIONAVEL", "Unidades fracionáveis"
         # Grupos do SCPI cujos materiais o formulário da oficina mecânica oferece (spec 007).
         GRUPO_OFICINA = "GRUPO_OFICINA", "Grupos (oficina)"
+        # Grupos do SCPI cujos materiais o formulário de EPIs oferece (spec 008).
+        GRUPO_EPI = "GRUPO_EPI", "Grupos (EPIs)"
 
     lista = models.CharField(max_length=30, choices=Lista.choices)
     valor = models.CharField(max_length=200)
@@ -175,6 +177,21 @@ class MaterialOficina(models.Model):
         ordering = ["material__nome"]
         verbose_name = "material da oficina"
         verbose_name_plural = "materiais da oficina"
+
+    def __str__(self):
+        return str(self.material)
+
+
+class MaterialEpi(models.Model):
+    """Material avulso do formulário de EPIs (spec 008), além dos grupos da lista `GRUPO_EPI`:
+    serve ao EPI de um grupo que não pode entrar inteiro."""
+
+    material = models.OneToOneField(Material, on_delete=models.PROTECT, related_name="material_epi")
+
+    class Meta:
+        ordering = ["material__nome"]
+        verbose_name = "material de EPIs"
+        verbose_name_plural = "materiais de EPIs"
 
     def __str__(self):
         return str(self.material)

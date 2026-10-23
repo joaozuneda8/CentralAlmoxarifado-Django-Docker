@@ -16,6 +16,7 @@ from catalogo.catalogos import (
     CatalogoAB,
     _grupo,
     catalogo_ab,
+    catalogo_epis,
     catalogo_limpeza,
     catalogo_oficina,
     catalogo_viaturas,
@@ -27,6 +28,7 @@ from catalogo.models import (
     Importacao,
     ItemLimpeza,
     Material,
+    MaterialEpi,
     MaterialOficina,
     Opcao,
     PecaViatura,
@@ -282,6 +284,49 @@ def _oficina() -> list[ItemSaude]:
     return saude
 
 
+FORMULARIO_EPIS = "Formulário de EPIs"
+
+
+def _epis() -> list[ItemSaude]:
+    """O formulário de EPIs (spec 008): quanto oferece ou por que está indisponível, os grupos da
+    lista sem material visível e os avulsos ocultos (o saldo já foi importado). O destino é
+    qualquer centro de custo, como nos formulários de limpeza e AB, então não há aviso de destino
+    aqui (o aviso geral de "nenhum centro de custo cadastrado" já cobre)."""
+    saude = []
+    n = len(catalogo_epis())
+    if not n:
+        saude.append(
+            ItemSaude(
+                "erro",
+                f"{FORMULARIO_EPIS}: nenhum material nos grupos nem entre os materiais de EPIs; "
+                "o formulário fica indisponível.",
+            )
+        )
+    else:
+        materiais = "1 material" if n == 1 else f"{numero(n)} materiais"
+        saude.append(ItemSaude("ok", f"{FORMULARIO_EPIS}: {materiais}."))
+    visiveis = {
+        _grupo(g)
+        for g in Material.objects.filter(oculto=False).values_list("grupo", flat=True).distinct()
+    }
+    sem_material = [v for v in Opcao.valores(Opcao.Lista.GRUPO_EPI) if _grupo(v) not in visiveis]
+    if sem_material:
+        saude.append(
+            ItemSaude("aviso", f"Grupos de EPIs sem material visível: {lista_curta(sem_material)}.")
+        )
+    ocultos = list(
+        MaterialEpi.objects.filter(material__oculto=True).values_list("material__codigo", flat=True)
+    )
+    if ocultos:
+        saude.append(
+            ItemSaude(
+                "aviso",
+                f"Materiais de EPIs ocultos no SCPI (não aparecem): {lista_curta(ocultos)}.",
+            )
+        )
+    return saude
+
+
 def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) -> list[ItemSaude]:
     """Tudo o que não é a situação de uma importação: cadastro, saldo e formulários."""
     saude = []
@@ -374,6 +419,7 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
     if ab is not None:
         saude += _viaturas(ab)
         saude += _oficina()
+        saude += _epis()
 
     if not CentroCusto.objects.exists():
         saude.append(
@@ -494,6 +540,7 @@ class Situacao:
     ab: CatalogoAB | None
     viaturas: int = 0  # peças visíveis na lista do formulário de viaturas (spec 006)
     oficina: int = 0  # materiais do formulário da oficina mecânica (spec 007)
+    epis: int = 0  # materiais do formulário de EPIs (spec 008)
 
     @property
     def tem_avisos(self) -> bool:
@@ -531,4 +578,5 @@ def situacao_do_catalogo(agora: datetime | None = None) -> Situacao:
         ab=ab,
         viaturas=len(catalogo_viaturas()),
         oficina=len(catalogo_oficina()),
+        epis=len(catalogo_epis()),
     )

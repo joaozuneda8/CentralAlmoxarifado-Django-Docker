@@ -164,8 +164,8 @@ def _com_catalogo(formulario, catalogo):
 
 def test_a_pagina_inicial_lista_os_formularios_publicos_a_partir_de_fluxos(client, novo):
     html = client.get(reverse("pedidos:inicio")).text
-    # Os quatro formulários públicos de `FLUXOS` (limpeza, AB, viaturas e oficina) e o de teste.
-    assert html.count('class="cartao cartao-opcao"') == 5
+    # Os cinco formulários públicos de `FLUXOS` (limpeza, AB, viaturas, oficina, EPIs) e o de teste.
+    assert html.count('class="cartao cartao-opcao"') == 6
     assert TITULO in html and "Ex.: parafuso, cabo, fusível" in html
     assert reverse("pedidos:formulario", args=["reposicao"]) in html
     # Os formulários de sempre continuam lá, e a saída avulsa nunca é pública.
@@ -219,3 +219,10 @@ def test_folha_destinos_e_ocorrencia_sao_opcionais_e_desligados_nos_fluxos_antig
     for nome in ("limpeza", "ab", "avulsa"):
         fluxo = fluxos.FLUXOS[nome]
         assert fluxo.folha is None and fluxo.centros is None and not fluxo.pede_ocorrencia
+
+
+def test_a_autorizacao_e_so_do_formulario_que_a_exige():
+    """`exige_autorizacao` (spec 008) tem padrão falso: os formulários anteriores não mudam."""
+    assert Fluxo.__dataclass_fields__["exige_autorizacao"].default is False
+    anteriores = [f for f in fluxos.FLUXOS.values() if f.nome != "epis"]
+    assert anteriores and not any(f.exige_autorizacao for f in anteriores)

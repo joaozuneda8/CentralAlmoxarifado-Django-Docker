@@ -8,6 +8,7 @@ from catalogo.models import (
     Importacao,
     ItemLimpeza,
     Material,
+    MaterialEpi,
     MaterialOficina,
     Opcao,
     ParametroReposicao,
@@ -91,6 +92,16 @@ class PecaViaturaAdmin(admin.ModelAdmin):
 class MaterialOficinaAdmin(admin.ModelAdmin):
     """Os materiais avulsos do formulário da oficina mecânica (spec 007), além dos grupos da lista
     "Grupos (oficina)" das opções: um material por linha, de qualquer grupo."""
+
+    autocomplete_fields = ["material"]
+    list_display = ["material"]
+    search_fields = ["material__codigo", "material__nome"]
+
+
+@admin.register(MaterialEpi)
+class MaterialEpiAdmin(admin.ModelAdmin):
+    """Os materiais avulsos do formulário de EPIs (spec 008), além dos grupos da lista "Grupos
+    (EPIs)" das opções: um material por linha, de qualquer grupo."""
 
     autocomplete_fields = ["material"]
     list_display = ["material"]

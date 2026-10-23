@@ -242,6 +242,31 @@ def formulario_oficina() -> list[ItemCatalogo] | None:
     return (catalogo_oficina() if saldo_importado() else None) or None
 
 
+def grupos_epis() -> set[str]:
+    """Os grupos do formulário de EPIs (spec 008), normalizados como os da oficina. Lista vazia:
+    nenhum grupo (sem padrão)."""
+    return {_grupo(v) for v in Opcao.valores(Opcao.Lista.GRUPO_EPI)}
+
+
+def catalogo_epis() -> list[ItemCatalogo]:
+    """Materiais do formulário de EPIs: os não ocultos dos grupos de EPIs e os avulsos
+    (`MaterialEpi`), uma vez cada, pelo nome; a unidade é a do SCPI."""
+    grupos = grupos_epis()
+    visiveis = Material.objects.filter(oculto=False)
+    casados = [
+        g for g in visiveis.values_list("grupo", flat=True).distinct() if _grupo(g) in grupos
+    ]
+    materiais = visiveis.filter(Q(grupo__in=casados) | Q(material_epi__isnull=False))
+    fracionaveis = unidades_fracionaveis()
+    return [_item(m, fracionaveis) for m in materiais.distinct().order_by("nome", "codigo")]
+
+
+def formulario_epis() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário de EPIs, ou None se ele está indisponível: o saldo nunca foi
+    importado ou a escolha dos EPIs não tem material visível."""
+    return (catalogo_epis() if saldo_importado() else None) or None
+
+
 def centros_oficina() -> list[Centro]:
     """Destinos do formulário da oficina: o centro OFICINA MECÂNICA (a linha sem placa) e cada
     viatura (centro com placa), esta só como "centro — placa"."""

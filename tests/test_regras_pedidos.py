@@ -320,3 +320,12 @@ def test_erros_de_material_nao_tem_campo():
     assert r.erros and all(e.campo is None and e.codigo for e in r.erros)
     r = valida_limpeza(("023.001.002", "1.5"))
     assert r.erros and all(e.campo is None for e in r.erros)
+
+
+def test_a_origem_de_epis_e_publica_como_as_outras():
+    """A origem nova vale para o limite por nome e o reenvio sem mudar as regras."""
+    from pedidos.regras import AVULSA, EPIS, cabecalho_enviado, origem_publica
+
+    assert origem_publica(EPIS) and not origem_publica(AVULSA)
+    envio = EnvioPedido(solicitante=" Ana ", destino="ETA I", obs="x", itens=[])
+    assert cabecalho_enviado(EPIS, envio) == ("Ana", "ETA I", "x", "")

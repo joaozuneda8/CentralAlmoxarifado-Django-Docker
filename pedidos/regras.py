@@ -60,7 +60,14 @@ LIMPEZA = "LIMPEZA"
 AB = "AB"
 VIATURAS = "VIATURAS"
 OFICINA = "OFICINA"
+EPIS = "EPIS"
 AVULSA = "AVULSA"
+
+# Situações da autorização da Segurança do Trabalho (spec 008), as mesmas gravadas em
+# `AutorizacaoPedido.situacao`. O pedido de um formulário que não exige autorização não tem nenhuma.
+AUTORIZACAO_AGUARDANDO = "AGUARDANDO"
+AUTORIZACAO_AUTORIZADA = "AUTORIZADO"
+AUTORIZACAO_RECUSADA = "RECUSADO"
 
 # O centro de custo da oficina mecânica: destino do formulário da oficina (spec 007) e o da
 # saída com placa sem centro próprio (`resolver_centro_custo`).
@@ -688,9 +695,23 @@ def situacao_scpi(linhas) -> Situacao:
     )
 
 
-def situacao_pedido(origem: str, atendido: bool, itens) -> Situacao:
+def situacao_pedido(origem: str, atendido: bool, itens, autorizacao: str | None = None) -> Situacao:
     """Situação do pedido (`situacaoPedido_`, sem o estado "conferir", que existia por causa
-    de gravação parcial na planilha)."""
+    de gravação parcial na planilha).
+
+    `autorizacao` é a situação da autorização da Segurança do Trabalho (spec 008), ou None para o
+    pedido de um formulário que não exige: aguardando ou recusada vale por cima de tudo (o pedido
+    ainda não pode ser atendido, ou nunca mais), e autorizada segue a regra do atendimento."""
+    if autorizacao == AUTORIZACAO_AGUARDANDO:
+        return Situacao(
+            "aguardando_autorizacao",
+            "Aguardando autorização",
+            "A Segurança do Trabalho ainda não autorizou; o pedido não pode ser atendido.",
+        )
+    if autorizacao == AUTORIZACAO_RECUSADA:
+        return Situacao(
+            "recusado", "Recusado", "A Segurança do Trabalho recusou o pedido; ele está encerrado."
+        )
     if origem == AVULSA:
         # Já nasce atendida: a saída é registrada direto pelo almoxarifado.
         return Situacao("atendido", "Atendido", "Atendimento confirmado e saída registrada.")
@@ -719,6 +740,32 @@ def situacao_pedido(origem: str, atendido: bool, itens) -> Situacao:
         "Aguardando atendimento",
         "Pedido enviado; o almoxarifado ainda não confirmou.",
     )
+
+
+_NUMERO_DE_PEDIDO = re.compile(r"^P-?(\d{1,9})$")
+
+
+def normalizar_numero_pedido(digitado: str) -> str:
+    """O número de pedido como a numeração o grava ("P-000123"), a partir do que o servidor
+    digita ("p-123", " P123 "). O que não parece um número de pedido volta só limpo e em
+    maiúsculas (a consulta não o acha)."""
+    limpo = "".join(str(digitado or "").split()).upper()
+    casou = _NUMERO_DE_PEDIDO.match(limpo)
+    return f"P-{int(casou.group(1)):06d}" if casou else limpo
+
+
+def texto_situacao_consulta(numero: str, autorizacao: str, motivo: str) -> tuple[str, str]:
+    """O que a consulta pública do pedido de EPI diz ao servidor (spec 008, FR-031): a situação
+    e, na recusa, o motivo. Nada além disso: nem nome, nem destino, nem materiais."""
+    if autorizacao == AUTORIZACAO_RECUSADA:
+        return f"Pedido {numero}: recusado pela Segurança do Trabalho.", motivo
+    if autorizacao == AUTORIZACAO_AUTORIZADA:
+        return (
+            f"Pedido {numero}: autorizado. O almoxarifado vai atendê-lo; procure o almoxarifado "
+            "para retirar.",
+            "",
+        )
+    return f"Pedido {numero}: aguardando autorização da Segurança do Trabalho.", ""
 
 
 # ---------------------------------------------------------------------------

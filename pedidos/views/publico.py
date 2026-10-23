@@ -1,9 +1,13 @@
+from django.conf import settings
+from django.core.cache import cache
 from django.shortcuts import render
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods
 
 from pedidos import carrinho as carrinho_mod
 from pedidos.fluxos import fluxo_publico, fluxos_publicos, opcoes_filtro
-from pedidos.models import ItemPedido
+from pedidos.models import AutorizacaoPedido, ItemPedido
 from pedidos.protecao import (
     CAMPO_ISCA,
     MENSAGEM_RAPIDO,
@@ -14,7 +18,13 @@ from pedidos.protecao import (
     ler,
     recusar,
 )
-from pedidos.regras import EnvioPedido, opcoes_destino, resolver_destino
+from pedidos.regras import (
+    EnvioPedido,
+    normalizar_numero_pedido,
+    opcoes_destino,
+    resolver_destino,
+    texto_situacao_consulta,
+)
 from pedidos.servicos import catalogo_de, centros_do_fluxo, registrar_pedido
 from pedidos.views.materiais import contexto_busca, urls_do_fluxo
 
@@ -103,7 +113,10 @@ def formulario(request, fluxo):
         envio.id,
         pedido,
         ip=request.META.get("REMOTE_ADDR"),
-        url_painel=request.build_absolute_uri(reverse("pedidos:painel")),
+        # Botão do aviso: a fila de autorização (a Segurança do Trabalho recebe) ou o painel.
+        url_painel=request.build_absolute_uri(
+            reverse("pedidos:autorizacoes" if fluxo.exige_autorizacao else "pedidos:painel")
+        ),
     )
     if resposta.ok:
         # `_sucesso.html` lista só o que o funcionário pediu (filtro por segurança).
@@ -136,3 +149,50 @@ def _por_campo(erros) -> dict[str, list[str]]:
         if erro.campo:
             por_campo.setdefault(erro.campo, []).append(erro.texto)
     return por_campo
+
+
+MENSAGEM_CONSULTA_NAO_ACHADA = "Não encontramos um pedido de EPIs com este número."
+MENSAGEM_CONSULTA_LIMITE = "Muitas consultas desta rede em pouco tempo. Procure o almoxarifado."
+MENSAGEM_CONSULTA_VAZIA = "Informe o número do pedido."
+JANELA_DAS_CONSULTAS = 10 * 60  # segundos
+
+
+def _consultas_demais(ip: str) -> bool:
+    """Conta esta consulta e diz se a origem passou do limite da janela. O contador vive no cache
+    do processo (um só): zerar numa reinicialização é aceitável para um limite contra varredura
+    de números (research R6), e evita uma tabela só para isso."""
+    chave = f"consulta_epi:{ip}"
+    cache.add(chave, 0, timeout=JANELA_DAS_CONSULTAS)
+    try:
+        n = cache.incr(chave)
+    except ValueError:  # a chave venceu entre o `add` e o `incr`
+        cache.set(chave, 1, timeout=JANELA_DAS_CONSULTAS)
+        n = 1
+    return n > settings.PEDIDOS_CONSULTA_LIMITE_IP_10_MIN
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def consulta_epi(request):
+    """O servidor, sem login, consulta pelo número do pedido de EPI se ele foi autorizado ou
+    recusado (spec 008, FR-031). Mostra só a situação e o motivo da recusa; número inexistente e
+    de outro formulário têm a mesma resposta; só lê (nada é gravado)."""
+    contexto = {"numero": ""}
+    if request.method == "POST":
+        digitado = request.POST.get("numero", "")
+        contexto["numero"] = digitado
+        if _consultas_demais(request.META.get("REMOTE_ADDR", "")):
+            contexto["aviso"] = MENSAGEM_CONSULTA_LIMITE
+        elif not normalizar_numero_pedido(digitado):
+            contexto["aviso"] = MENSAGEM_CONSULTA_VAZIA
+        else:
+            numero = normalizar_numero_pedido(digitado)
+            autorizacao = AutorizacaoPedido.objects.filter(pedido__numero=numero).first()
+            if autorizacao is None:
+                contexto["aviso"] = MENSAGEM_CONSULTA_NAO_ACHADA
+            else:
+                frase, motivo = texto_situacao_consulta(
+                    numero, autorizacao.situacao, autorizacao.motivo
+                )
+                contexto.update(frase=frase, motivo=motivo, situacao=autorizacao.situacao)
+    return render(request, "pedidos/consulta_epi.html", contexto)

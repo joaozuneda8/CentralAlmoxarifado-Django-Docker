@@ -7,8 +7,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from catalogo.catalogos import centros_oficina
-from catalogo.models import CentroCusto
+from catalogo.catalogos import centros_do_formulario
+from catalogo.models import CentroCusto, Formulario
 from pedidos.models import Pedido
 from pedidos.regras import Centro, opcoes_destino, resolver_destino
 from tests.oficina_cenario import FILTRO, OFICINA, PICKUP, RETRO, enviar, montar_oficina
@@ -59,14 +59,14 @@ def test_a_descricao_sozinha_da_viatura_nao_e_destino():
 @pytest.mark.django_db
 def test_centros_da_oficina():
     montar_oficina()
-    assert opcoes_destino(centros_oficina()) == [OFICINA, PICKUP, RETRO]
+    assert opcoes_destino(centros_do_formulario(Formulario.OFICINA)) == [OFICINA, PICKUP, RETRO]
 
 
 @pytest.mark.django_db
 def test_sem_o_centro_da_oficina_so_as_viaturas():
     montar_oficina()
     CentroCusto.objects.filter(descricao=OFICINA).delete()
-    assert opcoes_destino(centros_oficina()) == [PICKUP, RETRO]
+    assert opcoes_destino(centros_do_formulario(Formulario.OFICINA)) == [PICKUP, RETRO]
 
 
 @pytest.mark.django_db

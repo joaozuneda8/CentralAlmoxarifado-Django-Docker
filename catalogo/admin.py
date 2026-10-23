@@ -8,8 +8,6 @@ from catalogo.models import (
     Importacao,
     ItemLimpeza,
     Material,
-    MaterialEpi,
-    MaterialOficina,
     Opcao,
     ParametroReposicao,
     ParDePara,
@@ -88,32 +86,15 @@ class PecaViaturaAdmin(admin.ModelAdmin):
     search_fields = ["material__codigo", "material__nome", "nome_exibido"]
 
 
-@admin.register(MaterialOficina)
-class MaterialOficinaAdmin(admin.ModelAdmin):
-    """Os materiais avulsos do formulário da oficina mecânica (spec 007), além dos grupos da lista
-    "Grupos (oficina)" das opções: um material por linha, de qualquer grupo."""
-
-    autocomplete_fields = ["material"]
-    list_display = ["material"]
-    search_fields = ["material__codigo", "material__nome"]
-
-
-@admin.register(MaterialEpi)
-class MaterialEpiAdmin(admin.ModelAdmin):
-    """Os materiais avulsos do formulário de EPIs (spec 008), além dos grupos da lista "Grupos
-    (EPIs)" das opções: um material por linha, de qualquer grupo."""
-
-    autocomplete_fields = ["material"]
-    list_display = ["material"]
-    search_fields = ["material__codigo", "material__nome"]
-
-
 @admin.register(CentroCusto)
 class CentroCustoAdmin(admin.ModelAdmin):
-    list_display = ["descricao", "codigo", "placa", "equipe_manutencao"]
-    # A marca de equipe de manutenção define os destinos do formulário de viaturas (spec 006).
-    list_editable = ["equipe_manutencao"]
-    list_filter = ["equipe_manutencao"]
+    """Os centros de custo: criar, editar e ativar ou inativar. Onde cada linha é destino se define
+    na página Formulários (spec 009); a marca antiga de equipe de manutenção saiu."""
+
+    list_display = ["descricao", "codigo", "placa", "ativo"]
+    list_editable = ["ativo"]
+    list_filter = ["ativo"]
+    exclude = ["equipe_manutencao"]
     search_fields = ["descricao", "codigo", "placa"]
 
 

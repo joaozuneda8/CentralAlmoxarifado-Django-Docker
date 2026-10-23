@@ -108,6 +108,10 @@ coberto por teste de equivalência e pela adaptação planejada de `tests/cenari
 *(preenchidas por T001 e T052: tempo de abertura dos cinco formulários antes e depois, e da lista de
 materiais da configuração; SC-010.)*
 
+**Antes (T001, 2026-10-23, banco de desenvolvimento, `Client`, média de 10 aberturas):** limpeza 11 ms, AB
+41 ms, viaturas 40 ms, oficina 36 ms, EPIs 36 ms. Suíte de base: 1.697 passam, 1 pulado (flags do Windows),
+em 24 s.
+
 ## Implantação
 
 A migration roda no `deploy/atualizar.ps1`, que já faz o backup antes de migrar; nada de especial além de

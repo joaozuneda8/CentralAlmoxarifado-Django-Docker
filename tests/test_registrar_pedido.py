@@ -213,13 +213,13 @@ def _anotar_chamadas(monkeypatch, *nomes):
 @pytest.mark.parametrize("origem", [AB, LIMPEZA])
 def test_catalogo_e_centros_sao_lidos_antes_de_travar_a_numeracao(monkeypatch, avisos, origem):
     montar_cenario()
-    ordem = _anotar_chamadas(monkeypatch, "catalogo_de", "centros", "travar_sequencia")
+    ordem = _anotar_chamadas(monkeypatch, "catalogo_de", "centros_do_fluxo", "travar_sequencia")
     envio = envio_ab() if origem == AB else envio_limpeza()
     assert registrar_pedido(origem, uuid.uuid4(), envio).ok
     # O catálogo do AB é a parte mais pesada: nenhum outro envio espera por ele.
     assert ordem.count("catalogo_de") == 1
     trava = ordem.index("travar_sequencia")
-    assert ordem.index("catalogo_de") < trava and ordem.index("centros") < trava
+    assert ordem.index("catalogo_de") < trava and ordem.index("centros_do_fluxo") < trava
 
 
 def test_a_ordem_das_respostas_nao_muda_com_o_catalogo_lido_antes(monkeypatch, avisos, settings):

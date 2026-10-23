@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Q
 from django.utils import timezone
 
 from catalogo.consultas_curva import consolidado
@@ -20,12 +19,22 @@ from catalogo.curva import periodo
 from catalogo.models import (
     CentroCusto,
     ConfiguracaoCurva,
+    ExcecaoMaterial,
     ItemLimpeza,
     Material,
     Opcao,
     PecaViatura,
 )
-from pedidos.regras import CENTRO_OFICINA, Centro, estoque_inteiro, norm_u
+from pedidos.regras import (
+    AB,
+    EPIS,
+    LIMPEZA,
+    OFICINA,
+    VIATURAS,
+    Centro,
+    estoque_inteiro,
+    norm_u,
+)
 
 # Usados quando a lista GRUPO_OCULTO_AB está vazia (como `GRUPOS_OCULTOS_PADRAO_`).
 GRUPOS_OCULTOS_PADRAO = (
@@ -92,6 +101,63 @@ def _item(material: Material, fracionaveis: set[str], **outros) -> ItemCatalogo:
     }
     campos.update(outros)
     return ItemCatalogo(**campos)
+
+
+def aplicar_excecoes(
+    origem: str, base: list[ItemCatalogo], *, ordem_do_banco: bool = False
+) -> list[ItemCatalogo]:
+    """A base (a regra de origem do formulário) sem os materiais que o administrador retirou e com
+    os que acrescentou (spec 009): duas consultas pequenas, as exceções do formulário e os
+    materiais acrescentados.
+
+    O material oculto no cadastro nunca entra (o cadastro vence a exceção) e o que a base já traz
+    não se repete. Os acrescentados vêm ao fim, em ordem alfabética por nome e código; nos
+    formulários de catálogo alfabético por inteiro (`ordem_do_banco`: oficina e EPIs), a lista toda
+    sai na ordem do banco, com o acrescentado no lugar dele."""
+    excecoes = list(
+        ExcecaoMaterial.objects.filter(formulario=origem).values_list(
+            "material__codigo", "habilitado"
+        )
+    )
+    if not excecoes:
+        return base
+    retirados = {norm_u(codigo) for codigo, habilitado in excecoes if not habilitado}
+    itens = [i for i in base if norm_u(i.codigo) not in retirados]
+    presentes = {norm_u(i.codigo) for i in itens}
+    acrescentar = [c for c, habilitado in excecoes if habilitado and norm_u(c) not in presentes]
+    novos = Material.objects.filter(codigo__in=acrescentar, oculto=False)
+    if ordem_do_banco:
+        codigos = [i.codigo for i in itens] + [m.codigo for m in novos]
+        fracionaveis = unidades_fracionaveis()
+        todos = Material.objects.filter(codigo__in=codigos, oculto=False).order_by("nome", "codigo")
+        return [_item(m, fracionaveis) for m in todos]
+    fracionaveis = unidades_fracionaveis()
+    return itens + [_item(m, fracionaveis) for m in novos.order_by("nome", "codigo")]
+
+
+def regra_de_origem(origem: str) -> list[ItemCatalogo]:
+    """Os itens que a regra de origem do formulário traz hoje, **sem** as exceções (e sem o corte
+    "indisponível" por saldo nunca importado): a base da disponibilidade efetiva."""
+    if origem == LIMPEZA:
+        return catalogo_limpeza()
+    if origem == AB:
+        ab = catalogo_ab()
+        return ab.itens if ab is not None else []
+    if origem == VIATURAS:
+        return _base_viaturas()
+    if origem == OFICINA:
+        return catalogo_oficina()
+    if origem == EPIS:
+        return catalogo_epis()
+    raise KeyError(origem)
+
+
+def catalogo_efetivo(origem: str) -> list[ItemCatalogo]:
+    """A disponibilidade efetiva do formulário (regra de origem mais exceções), sem o corte de
+    "indisponível" por saldo nunca importado: o que a saúde e a tela de configuração contam."""
+    return aplicar_excecoes(
+        origem, regra_de_origem(origem), ordem_do_banco=origem in (OFICINA, EPIS)
+    )
 
 
 def catalogo_limpeza() -> list[ItemCatalogo]:
@@ -167,15 +233,19 @@ def catalogo_avulsa() -> list[ItemCatalogo]:
 
 def formulario_limpeza() -> list[ItemCatalogo] | None:
     """O catálogo do formulário de limpeza, ou None se ele está indisponível: o saldo nunca foi
-    importado (o formulário limita pelo saldo) ou não há item algum."""
-    return (catalogo_limpeza() if saldo_importado() else None) or None
+    importado (o formulário limita pelo saldo) ou não há item algum (depois das exceções)."""
+    if not saldo_importado():
+        return None
+    return aplicar_excecoes(LIMPEZA, catalogo_limpeza()) or None
 
 
 def formulario_ab() -> list[ItemCatalogo] | None:
     """O catálogo do formulário AB, ou None se ele está indisponível: o saldo nunca foi importado
-    ou nenhum material com saída entra no catálogo."""
+    ou nenhum material com saída entra no catálogo (depois das exceções)."""
     ab = catalogo_ab()
-    return (ab.itens if ab is not None else None) or None
+    if ab is None:
+        return None
+    return aplicar_excecoes(AB, ab.itens) or None
 
 
 def formulario_avulsa() -> list[ItemCatalogo] | None:
@@ -191,16 +261,22 @@ def catalogo_viaturas() -> list[ItemCatalogo]:
     return [_item(p.material, fracionaveis, nome=p.nome_exibido or p.material.nome) for p in pecas]
 
 
-def formulario_viaturas() -> list[ItemCatalogo] | None:
-    """O catálogo do formulário de viaturas: a lista e, depois, o catálogo AB sem repetir as peças
-    da lista; None se o saldo nunca foi importado ou não há nada a oferecer."""
-    if not saldo_importado():
-        return None
+def _base_viaturas() -> list[ItemCatalogo]:
+    """A regra de origem das viaturas: a lista e, depois, o catálogo AB sem repetir as peças da
+    lista."""
     lista = catalogo_viaturas()
     na_lista = {norm_u(i.codigo) for i in lista}
     ab = catalogo_ab()
     resto = [i for i in (ab.itens if ab is not None else []) if norm_u(i.codigo) not in na_lista]
-    return (lista + resto) or None
+    return lista + resto
+
+
+def formulario_viaturas() -> list[ItemCatalogo] | None:
+    """O catálogo do formulário de viaturas: a lista e, depois, o catálogo AB sem repetir as peças
+    da lista, com as exceções; None se o saldo nunca foi importado ou não há nada a oferecer."""
+    if not saldo_importado():
+        return None
+    return aplicar_excecoes(VIATURAS, _base_viaturas()) or None
 
 
 def folha_viaturas() -> list[str]:
@@ -208,13 +284,46 @@ def folha_viaturas() -> list[str]:
     return [i.codigo for i in catalogo_viaturas()]
 
 
-def centros_equipe_manutencao() -> list[Centro]:
-    """Destinos do formulário de viaturas: os centros de custo com alguma linha marcada como de
-    equipe de manutenção, um por descrição e sem placa (o pedido não identifica a viatura)."""
-    centros: dict[str, Centro] = {}
-    for c in CentroCusto.objects.filter(equipe_manutencao=True).order_by("descricao", "codigo"):
-        centros.setdefault(c.descricao, Centro(c.descricao, c.codigo))
-    return list(centros.values())
+MODO_PADRAO = "padrao"
+MODO_SEM_PLACA = "sem_placa"
+MODO_OFICINA = "oficina"
+
+# Como cada formulário apresenta o destino (característica do formulário, não configuração):
+# limpeza, AB e EPIs oferecem a descrição e, para a linha com placa, "descrição — placa"; as
+# viaturas só a descrição, uma por centro (a placa não importa); a oficina oferece a linha com
+# placa só como "descrição — placa" e a linha sem placa como a descrição (spec 009, FR-007a).
+MODO_DESTINO = {
+    LIMPEZA: MODO_PADRAO,
+    AB: MODO_PADRAO,
+    EPIS: MODO_PADRAO,
+    VIATURAS: MODO_SEM_PLACA,
+    OFICINA: MODO_OFICINA,
+}
+
+
+def centros_do_formulario(origem: str) -> list[Centro]:
+    """Os destinos do formulário: as linhas de centro ativas e habilitadas nele (página
+    Formulários), apresentadas pelo modo do formulário. Lista vazia: formulário sem destino."""
+    linhas = CentroCusto.objects.filter(ativo=True, formularios__formulario=origem)
+    modo = MODO_DESTINO[origem]
+    if modo == MODO_SEM_PLACA:
+        centros: dict[str, Centro] = {}
+        for c in linhas.order_by("descricao", "codigo"):
+            centros.setdefault(c.descricao, Centro(c.descricao, c.codigo))
+        return list(centros.values())
+    if modo == MODO_OFICINA:
+        sem_placa = [
+            Centro(c.descricao, c.codigo)
+            for c in linhas.filter(placa__isnull=True).order_by("descricao", "codigo")
+        ]
+        com_placa = [
+            Centro(c.descricao, c.codigo, c.placa, so_com_placa=True)
+            for c in linhas.filter(placa__isnull=False).order_by("descricao", "placa")
+        ]
+        return sem_placa + com_placa
+    return [
+        Centro(c.descricao, c.codigo, c.placa or "") for c in linhas.order_by("descricao", "placa")
+    ]
 
 
 def grupos_oficina() -> set[str]:
@@ -223,23 +332,29 @@ def grupos_oficina() -> set[str]:
     return {_grupo(v) for v in Opcao.valores(Opcao.Lista.GRUPO_OFICINA)}
 
 
-def catalogo_oficina() -> list[ItemCatalogo]:
-    """Materiais do formulário da oficina: os não ocultos dos grupos da oficina e os avulsos
-    (`MaterialOficina`), uma vez cada, pelo nome; a unidade é a do SCPI."""
-    grupos = grupos_oficina()
+def _materiais_dos_grupos(grupos: set[str]) -> list[ItemCatalogo]:
+    """Os materiais visíveis dos grupos dados, pelo nome (regra de origem da oficina e dos EPIs)."""
     visiveis = Material.objects.filter(oculto=False)
     casados = [
         g for g in visiveis.values_list("grupo", flat=True).distinct() if _grupo(g) in grupos
     ]
-    materiais = visiveis.filter(Q(grupo__in=casados) | Q(material_oficina__isnull=False))
     fracionaveis = unidades_fracionaveis()
-    return [_item(m, fracionaveis) for m in materiais.distinct().order_by("nome", "codigo")]
+    materiais = visiveis.filter(grupo__in=casados).order_by("nome", "codigo")
+    return [_item(m, fracionaveis) for m in materiais]
+
+
+def catalogo_oficina() -> list[ItemCatalogo]:
+    """A regra de origem da oficina (spec 007): os materiais não ocultos dos grupos da lista
+    `GRUPO_OFICINA`, pelo nome. Os avulsos são exceções da configuração (spec 009)."""
+    return _materiais_dos_grupos(grupos_oficina())
 
 
 def formulario_oficina() -> list[ItemCatalogo] | None:
     """O catálogo do formulário da oficina, ou None se ele está indisponível: o saldo nunca foi
-    importado ou a escolha da oficina não tem material visível."""
-    return (catalogo_oficina() if saldo_importado() else None) or None
+    importado ou a oficina não tem material visível (depois das exceções)."""
+    if not saldo_importado():
+        return None
+    return aplicar_excecoes(OFICINA, catalogo_oficina(), ordem_do_banco=True) or None
 
 
 def grupos_epis() -> set[str]:
@@ -249,34 +364,14 @@ def grupos_epis() -> set[str]:
 
 
 def catalogo_epis() -> list[ItemCatalogo]:
-    """Materiais do formulário de EPIs: os não ocultos dos grupos de EPIs e os avulsos
-    (`MaterialEpi`), uma vez cada, pelo nome; a unidade é a do SCPI."""
-    grupos = grupos_epis()
-    visiveis = Material.objects.filter(oculto=False)
-    casados = [
-        g for g in visiveis.values_list("grupo", flat=True).distinct() if _grupo(g) in grupos
-    ]
-    materiais = visiveis.filter(Q(grupo__in=casados) | Q(material_epi__isnull=False))
-    fracionaveis = unidades_fracionaveis()
-    return [_item(m, fracionaveis) for m in materiais.distinct().order_by("nome", "codigo")]
+    """A regra de origem dos EPIs (spec 008): os materiais não ocultos dos grupos da lista
+    `GRUPO_EPI`, pelo nome. Os avulsos são exceções da configuração (spec 009)."""
+    return _materiais_dos_grupos(grupos_epis())
 
 
 def formulario_epis() -> list[ItemCatalogo] | None:
     """O catálogo do formulário de EPIs, ou None se ele está indisponível: o saldo nunca foi
-    importado ou a escolha dos EPIs não tem material visível."""
-    return (catalogo_epis() if saldo_importado() else None) or None
-
-
-def centros_oficina() -> list[Centro]:
-    """Destinos do formulário da oficina: o centro OFICINA MECÂNICA (a linha sem placa) e cada
-    viatura (centro com placa), esta só como "centro — placa"."""
-    oficina = [
-        Centro(c.descricao, c.codigo)
-        for c in CentroCusto.objects.filter(placa__isnull=True).order_by("codigo")
-        if norm_u(c.descricao) == norm_u(CENTRO_OFICINA)
-    ][:1]
-    viaturas = [
-        Centro(c.descricao, c.codigo, c.placa, so_com_placa=True)
-        for c in CentroCusto.objects.filter(placa__isnull=False).order_by("descricao", "placa")
-    ]
-    return oficina + viaturas
+    importado ou a escolha dos EPIs não tem material visível (depois das exceções)."""
+    if not saldo_importado():
+        return None
+    return aplicar_excecoes(EPIS, catalogo_epis(), ordem_do_banco=True) or None

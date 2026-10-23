@@ -11,9 +11,10 @@ from decimal import Decimal
 
 from django.urls import reverse
 
-from catalogo.models import Material, MaterialOficina, Opcao
+from catalogo.models import Formulario, Material, Opcao
 from pedidos.protecao import emitir
 from tests.cenario import montar_cenario
+from tests.config_cenario import excecao
 
 FILTRO = "006.002.001"
 PNEU = "006.000.001"
@@ -43,7 +44,8 @@ def montar_oficina() -> None:
             },
         )
     Opcao.objects.get_or_create(lista=Opcao.Lista.GRUPO_OFICINA, valor="Auto Peças")
-    MaterialOficina.objects.get_or_create(material=Material.objects.get(codigo=OLEO))
+    # O avulso da oficina é uma exceção da configuração (spec 009), que acrescenta o óleo.
+    excecao(Formulario.OFICINA, Material.objects.get(codigo=OLEO), True)
 
 
 def enviar(client, itens, *, destino=OFICINA, solicitante="Marcos", token=None):

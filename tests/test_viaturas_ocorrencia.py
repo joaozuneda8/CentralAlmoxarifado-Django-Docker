@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from catalogo.models import CentroCusto, Material, PecaViatura
+from catalogo.models import Material, PecaViatura
 from pedidos.models import Pedido
 from pedidos.regras import (
     LIMPEZA,
@@ -18,6 +18,7 @@ from pedidos.regras import (
 )
 from pedidos.servicos import registrar_pedido
 from tests.cenario import envio_limpeza, itens, montar_cenario
+from tests.config_cenario import criar_centro
 
 pytestmark = pytest.mark.django_db
 
@@ -44,7 +45,7 @@ def erros(e):
 @pytest.fixture
 def viaturas():
     montar_cenario()
-    CentroCusto.objects.create(descricao="EQUIPE NORTE", codigo="51", equipe_manutencao=True)
+    criar_centro("EQUIPE NORTE", "51", formularios=[VIATURAS])
     PecaViatura.objects.create(material=Material.objects.get(codigo=FITA))
 
 

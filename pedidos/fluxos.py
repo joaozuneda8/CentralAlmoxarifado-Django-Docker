@@ -10,14 +10,14 @@ novo em `Pedido.Origem` (com a migration de `choices`).
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 
 from django.conf import settings
 from django.http import Http404
 
 from catalogo.catalogos import (
     ItemCatalogo,
-    centros_equipe_manutencao,
-    centros_oficina,
+    centros_do_formulario,
     folha_viaturas,
     formulario_ab,
     formulario_avulsa,
@@ -62,7 +62,8 @@ class Fluxo:
     regra_quantidade: str = REGRA_POR_UNIDADE
     # Os códigos da folha (a lista preenchida de uma vez, num diálogo), na ordem; None: sem folha.
     folha: Callable[[], list[str]] | None = None
-    # Os centros de custo aceitos como destino; None: todos os cadastrados.
+    # Os centros de custo aceitos como destino; None: todos os cadastrados (a saída avulsa). Os
+    # formulários públicos leem a configuração (`centros_do_formulario`, spec 009).
     centros: Callable[[], list[Centro]] | None = None
     # Mostra, grava e compara no reenvio o "Nº da ocorrência" (opcional para quem pede).
     pede_ocorrencia: bool = False
@@ -101,6 +102,7 @@ FLUXOS: dict[str, Fluxo] = {
         exemplo_busca="Ex.: detergente, café",
         exemplo_inicio="Ex.: café, copo descartável, água sanitária, caneta",
         icone="caixa",
+        centros=partial(centros_do_formulario, LIMPEZA),
     ),
     "ab": Fluxo(
         nome="ab",
@@ -110,6 +112,7 @@ FLUXOS: dict[str, Fluxo] = {
         exemplo_busca="Ex.: luva, fita veda rosca",
         exemplo_inicio="Ex.: luva, botina, fita veda-rosca, cimento",
         icone="catalogo",
+        centros=partial(centros_do_formulario, AB),
     ),
     "viaturas": Fluxo(
         nome="viaturas",
@@ -121,7 +124,7 @@ FLUXOS: dict[str, Fluxo] = {
         icone="atualizar",
         exemplo_destino="Centro de custo da equipe",
         folha=folha_viaturas,
-        centros=centros_equipe_manutencao,
+        centros=partial(centros_do_formulario, VIATURAS),
         pede_ocorrencia=True,
     ),
     "oficina": Fluxo(
@@ -133,7 +136,7 @@ FLUXOS: dict[str, Fluxo] = {
         exemplo_inicio="Ex.: filtro, óleo, pneu, aditivo, lâmpada",
         icone="caixa-check",
         exemplo_destino="Oficina mecânica ou placa da viatura",
-        centros=centros_oficina,
+        centros=partial(centros_do_formulario, OFICINA),
     ),
     "epis": Fluxo(
         nome="epis",
@@ -143,6 +146,7 @@ FLUXOS: dict[str, Fluxo] = {
         exemplo_busca="Ex.: luva, capacete, óculos",
         exemplo_inicio="Ex.: luva, botina, capacete, protetor auricular",
         icone="escudo",
+        centros=partial(centros_do_formulario, EPIS),
         exige_autorizacao=True,
     ),
     "avulsa": Fluxo(

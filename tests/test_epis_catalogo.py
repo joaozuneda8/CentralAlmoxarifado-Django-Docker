@@ -4,7 +4,7 @@ materiais visíveis dos grupos de EPIs e os materiais avulsos, uma vez cada."""
 import pytest
 
 from catalogo.catalogos import catalogo_epis, formulario_epis, grupos_epis
-from catalogo.models import Material, MaterialEpi, Opcao
+from catalogo.models import ExcecaoMaterial, Formulario, Material, Opcao
 from tests.epis_cenario import CAPACETE, FITA, LUVA, OCULOS, PROTETOR, montar_epis
 
 pytestmark = pytest.mark.django_db
@@ -16,7 +16,7 @@ def cenario():
 
 
 def codigos():
-    return [i.codigo for i in catalogo_epis()]
+    return [i.codigo for i in formulario_epis() or []]
 
 
 def test_grupos_e_avulsos_pelo_nome():
@@ -43,18 +43,22 @@ def test_o_catalogo_antigo_de_epi_do_cenario_nao_entra_sem_ser_escolhido():
 
 
 def test_avulso_que_tambem_e_do_grupo_aparece_uma_vez():
-    MaterialEpi.objects.create(material=Material.objects.get(codigo=LUVA))
+    ExcecaoMaterial.objects.create(
+        material=Material.objects.get(codigo=LUVA), formulario=Formulario.EPIS, habilitado=True
+    )
     assert codigos().count(LUVA) == 1
 
 
 def test_retirar_o_avulso_nao_tira_o_material_do_grupo():
-    MaterialEpi.objects.create(material=Material.objects.get(codigo=LUVA))
-    MaterialEpi.objects.filter(material__codigo=LUVA).delete()
+    ExcecaoMaterial.objects.create(
+        material=Material.objects.get(codigo=LUVA), formulario=Formulario.EPIS, habilitado=True
+    )
+    ExcecaoMaterial.objects.filter(formulario=Formulario.EPIS, material__codigo=LUVA).delete()
     assert LUVA in codigos()
 
 
 def test_retirar_o_avulso_de_outro_grupo_tira_o_material():
-    MaterialEpi.objects.filter(material__codigo=OCULOS).delete()
+    ExcecaoMaterial.objects.filter(formulario=Formulario.EPIS, material__codigo=OCULOS).delete()
     assert OCULOS not in codigos()
 
 
@@ -65,20 +69,20 @@ def test_oculto_nao_aparece():
 
 def test_sem_estoque_e_duplicado_aparecem_bloqueados():
     Material.objects.filter(codigo=LUVA).update(duplicado=True)
-    itens = {i.codigo: i for i in catalogo_epis()}
+    itens = {i.codigo: i for i in formulario_epis()}
     assert itens[PROTETOR].disponivel == 0
     assert itens[LUVA].duplicado
 
 
 def test_unidade_e_fracao_sao_as_do_scpi():
-    itens = {i.codigo: i for i in catalogo_epis()}
+    itens = {i.codigo: i for i in formulario_epis()}
     assert (itens[LUVA].unidade, itens[LUVA].fracionavel) == ("UN", False)
 
 
 def test_sem_escolha_o_formulario_fica_indisponivel():
     assert formulario_epis()
     Opcao.objects.filter(lista=Opcao.Lista.GRUPO_EPI).delete()
-    MaterialEpi.objects.all().delete()
+    ExcecaoMaterial.objects.all().delete()
     assert catalogo_epis() == [] and formulario_epis() is None
 
 

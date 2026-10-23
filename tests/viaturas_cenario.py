@@ -2,7 +2,7 @@
 
 Lista: TUBO (M, fora do AB), FITA (UN, no AB), BOTINA (UN, saldo 2,5) e LUVA (sem estoque).
 Só no AB, fora da lista: ISOLANTE. Destino: "EQUIPE NORTE", com duas linhas (uma por placa), uma
-só marcada como de equipe de manutenção.
+só habilitada nas viaturas (spec 009).
 """
 
 import time
@@ -11,9 +11,10 @@ from decimal import Decimal
 from django.urls import reverse
 from django.utils import timezone
 
-from catalogo.models import CentroCusto, Material, PecaViatura, SaidaSCPI
+from catalogo.models import CentroCusto, Formulario, Material, PecaViatura, SaidaSCPI
 from pedidos.protecao import emitir
 from tests.cenario import montar_cenario
+from tests.config_cenario import habilitar
 
 TUBO = "016.020.001"
 FITA = "016.005.010"
@@ -59,10 +60,13 @@ def montar_viaturas() -> None:
             defaults={"ordem": ordem, "nome_exibido": nome},
         )
     if not CentroCusto.objects.filter(descricao=EQUIPE).exists():
-        CentroCusto.objects.create(descricao=EQUIPE, codigo="51", placa="AAA1A11")
-        CentroCusto.objects.create(
-            descricao=EQUIPE, codigo="51", placa="BBB2B22", equipe_manutencao=True
-        )
+        linhas = [
+            CentroCusto.objects.create(descricao=EQUIPE, codigo="51", placa="AAA1A11"),
+            CentroCusto.objects.create(descricao=EQUIPE, codigo="51", placa="BBB2B22"),
+        ]
+        # Como antes: todo centro é destino de limpeza, AB e EPIs; só uma linha, das viaturas.
+        habilitar(linhas, Formulario.LIMPEZA, Formulario.AB, Formulario.EPIS)
+        habilitar(linhas[1], Formulario.VIATURAS)
 
 
 def enviar(client, itens, *, destino=EQUIPE, ocorrencia="", solicitante="Carlos", token=None):

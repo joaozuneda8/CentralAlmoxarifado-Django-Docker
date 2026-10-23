@@ -10,7 +10,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from catalogo.models import Material, MaterialOficina, Opcao
+from catalogo.models import ExcecaoMaterial, Material, Opcao
 from pedidos.models import LinhaSaida, Pedido
 from pedidos.protecao import emitir
 from pedidos.regras import OFICINA as ORIGEM
@@ -58,7 +58,7 @@ def test_a_busca_so_acha_a_escolha_da_oficina(client):
 
 def test_sem_escolha_o_formulario_fica_indisponivel(client):
     Opcao.objects.filter(lista=Opcao.Lista.GRUPO_OFICINA).delete()
-    MaterialOficina.objects.all().delete()
+    ExcecaoMaterial.objects.all().delete()
     assert INDISPONIVEL in client.get(URL).text
 
 
@@ -93,7 +93,7 @@ def test_a_regra_de_quantidade_e_a_dos_formularios_publicos(client, itens, erro)
 
 def test_material_retirado_da_escolha_antes_do_envio_e_recusado(client):
     client.get(URL)
-    MaterialOficina.objects.all().delete()
+    ExcecaoMaterial.objects.all().delete()
     r = enviar(client, [(OLEO, "1")])
     assert "não está mais no catálogo" in r.text and not Pedido.objects.exists()
 

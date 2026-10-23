@@ -15,6 +15,7 @@ from django.utils import timezone
 from catalogo.models import CentroCusto, ItemLimpeza, Material, Opcao, SaidaSCPI
 from pedidos.models import Atendimento, ItemPedido, LinhaSaida, Pedido
 from pedidos.regras import AVULSA, LIMPEZA, DadosSaida, EnvioPedido, ItemEnviado
+from tests.config_cenario import habilitar_como_antes
 
 MATERIAIS = [
     # código, nome, grupo, estoque, oculto
@@ -104,6 +105,8 @@ def montar_cenario(*, com_estoque: bool = True) -> None:
     for descricao, codigo, placa in centros:
         if not CentroCusto.objects.filter(descricao=descricao, codigo=codigo).exists():
             CentroCusto.objects.create(descricao=descricao, codigo=codigo, placa=placa)
+    # Os centros do cenário são destino onde as regras antigas os ofereciam (spec 009).
+    habilitar_como_antes()
 
 
 def dar_saldo(*codigos: str, saldo: int = 10) -> None:

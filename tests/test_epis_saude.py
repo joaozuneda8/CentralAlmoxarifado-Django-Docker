@@ -5,7 +5,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from catalogo.models import Material, MaterialEpi, Opcao
+from catalogo.models import ExcecaoMaterial, Material, Opcao
 from catalogo.saude import ItemSaude, saude_do_catalogo, situacao_do_catalogo
 from tests.epis_cenario import OCULOS, montar_epis
 
@@ -40,7 +40,7 @@ def test_um_so_material_fica_no_singular():
 
 def test_sem_material_fica_indisponivel():
     Opcao.objects.filter(lista=Opcao.Lista.GRUPO_EPI).delete()
-    MaterialEpi.objects.all().delete()
+    ExcecaoMaterial.objects.all().delete()
     assert texto_de(FORMULARIO) == ItemSaude(
         "erro",
         f"{FORMULARIO}: nenhum material nos grupos nem entre os materiais de EPIs; o formulário "

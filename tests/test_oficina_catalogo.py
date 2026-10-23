@@ -4,7 +4,7 @@ R4): os materiais visíveis dos grupos da oficina e os materiais avulsos, uma ve
 import pytest
 
 from catalogo.catalogos import catalogo_oficina, formulario_oficina, grupos_oficina
-from catalogo.models import Material, MaterialOficina, Opcao
+from catalogo.models import ExcecaoMaterial, Formulario, Material, Opcao
 from tests.oficina_cenario import FILTRO, FITA, OLEO, PNEU, montar_oficina
 
 pytestmark = pytest.mark.django_db
@@ -16,7 +16,7 @@ def cenario():
 
 
 def codigos():
-    return [i.codigo for i in catalogo_oficina()]
+    return [i.codigo for i in formulario_oficina() or []]
 
 
 def test_grupos_e_avulsos_pelo_nome():
@@ -35,13 +35,17 @@ def test_outro_grupo_fica_de_fora():
 
 
 def test_avulso_que_tambem_e_do_grupo_aparece_uma_vez():
-    MaterialOficina.objects.create(material=Material.objects.get(codigo=FILTRO))
+    ExcecaoMaterial.objects.create(
+        material=Material.objects.get(codigo=FILTRO), formulario=Formulario.OFICINA, habilitado=True
+    )
     assert codigos().count(FILTRO) == 1
 
 
 def test_retirar_o_avulso_nao_tira_o_material_do_grupo():
-    MaterialOficina.objects.create(material=Material.objects.get(codigo=FILTRO))
-    MaterialOficina.objects.filter(material__codigo=FILTRO).delete()
+    ExcecaoMaterial.objects.create(
+        material=Material.objects.get(codigo=FILTRO), formulario=Formulario.OFICINA, habilitado=True
+    )
+    ExcecaoMaterial.objects.filter(formulario=Formulario.OFICINA, material__codigo=FILTRO).delete()
     assert FILTRO in codigos()
 
 
@@ -52,13 +56,13 @@ def test_oculto_nao_aparece():
 
 def test_sem_estoque_e_duplicado_aparecem():
     Material.objects.filter(codigo=FILTRO).update(duplicado=True)
-    itens = {i.codigo: i for i in catalogo_oficina()}
+    itens = {i.codigo: i for i in formulario_oficina()}
     assert itens[PNEU].disponivel == 0
     assert itens[FILTRO].duplicado
 
 
 def test_unidade_e_fracao_sao_as_do_scpi():
-    itens = {i.codigo: i for i in catalogo_oficina()}
+    itens = {i.codigo: i for i in formulario_oficina()}
     assert (itens[OLEO].unidade, itens[OLEO].fracionavel) == ("LT", True)
     assert (itens[FILTRO].unidade, itens[FILTRO].fracionavel) == ("UN", False)
 
@@ -66,7 +70,7 @@ def test_unidade_e_fracao_sao_as_do_scpi():
 def test_sem_escolha_o_formulario_fica_indisponivel():
     assert formulario_oficina()
     Opcao.objects.filter(lista=Opcao.Lista.GRUPO_OFICINA).delete()
-    MaterialOficina.objects.all().delete()
+    ExcecaoMaterial.objects.all().delete()
     assert catalogo_oficina() == [] and formulario_oficina() is None
 
 

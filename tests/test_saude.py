@@ -13,6 +13,8 @@ from catalogo.saude import (
     saude_do_catalogo,
     situacao_do_catalogo,
 )
+from pedidos.regras import VIATURAS as ORIGEM_VIATURAS
+from tests.config_cenario import criar_centro
 
 pytestmark = pytest.mark.django_db
 
@@ -326,7 +328,7 @@ def lista_de_viaturas():
 
 def test_viaturas_disponivel_conta_a_lista_e_o_ab():
     lista_de_viaturas()
-    CentroCusto.objects.create(descricao="EQUIPE NORTE", codigo="51", equipe_manutencao=True)
+    criar_centro("EQUIPE NORTE", "51", formularios=[ORIGEM_VIATURAS])
     assert texto_de(VIATURAS) == ItemSaude(
         "ok", f"{VIATURAS}: 2 peças na lista e 0 materiais do AB."
     )
@@ -336,19 +338,19 @@ def test_viaturas_disponivel_conta_a_lista_e_o_ab():
     assert situacao_do_catalogo(AGORA).viaturas == 2
 
 
-def test_viaturas_sem_centro_marcado_fica_indisponivel():
+def test_viaturas_sem_centro_habilitado_fica_indisponivel():
     lista_de_viaturas()
     CentroCusto.objects.create(descricao="ETA I", codigo="12")
     assert texto_de(VIATURAS) == ItemSaude(
         "erro",
-        f"{VIATURAS}: nenhum centro de custo marcado como de equipe de manutenção; o formulário "
-        "fica indisponível.",
+        f"{VIATURAS}: nenhum centro de custo habilitado como destino; o formulário fica "
+        "indisponível.",
     )
 
 
 def test_viaturas_sem_nada_a_oferecer_fica_indisponivel():
     Material.objects.create(codigo="9", nome="X", estoque_em=AGORA)
-    CentroCusto.objects.create(descricao="EQUIPE NORTE", codigo="51", equipe_manutencao=True)
+    criar_centro("EQUIPE NORTE", "51", formularios=[ORIGEM_VIATURAS])
     assert texto_de(VIATURAS) == ItemSaude(
         "erro",
         f"{VIATURAS}: nenhuma peça na lista nem material no AB; o formulário fica indisponível.",

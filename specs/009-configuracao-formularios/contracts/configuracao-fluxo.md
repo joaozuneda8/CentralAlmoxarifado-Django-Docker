@@ -26,7 +26,7 @@ muda.
 Continua `Callable[[], list[Centro]] | None`. Agora **as cinco entradas públicas** o definem:
 
 ```python
-centros=partial(centros_do_formulario, LIMPEZA)   # idem AB, VIATURAS, OFICINA, EPIS
+centros = partial(centros_do_formulario, LIMPEZA)  # idem AB, VIATURAS, OFICINA, EPIS
 ```
 
 A avulsa segue com `centros=None` (todos), porque não faz parte da configuração. As funções

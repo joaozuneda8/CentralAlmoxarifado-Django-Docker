@@ -1,15 +1,16 @@
 """Manutenção da escolha dos EPIs e do acesso da Segurança do Trabalho no admin (spec 008, US4,
-FR-019, FR-029): vale no próximo acesso ao formulário, sem nova publicação."""
+FR-019, FR-029): vale no próximo acesso ao formulário, sem nova publicação. Os avulsos saíram do
+admin na spec 009."""
 
 import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
-from catalogo.models import Material, MaterialEpi, Opcao
+from catalogo.models import MaterialEpi, Opcao
 from contas.acesso import GRUPO_SEGURANCA_TRABALHO, da_seguranca_trabalho
-from tests.epis_cenario import CAPACETE, FITA, LUVA, OCULOS, montar_epis
+from tests.epis_cenario import LUVA, montar_epis
 
 pytestmark = pytest.mark.django_db
 
@@ -25,36 +26,12 @@ def acha(client, q, codigo):
     return f'data-codigo="{codigo}"' in client.get(BUSCA, {"q": q}).text
 
 
-def test_os_materiais_avulsos_de_epis_no_admin(admin_client):
-    url = reverse("admin:catalogo_materialepi_changelist")
-    assert "ÓCULOS DE PROTEÇÃO" in admin_client.get(url).text
-    assert admin_client.get(url, {"q": OCULOS}).status_code == 200
-    fita = Material.objects.get(codigo=FITA)
-    r = admin_client.post(reverse("admin:catalogo_materialepi_add"), {"material": fita.pk})
-    assert r.status_code == 302 and MaterialEpi.objects.filter(material=fita).exists()
-    # De novo: recusado (um por material).
-    r = admin_client.post(reverse("admin:catalogo_materialepi_add"), {"material": fita.pk})
-    assert r.status_code == 200 and MaterialEpi.objects.filter(material=fita).count() == 1
-
-
-def test_autocomplete_do_material():
-    assert admin.site._registry[MaterialEpi].autocomplete_fields == ["material"]
-
-
-def test_incluir_um_avulso_vale_no_proximo_acesso(client, admin_client):
-    assert not acha(client, "fita", FITA)
-    fita = Material.objects.get(codigo=FITA)
-    admin_client.post(reverse("admin:catalogo_materialepi_add"), {"material": fita.pk})
-    assert acha(client, "fita", FITA)
-
-
-def test_retirar_um_avulso_tira_so_ele(client, admin_client):
-    avulso = MaterialEpi.objects.get(material__codigo=OCULOS)
-    admin_client.post(
-        reverse("admin:catalogo_materialepi_delete", args=[avulso.pk]), {"post": "yes"}
-    )
-    assert not acha(client, "óculos", OCULOS)
-    assert acha(client, "capacete", CAPACETE)
+def test_os_avulsos_de_epis_saíram_do_admin():
+    """Spec 009: o material avulso de EPIs é uma exceção da configuração (página Formulários); o
+    cadastro antigo ficou no banco, sem tela."""
+    assert MaterialEpi not in admin.site._registry
+    with pytest.raises(NoReverseMatch):
+        reverse("admin:catalogo_materialepi_changelist")
 
 
 def test_a_lista_de_grupos_de_epis_no_admin(client, admin_client):

@@ -131,15 +131,18 @@ def test_a_reversao_nao_apaga_nada_nem_os_cadastros_antigos():
     assert CentroCusto.objects.filter(equipe_manutencao=True).count() == 1
 
 
-def test_reaplicar_depois_de_um_ajuste_do_administrador_nao_desfaz_nem_falha():
-    """A verificação só vale na primeira carga: depois, a tabela pode divergir da regra antiga por
-    escolha do administrador, e reaplicar a 0007 não a desfaz nem levanta erro."""
+def test_reaplicar_com_configuracao_existente_nao_recoloca_o_que_o_administrador_tirou():
+    """A carga é de uma vez só: com as tabelas já preenchidas (o administrador pode ter tirado
+    linhas e exceções, e a migration ser desfeita e reaplicada), nada é recolocado e nada falha."""
     cadastro()
+    MaterialEpi.objects.create(material=material("001.001.001", "LUVA"))
     MIGRACAO.transcrever(apps, None)
-    CentroFormulario.objects.filter(formulario="LIMPEZA", centro__descricao="ETA I").delete()
+    CentroFormulario.objects.filter(formulario="LIMPEZA", centro__codigo="12").delete()
+    ExcecaoMaterial.objects.filter(formulario="EPIS").delete()
+    MIGRACAO.desfazer(apps, None)
+    MIGRACAO.transcrever(apps, None)  # não levanta e não recoloca
     assert not CentroFormulario.objects.filter(formulario="LIMPEZA", centro__codigo="12").exists()
-    MIGRACAO.transcrever(apps, None)  # não levanta; o get_or_create recoloca o que faltava
-    assert CentroFormulario.objects.filter(formulario="LIMPEZA", centro__codigo="12").exists()
+    assert not ExcecaoMaterial.objects.filter(formulario="EPIS").exists()
 
 
 def test_a_transcricao_e_atomica_se_a_verificacao_falhar_nada_fica_gravado(monkeypatch):

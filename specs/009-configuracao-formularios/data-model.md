@@ -96,7 +96,8 @@ muda `disponivel` (aparece bloqueado).
 
 Reversão: a carga (`0007`) **não apaga nada** (as tabelas guardam também as escolhas do administrador,
 que ela não saberia distinguir); desfazer o esquema (`0006`) remove as tabelas e `ativo`. Os cadastros
-antigos nunca foram tocados. A carga é atômica e só se verifica na primeira vez (tabelas vazias).
+antigos nunca foram tocados. A carga é atômica e só roda com as tabelas vazias: com configuração já feita, é do administrador e a
+carga não recoloca nada.
 
 ## Relações e o que NÃO muda
 

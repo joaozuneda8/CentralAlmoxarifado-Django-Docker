@@ -117,7 +117,7 @@ transacional: se a transcrição falhar, o esquema já está concluído e a nova
 transcrição, idempotente. Em duas partes:
 esquema (`ativo`, `CentroFormulario`, `ExcecaoMaterial`) e dados (`transcrever`, uma função de módulo
 chamável `(apps, schema_editor)`, como `carregar_unidades` da 0002, sem reversão destrutiva: desfazer a `0007` não apaga nada, porque as tabelas já guardam também as
-escolhas do administrador; a carga é atômica e só se verifica na primeira vez):
+escolhas do administrador; a carga é atômica e só roda com as tabelas vazias, para nunca recolocar o que o administrador tirou):
 
 | Origem hoje | Vira |
 |---|---|

@@ -110,10 +110,10 @@ def conferir(apps):
 
 
 def transcrever(apps, schema_editor):
-    """Idempotente: o que já existe fica como está (a configuração pode ter sido ajustada). Tudo
-    numa transação, porque o MySQL não faz uma para a migration: se a verificação falhar, nenhuma
-    linha fica gravada. A verificação só roda na **primeira** carga (tabelas vazias): depois, a
-    tabela pode divergir da regra antiga por escolha do administrador."""
+    """Carrega **uma vez só**, com as tabelas vazias: se já há configuração, ela é do administrador
+    (inclusive depois de desfazer e reaplicar esta migration) e nada é recolocado. Tudo numa
+    transação, porque o MySQL não faz uma para a migration: se a verificação falhar, nenhuma linha
+    fica gravada. Repetir é seguro (a segunda vez não faz nada)."""
     with transaction.atomic():
         _transcrever(apps)
 
@@ -122,7 +122,8 @@ def _transcrever(apps):
     CentroCusto = apps.get_model("catalogo", "CentroCusto")
     CentroFormulario = apps.get_model("catalogo", "CentroFormulario")
     ExcecaoMaterial = apps.get_model("catalogo", "ExcecaoMaterial")
-    primeira_carga = not CentroFormulario.objects.exists() and not ExcecaoMaterial.objects.exists()
+    if CentroFormulario.objects.exists() or ExcecaoMaterial.objects.exists():
+        return  # já há configuração: é do administrador, e a carga não a desfaz
 
     def habilitar(formulario, centros):
         for c in centros:
@@ -143,8 +144,7 @@ def _transcrever(apps):
                 formulario=formulario,
                 defaults={"habilitado": True},
             )
-    if primeira_carga:
-        conferir(apps)
+    conferir(apps)
 
 
 def desfazer(apps, schema_editor):

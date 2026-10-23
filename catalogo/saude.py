@@ -453,10 +453,29 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
             f"{ab.na_limpeza} também na lista de limpeza, que prevalece; "
             f"{ab.ocultos} ocultos ou em grupo oculto"
         )
-        if ab.itens:
+        # O que o formulário oferece de fato (regra mais exceções); a regra do AB segue como
+        # informação separada, no texto.
+        efetivo = catalogo_efetivo(Formulario.AB, ab)
+        if efetivo and not ExcecaoMaterial.objects.filter(formulario=Formulario.AB).exists():
             saude.append(
                 ItemSaude(
-                    "ok", f"Formulário AB: {len(ab.itens)} itens de {com_saida} ({descartados})."
+                    "ok", f"Formulário AB: {len(efetivo)} itens de {com_saida} ({descartados})."
+                )
+            )
+        elif efetivo:
+            saude.append(
+                ItemSaude(
+                    "ok",
+                    f"Formulário AB: {len(efetivo)} itens, contadas as exceções do administrador "
+                    f"({len(ab.itens)} pela regra, de {com_saida}; {descartados}).",
+                )
+            )
+        elif ab.itens:
+            saude.append(
+                ItemSaude(
+                    "erro",
+                    "Formulário AB: todos os materiais foram retirados do formulário; o "
+                    "formulário fica indisponível.",
                 )
             )
         else:
@@ -600,6 +619,7 @@ class Situacao:
     avisos: list[ItemSaude]  # o que não é de uma importação e precisa de atenção
     limpeza: int
     ab: CatalogoAB | None
+    ab_oferecidos: int = 0  # o que o formulário AB oferece de fato (regra mais exceções)
     viaturas: int = 0  # peças visíveis na lista do formulário de viaturas (spec 006)
     oficina: int = 0  # materiais do formulário da oficina mecânica (spec 007)
     epis: int = 0  # materiais do formulário de EPIs (spec 008)
@@ -638,6 +658,7 @@ def situacao_do_catalogo(agora: datetime | None = None) -> Situacao:
         avisos=[i for i in _demais(agora, ab, total, ocultos) if i.nivel != "ok"],
         limpeza=len(catalogo_efetivo(Formulario.LIMPEZA)),
         ab=ab,
+        ab_oferecidos=len(catalogo_efetivo(Formulario.AB, ab)) if ab is not None else 0,
         viaturas=len(catalogo_viaturas()),
         oficina=len(catalogo_efetivo(Formulario.OFICINA)),
         epis=len(catalogo_efetivo(Formulario.EPIS)),

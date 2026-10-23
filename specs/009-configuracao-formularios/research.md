@@ -116,7 +116,8 @@ um centro inativado virar `ERRO` (Princípio III e Princípio IV: nada que o rob
 transacional: se a transcrição falhar, o esquema já está concluído e a nova tentativa roda só a
 transcrição, idempotente. Em duas partes:
 esquema (`ativo`, `CentroFormulario`, `ExcecaoMaterial`) e dados (`transcrever`, uma função de módulo
-chamável `(apps, schema_editor)`, como `carregar_unidades` da 0002, reversível por apagar as linhas novas):
+chamável `(apps, schema_editor)`, como `carregar_unidades` da 0002, sem reversão destrutiva: desfazer a `0007` não apaga nada, porque as tabelas já guardam também as
+escolhas do administrador; a carga é atômica e só se verifica na primeira vez):
 
 | Origem hoje | Vira |
 |---|---|

@@ -160,3 +160,43 @@ def test_viaturas_so_com_materiais_acrescentados_esta_disponivel_e_nao_e_erro():
     excecao(Formulario.VIATURAS, material("900.000.009", "TESOURA", "ALMOX"), True)
     avisos = [(n, t) for n, t in textos() if t.startswith("Formulário de reposição de peças")]
     assert avisos and all(n != "erro" for n, _ in avisos)
+
+
+# --- O AB pela disponibilidade efetiva -----------------------------------------------------------
+
+
+def test_ab_com_excecoes_conta_o_que_oferece_e_diz_de_onde_vem():
+    excecao(Formulario.AB, Material.objects.get(codigo=FITA), False)  # sai um
+    excecao(Formulario.AB, material("900.000.001", "TESOURA", "ALMOX"), True)  # entra um
+    textos_ab = [t for n, t in textos() if t.startswith("Formulário AB:")]
+    assert len(textos_ab) == 1 and textos_ab[0].startswith(
+        "Formulário AB: 3 itens, contadas as exceções"
+    )
+    assert "3 pela regra" in textos_ab[0]
+    assert situacao_do_catalogo().ab_oferecidos == 3
+
+
+def test_ab_sem_excecao_mantem_o_texto_de_sempre():
+    (texto,) = [t for n, t in textos() if t.startswith("Formulário AB:")]
+    assert texto.startswith("Formulário AB: 3 itens de ") and "exceções" not in texto
+
+
+def test_ab_esvaziado_pelas_excecoes_e_erro_e_nao_ok():
+    for codigo in (FITA, "013.006.001", "013.005.007"):
+        excecao(Formulario.AB, Material.objects.get(codigo=codigo), False)
+    assert (
+        "erro",
+        "Formulário AB: todos os materiais foram retirados do formulário; o formulário fica "
+        "indisponível.",
+    ) in textos()
+    assert situacao_do_catalogo().ab_oferecidos == 0
+
+
+def test_ab_sem_item_pela_regra_mas_com_acrescentado_esta_disponivel():
+    from catalogo.models import SaidaSCPI
+
+    SaidaSCPI.objects.all().delete()
+    excecao(Formulario.AB, material("900.000.001", "TESOURA", "ALMOX"), True)
+    textos_ab = [(n, t) for n, t in textos() if t.startswith("Formulário AB:")]
+    assert textos_ab and all(n == "ok" for n, _ in textos_ab)
+    assert situacao_do_catalogo().ab_oferecidos == 1

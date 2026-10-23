@@ -404,7 +404,7 @@ Segurança do Trabalho, a rota nem abre.
   que nenhum formulário oferece**: os destinos de cada formulário (todos, as marcas de equipe de
   manutenção, o centro da oficina e as viaturas) e os avulsos da oficina e dos EPIs.
 - **FR-037**: A migração NÃO DEVE ser destrutiva: nada é apagado nem alterado no cadastro de materiais, nos
-  pedidos nem nos cadastros de origem; DEVE ser **reversível** (desfazê-la apaga só o que ela criou); a
+  pedidos nem nos cadastros de origem; DEVE ser **reversível** (desfazer a carga não apaga nada, porque depois da implantação as tabelas guardam também as escolhas do administrador; as tabelas somem ao desfazer o esquema); a
   transcrição DEVE ser verificável (os formulários oferecem o mesmo conjunto antes e depois).
 - **FR-038**: Quando a transcrição não reproduzir com segurança o que um formulário oferece hoje, a
   migração DEVE parar e registrar a necessidade de decisão, em vez de adivinhar. Uma regra antiga que já

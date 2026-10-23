@@ -1,6 +1,6 @@
 import unicodedata
 
-from django.db import migrations
+from django.db import migrations, transaction
 
 # Configuração das opções por formulário (spec 009), parte 2: os dados. Esta migration transcreve para
 # as tabelas novas o que cada formulário oferecia por regra escrita no código, **sem mudar o que
@@ -110,10 +110,19 @@ def conferir(apps):
 
 
 def transcrever(apps, schema_editor):
-    """Idempotente: o que já existe fica como está (a configuração pode ter sido ajustada)."""
+    """Idempotente: o que já existe fica como está (a configuração pode ter sido ajustada). Tudo
+    numa transação, porque o MySQL não faz uma para a migration: se a verificação falhar, nenhuma
+    linha fica gravada. A verificação só roda na **primeira** carga (tabelas vazias): depois, a
+    tabela pode divergir da regra antiga por escolha do administrador."""
+    with transaction.atomic():
+        _transcrever(apps)
+
+
+def _transcrever(apps):
     CentroCusto = apps.get_model("catalogo", "CentroCusto")
     CentroFormulario = apps.get_model("catalogo", "CentroFormulario")
     ExcecaoMaterial = apps.get_model("catalogo", "ExcecaoMaterial")
+    primeira_carga = not CentroFormulario.objects.exists() and not ExcecaoMaterial.objects.exists()
 
     def habilitar(formulario, centros):
         for c in centros:
@@ -134,13 +143,15 @@ def transcrever(apps, schema_editor):
                 formulario=formulario,
                 defaults={"habilitado": True},
             )
-    conferir(apps)
+    if primeira_carga:
+        conferir(apps)
 
 
 def desfazer(apps, schema_editor):
-    """Apaga só o que a transcrição criou nas tabelas novas; os cadastros antigos nunca foram tocados."""
-    apps.get_model("catalogo", "CentroFormulario").objects.all().delete()
-    apps.get_model("catalogo", "ExcecaoMaterial").objects.all().delete()
+    """Não apaga nada: depois da implantação as tabelas guardam também as escolhas do administrador,
+    que a reversão não saberia distinguir das linhas transcritas, e o código antigo não as lê (os
+    cadastros antigos nunca foram tocados). As tabelas somem ao desfazer a `0006`; reaplicar a
+    `0007` é seguro (idempotente)."""
 
 
 class Migration(migrations.Migration):

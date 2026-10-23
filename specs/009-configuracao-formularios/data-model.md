@@ -94,8 +94,9 @@ muda `disponivel` (aparece bloqueado).
 | `MaterialOficina` | `ExcecaoMaterial(OFICINA, habilitado=True)` |
 | `MaterialEpi` | `ExcecaoMaterial(EPIS, habilitado=True)` |
 
-Reversão: apagar as linhas de `CentroFormulario` e `ExcecaoMaterial` e remover `ativo`; os cadastros
-antigos nunca foram tocados.
+Reversão: a carga (`0007`) **não apaga nada** (as tabelas guardam também as escolhas do administrador,
+que ela não saberia distinguir); desfazer o esquema (`0006`) remove as tabelas e `ativo`. Os cadastros
+antigos nunca foram tocados. A carga é atômica e só se verifica na primeira vez (tabelas vazias).
 
 ## Relações e o que NÃO muda
 

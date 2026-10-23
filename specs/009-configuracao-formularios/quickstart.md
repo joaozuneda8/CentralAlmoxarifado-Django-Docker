@@ -48,6 +48,7 @@ Esperado: os testes novos (estado, catálogo, centros, tela, permissões, lote, 
 | 10 | Filtrar um grupo e **Retirar todos** no AB | A prévia mostra o número exato; ao confirmar, só os materiais do filtro mudam, só no AB |
 | 11 | Pedir o lote sem nenhum filtro | A prévia exige marcar "Estou ciente" |
 | 12 | Abrir a consulta por material | Os cinco formulários com estado e origem (regra, acrescentado, retirado) |
+| 12a | Entrar como o **staff comum** com `change_centrocusto` e `change_excecaomaterial` e alterar um centro (habilitar ou desabilitar) e uma exceção de material | As duas gravações valem; sem uma das permissões, só a gravação correspondente é recusada (403) |
 | 13 | Entrar como usuário comum (sem `is_staff`) | Vê tudo, sem controles; um POST forjado dá 403 e nada muda |
 | 14 | Entrar como Segurança do Trabalho e abrir a página | Redireciona à fila de autorização |
 | 15 | Em Automações, aba Visão geral | A saúde mostra os avisos novos (formulário sem destino, centro sem formulário, exceção sem efeito) quando existirem |

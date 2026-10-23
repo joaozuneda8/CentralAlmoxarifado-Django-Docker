@@ -116,14 +116,43 @@ def test_os_cadastros_antigos_ficam_intactos():
     assert MaterialOficina.objects.count() == 1
 
 
-def test_a_reversao_apaga_so_o_que_a_transcricao_criou():
+def test_a_reversao_nao_apaga_nada_nem_os_cadastros_antigos():
+    """Depois da implantação as tabelas guardam também as escolhas do administrador, que a reversão
+    não saberia distinguir das linhas transcritas: ela não apaga nada (as tabelas somem ao desfazer
+    a 0006) e reaplicar a transcrição é seguro."""
     cadastro()
     MaterialEpi.objects.create(material=material("001.001.001", "LUVA"))
     MIGRACAO.transcrever(apps, None)
+    total = (CentroFormulario.objects.count(), ExcecaoMaterial.objects.count())
+    assert total[0] and total[1]
     MIGRACAO.desfazer(apps, None)
-    assert not CentroFormulario.objects.exists() and not ExcecaoMaterial.objects.exists()
+    assert (CentroFormulario.objects.count(), ExcecaoMaterial.objects.count()) == total
     assert CentroCusto.objects.count() == 5 and MaterialEpi.objects.count() == 1
     assert CentroCusto.objects.filter(equipe_manutencao=True).count() == 1
+
+
+def test_reaplicar_depois_de_um_ajuste_do_administrador_nao_desfaz_nem_falha():
+    """A verificação só vale na primeira carga: depois, a tabela pode divergir da regra antiga por
+    escolha do administrador, e reaplicar a 0007 não a desfaz nem levanta erro."""
+    cadastro()
+    MIGRACAO.transcrever(apps, None)
+    CentroFormulario.objects.filter(formulario="LIMPEZA", centro__descricao="ETA I").delete()
+    assert not CentroFormulario.objects.filter(formulario="LIMPEZA", centro__codigo="12").exists()
+    MIGRACAO.transcrever(apps, None)  # não levanta; o get_or_create recoloca o que faltava
+    assert CentroFormulario.objects.filter(formulario="LIMPEZA", centro__codigo="12").exists()
+
+
+def test_a_transcricao_e_atomica_se_a_verificacao_falhar_nada_fica_gravado(monkeypatch):
+    cadastro()
+    MaterialOficina.objects.create(material=material("001.001.001", "OLEO"))
+
+    def falha(apps_):
+        raise RuntimeError("a verificação falhou")
+
+    monkeypatch.setattr(MIGRACAO, "conferir", falha)
+    with pytest.raises(RuntimeError):
+        MIGRACAO.transcrever(apps, None)
+    assert not CentroFormulario.objects.exists() and not ExcecaoMaterial.objects.exists()
 
 
 def test_a_verificacao_levanta_erro_quando_a_transcricao_diverge_dos_centros():

@@ -39,6 +39,12 @@ no servidor; cada botão é um formulário POST com CSRF.
   </form>
 
   <p class="texto-secundario" role="status">{{ total_materiais|separador_milhar }} {% if total_materiais == 1 %}material{% else %}materiais{% endif %}{% if filtros_ativos %} no filtro{% endif %}.</p>
+  {% if pode_alterar_materiais and total_materiais %}
+  <div class="acoes">
+    <a class="botao botao-secundario" href="{% url 'catalogo:formularios_lote' %}?{{ lote_query }}&acao=acrescentar">Acrescentar todos os {{ total_materiais|separador_milhar }} resultados</a>
+    <a class="botao botao-secundario" href="{% url 'catalogo:formularios_lote' %}?{{ lote_query }}&acao=retirar">Retirar todos os {{ total_materiais|separador_milhar }} resultados</a>
+  </div>
+  {% endif %}
 
   <div class="tabela-rolagem">
     <table class="tabela">
@@ -61,6 +67,7 @@ no servidor; cada botão é um formulário POST com CSRF.
               {% if l.material.grupo %}· {{ l.material.grupo }}{% if l.material.subgrupo %} › {{ l.material.subgrupo }}{% endif %}{% endif %}
               · saldo {{ l.saldo }}
             </span>
+            <span class="material-info"><a class="botao botao-texto" href="{% url 'catalogo:formularios_material' l.material.codigo %}">Onde aparece</a></span>
             {% if l.canonico %}<span class="material-info texto-suave">Código antigo: o canônico é <span class="mono">{{ l.canonico }}</span>.</span>{% endif %}
             {% if l.material.duplicado %}<span class="material-info"><span class="selo selo-aviso">Cadastro duplicado</span> o formulário o mostra bloqueado.</span>{% endif %}
           </td>

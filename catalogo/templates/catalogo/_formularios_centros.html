@@ -61,6 +61,19 @@ centro é no admin. Estado sempre em texto (selos), nunca só por cor.
                 <button type="submit" class="botao botao-secundario">Habilitar{% if g.n_habilitadas %} todas{% endif %}</button>
                 {% endif %}
               </form>
+              <form method="post" action="{% url 'catalogo:formularios_ativo' %}" class="acoes">
+                {% csrf_token %}
+                <input type="hidden" name="formulario" value="{{ formulario }}">
+                <input type="hidden" name="qc" value="{{ termo }}">
+                {% for pk in g.ids %}<input type="hidden" name="centro" value="{{ pk }}">{% endfor %}
+                {% if g.n_inativas == g.linhas|length %}
+                <input type="hidden" name="ativo" value="1">
+                <button type="submit" class="botao botao-texto">Ativar</button>
+                {% else %}
+                <input type="hidden" name="ativo" value="0">
+                <button type="submit" class="botao botao-texto">Inativar</button>
+                {% endif %}
+              </form>
             </td>
             {% endif %}
           </tr>
@@ -83,6 +96,14 @@ centro é no admin. Estado sempre em texto (selos), nunca só por cor.
                 <input type="hidden" name="centro" value="{{ l.centro.pk }}">
                 <input type="hidden" name="habilitado" value="{% if l.habilitada %}0{% else %}1{% endif %}">
                 <button type="submit" class="botao botao-secundario">{% if l.habilitada %}Desabilitar{% else %}Habilitar{% endif %}</button>
+              </form>
+              <form method="post" action="{% url 'catalogo:formularios_ativo' %}" class="acoes">
+                {% csrf_token %}
+                <input type="hidden" name="formulario" value="{{ formulario }}">
+                <input type="hidden" name="qc" value="{{ termo }}">
+                <input type="hidden" name="centro" value="{{ l.centro.pk }}">
+                <input type="hidden" name="ativo" value="{% if l.centro.ativo %}0{% else %}1{% endif %}">
+                <button type="submit" class="botao botao-texto">{% if l.centro.ativo %}Inativar{% else %}Ativar{% endif %}</button>
               </form>
             </td>
             {% endif %}

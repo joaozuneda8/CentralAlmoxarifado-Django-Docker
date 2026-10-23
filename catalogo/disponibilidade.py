@@ -109,8 +109,9 @@ def _gravar_excecao(origem, material, alvo: bool | None, usuario) -> bool:
         return True
     if atual is not None and atual.habilitado == alvo:
         return False
-    # INSERT ... ON DUPLICATE KEY UPDATE: dois administradores gravando o mesmo material ao mesmo
-    # tempo deixam uma linha só e nenhum erro (a última vale); `update_or_create` falharia na corrida.
+    # INSERT ... ON DUPLICATE KEY UPDATE: dois administradores gravando o mesmo material ao
+    # mesmo tempo deixam uma linha só e nenhum erro, e a última vale (o `update_or_create` falha
+    # na corrida).
     ExcecaoMaterial.objects.bulk_create(
         [
             ExcecaoMaterial(
@@ -265,3 +266,13 @@ def materiais_da_tela(origem: str, filtros: dict, situacao: SituacaoDoFormulario
     elif estado_pedido == "excecao":
         consulta = consulta.filter(codigo__in=list(situacao.excecoes))
     return consulta.order_by("nome", "codigo")
+
+
+def estados_do_material(material) -> list[tuple[str, Estado]]:
+    """O estado do material em cada um dos cinco formulários, na ordem de `Formulario` (a
+    consulta "onde este material aparece e por quê"). Calcula a regra de origem de cada um."""
+    from catalogo.models import Formulario
+
+    return [
+        (origem, situacao_do_formulario(origem).estado(material)) for origem in Formulario.values
+    ]

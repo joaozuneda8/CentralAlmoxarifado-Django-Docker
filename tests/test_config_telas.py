@@ -331,3 +331,256 @@ def test_material_duplicado_e_marcado(admin):
     Material.objects.filter(codigo=FITA).update(duplicado=True)
     linha = linhas_da_aba(admin.get(PAGINA, {"formulario": "AB", "aba": "materiais", "q": "veda"}))
     assert "Cadastro duplicado" in linha
+
+
+# --- Lote: prévia e confirmação (US3) ----------------------------------------------------------
+
+LOTE = reverse("catalogo:formularios_lote")
+
+
+def previa(cliente, **parametros):
+    return cliente.get(LOTE, {"formulario": "AB", "acao": "retirar", **parametros})
+
+
+def grupo_do_lote(n=20):
+    return [material(f"800.000.{i:03d}", f"PECA {i:02d}", "LOTE") for i in range(n)]
+
+
+def test_a_previa_mostra_formulario_acao_numero_exato_e_amostra(admin):
+    grupo_do_lote(20)
+    r = previa(admin, acao="acrescentar", grupo="LOTE")
+    assert r.status_code == 200
+    t = texto(r)
+    assert "Ferramentas, peças e materiais" in t and "Acrescentar ao formulário" in t
+    assert "20 materiais" in t
+    assert "PECA 00" in t and "PECA 09" in t and "PECA 10" not in t  # a amostra tem 10
+    assert 'name="total" value="20"' in r.text
+    assert 'name="ciente"' not in r.text  # com filtro, não pede o "ciente"
+
+
+def test_a_previa_sem_filtro_alcanca_o_catalogo_inteiro_e_pede_o_ciente(admin):
+    total = Material.objects.filter(oculto=False).count()
+    r = previa(admin)
+    assert f"{total} materiais" in texto(r) and "catálogo inteiro" in texto(r)
+    assert 'name="ciente"' in r.text and "required" in r.text.split('name="ciente"')[1][:200]
+
+
+def test_previa_com_acao_ou_formulario_invalido_e_400(admin):
+    assert admin.get(LOTE, {"formulario": "AB", "acao": "restaurar"}).status_code == 400
+    assert admin.get(LOTE, {"formulario": "AB"}).status_code == 400
+    assert admin.get(LOTE, {"formulario": "XX", "acao": "retirar"}).status_code == 400
+
+
+def test_confirmar_aplica_a_todos_do_filtro_e_so_a_eles(admin):
+    grupo_do_lote(20)
+    r = admin.post(
+        LOTE, {"formulario": "AB", "acao": "acrescentar", "grupo": "LOTE", "total": "20"}
+    )
+    assert volta(r) == {"formulario": "AB", "aba": "materiais", "grupo": "LOTE"}
+    assert ExcecaoMaterial.objects.count() == 20
+    assert set(ExcecaoMaterial.objects.values_list("formulario", flat=True)) == {"AB"}
+    assert (
+        ultima_mensagem(r) == "20 mudaram e 0 já estavam assim em Ferramentas, peças e materiais."
+    )
+    corpo = linhas_da_aba(
+        admin.get(PAGINA, {"formulario": "AB", "aba": "materiais", "grupo": "LOTE"})
+    )
+    assert corpo.count("acrescentado pelo administrador") == 20
+
+
+def test_o_lote_vale_para_todas_as_paginas_do_filtro(admin):
+    grupo_do_lote(120)
+    admin.post(LOTE, {"formulario": "AB", "acao": "acrescentar", "grupo": "LOTE", "total": "120"})
+    assert ExcecaoMaterial.objects.count() == 120
+
+
+def test_total_diferente_recusa_e_volta_a_previa_com_o_numero_atual(admin):
+    grupo_do_lote(20)
+    r = admin.post(
+        LOTE, {"formulario": "AB", "acao": "acrescentar", "grupo": "LOTE", "total": "15"}
+    )
+    assert r.status_code == 302
+    url = urlparse(r["Location"])
+    assert url.path == LOTE and parse_qs(url.query)["grupo"] == ["LOTE"]
+    assert not ExcecaoMaterial.objects.exists()
+    assert (
+        "mudou" in ultima_mensagem(r) and "15" in ultima_mensagem(r) and "20" in ultima_mensagem(r)
+    )
+
+
+def test_sem_filtro_exige_o_ciente_para_aplicar(admin):
+    total = Material.objects.filter(oculto=False).count()
+    corpo = {"formulario": "AB", "acao": "retirar", "total": str(total)}
+    r = admin.post(LOTE, corpo)
+    assert urlparse(r["Location"]).path == LOTE and not ExcecaoMaterial.objects.exists()
+    assert "ciente" in ultima_mensagem(r)
+    r = admin.post(LOTE, {**corpo, "ciente": "1"})
+    assert urlparse(r["Location"]).path == PAGINA
+    assert ExcecaoMaterial.objects.filter(formulario="AB", habilitado=False).exists()
+
+
+def test_retirar_em_lote_com_filtro_de_estado(admin):
+    r = admin.post(
+        LOTE, {"formulario": "AB", "acao": "retirar", "estado": "disponivel", "total": "3"}
+    )
+    assert ultima_mensagem(r).startswith("3 mudaram")
+    assert {e.material.codigo for e in ExcecaoMaterial.objects.all()} == {
+        FITA,
+        BOTINA,
+        "013.005.007",
+    }
+
+
+def test_o_lote_nao_mexe_nos_outros_formularios_nem_no_cadastro(admin):
+    grupo_do_lote(5)
+    antes = list(Material.objects.values_list("codigo", "estoque", "oculto"))
+    admin.post(
+        LOTE, {"formulario": "OFICINA", "acao": "acrescentar", "grupo": "LOTE", "total": "5"}
+    )
+    assert set(ExcecaoMaterial.objects.values_list("formulario", flat=True)) == {"OFICINA"}
+    assert list(Material.objects.values_list("codigo", "estoque", "oculto")) == antes
+
+
+def test_a_previa_para_quem_so_ve_nao_tem_o_botao_de_confirmar(client):
+    client.force_login(usuarios()["comum"])
+    r = previa(client, grupo="EPI")
+    assert r.status_code == 200 and 'name="total"' not in r.text
+    assert "permissão" in texto(r)
+
+
+def test_aplicar_sem_permissao_e_403(client):
+    client.force_login(usuarios()["comum"])
+    r = client.post(LOTE, {"formulario": "AB", "acao": "retirar", "grupo": "EPI", "total": "2"})
+    assert r.status_code == 403 and not ExcecaoMaterial.objects.exists()
+
+
+def test_o_botao_do_lote_aparece_na_aba_para_quem_pode_e_leva_o_filtro(admin):
+    r = admin.get(PAGINA, {"formulario": "AB", "aba": "materiais", "grupo": "EPI"})
+    assert f'href="{LOTE}?' in r.text and "acao=retirar" in r.text and "acao=acrescentar" in r.text
+    assert "grupo=EPI" in r.text and "Retirar todos os 2 resultados" in texto(r)
+    assert "Acrescentar todos os 2 resultados" in texto(r)
+
+
+# --- Onde um material aparece (US4) ------------------------------------------------------------
+
+
+def onde(codigo):
+    return reverse("catalogo:formularios_material", args=[codigo])
+
+
+def test_a_consulta_mostra_os_cinco_formularios_com_estado_e_origem(admin):
+    from tests.config_cenario import excecao
+
+    excecao(Formulario.OFICINA, Material.objects.get(codigo=FITA), True)
+    excecao(Formulario.EPIS, Material.objects.get(codigo=FITA), False)
+    excecao(Formulario.AB, Material.objects.get(codigo=FITA), True)  # o AB já traz: sem efeito
+    r = admin.get(onde(FITA))
+    assert r.status_code == 200
+    t = texto(r)
+    for nome in (
+        "Limpeza, copa e escritório",
+        "Ferramentas, peças e materiais",
+        "Reposição de peças das viaturas",
+        "Oficina mecânica",
+        "Equipamentos de proteção individual (EPIs)",
+    ):
+        assert nome in t
+    linhas = {
+        f: next(x for x in r.text.split("<tr>") if f'data-formulario="{f}"' in x)
+        for f in Formulario.values
+    }
+    assert "pela regra do formulário" in linhas["AB"] and "Disponível" in linhas["AB"]
+    assert "pela regra do formulário" in linhas["VIATURAS"]
+    assert "acrescentado pelo administrador" in linhas["OFICINA"]
+    assert "Não disponível" in linhas["EPIS"] and "fora da regra do formulário" in linhas["EPIS"]
+    assert "Exceção sem efeito" in linhas["AB"]
+
+
+def test_retirado_e_marcado_como_retirado(admin):
+    from tests.config_cenario import excecao
+
+    excecao(Formulario.AB, Material.objects.get(codigo=FITA), False)
+    linha = next(x for x in admin.get(onde(FITA)).text.split("<tr>") if 'data-formulario="AB"' in x)
+    assert "Não disponível" in linha and "retirado pelo administrador" in linha
+
+
+def test_oculto_e_duplicado_valem_em_todos_os_formularios(admin):
+    r = admin.get(onde(CAPACETE_OCULTO))
+    assert r.status_code == 200 and r.text.count("Oculto no cadastro") >= 5
+    assert "o cadastro do SCPI o oculta em todos os formulários" in texto(r)
+    Material.objects.filter(codigo=FITA).update(duplicado=True)
+    assert "Cadastro duplicado" in texto(admin.get(onde(FITA)))
+
+
+def test_codigo_inexistente_e_404(admin):
+    assert admin.get(onde("000.000.000")).status_code == 404
+
+
+def test_a_consulta_e_aberta_a_quem_so_ve_e_exige_login(client):
+    assert "/entrar/" in client.get(onde(FITA))["Location"]
+    client.force_login(usuarios()["comum"])
+    assert client.get(onde(FITA)).status_code == 200
+
+
+def test_o_link_da_lista_leva_a_consulta_do_material(admin):
+    r = admin.get(PAGINA, {"formulario": "AB", "aba": "materiais", "q": "veda"})
+    assert f'href="{onde(FITA)}"' in r.text
+
+
+def test_a_consulta_leva_de_volta_ao_material_na_lista_do_formulario(admin):
+    r = admin.get(onde(FITA))
+    assert "formulario=AB" in r.text and f"q={FITA}" in r.text
+
+
+# --- Ativar e inativar o centro (US5) ----------------------------------------------------------
+
+ATIVO = reverse("catalogo:formularios_ativo")
+
+
+def test_inativar_e_ativar_pela_pagina_e_volta_ao_mesmo_estado(admin):
+    centro = criar_centro("SETOR NOVO", "90", formularios=[Formulario.AB, Formulario.EPIS])
+    r = admin.post(ATIVO, {"formulario": "AB", "centro": [centro.pk], "ativo": "0", "qc": "novo"})
+    assert volta(r) == {"formulario": "AB", "aba": "centros", "qc": "novo"}
+    assert CentroCusto.objects.get(pk=centro.pk).ativo is False
+    assert ultima_mensagem(r) == "1 linha inativada."
+    assert CentroFormulario.objects.filter(centro=centro).count() == 2  # a escolha fica guardada
+    r = admin.post(ATIVO, {"formulario": "AB", "centro": [centro.pk], "ativo": "1"})
+    assert CentroCusto.objects.get(pk=centro.pk).ativo is True
+    assert ultima_mensagem(r) == "1 linha ativada."
+
+
+def test_inativar_de_novo_nao_muda_nada_e_sem_id_avisa(admin):
+    centro = criar_centro("SETOR NOVO", "90", ativo=False)
+    r = admin.post(ATIVO, {"formulario": "AB", "centro": [centro.pk], "ativo": "0"})
+    assert ultima_mensagem(r) == "Nada mudou: os centros já estavam assim."
+    r = admin.post(ATIVO, {"formulario": "AB", "ativo": "0"})
+    assert ultima_mensagem(r) == "Nenhum centro de custo foi escolhido."
+
+
+def test_a_aba_mostra_inativar_ou_ativar_conforme_o_estado(admin):
+    criar_centro("SETOR PARADO", "88", formularios=[Formulario.LIMPEZA], ativo=False)
+    criar_centro("SETOR VIVO", "89", formularios=[Formulario.LIMPEZA])
+    painel = admin.get(PAGINA, {"formulario": "LIMPEZA", "aba": "centros"}).text
+    painel = painel.split('id="painel-centros"')[1].split('id="painel-materiais"')[0]
+    assert "Ativar" in painel.split("SETOR PARADO")[1].split("</tr>")[0]
+    assert "Inativar" in painel.split("SETOR VIVO")[1].split("</tr>")[0]
+
+
+def test_nas_viaturas_inativar_vale_para_todas_as_linhas_da_descricao(admin):
+    from tests.viaturas_cenario import EQUIPE, montar_viaturas
+
+    montar_viaturas()
+    ids = list(CentroCusto.objects.filter(descricao=EQUIPE).values_list("pk", flat=True))
+    admin.post(ATIVO, {"formulario": "VIATURAS", "centro": ids, "ativo": "0"})
+    assert not CentroCusto.objects.filter(descricao=EQUIPE, ativo=True).exists()
+    painel = admin.get(PAGINA, {"formulario": "VIATURAS", "aba": "centros"}).text
+    assert "Ativar" in painel.split(EQUIPE)[1].split("</tr>")[0]
+
+
+def test_ativar_so_aceita_post_e_exige_a_permissao(client):
+    assert usuarios() and client.get(ATIVO).status_code in (302, 405)
+    client.force_login(usuarios()["comum"])
+    assert client.get(ATIVO).status_code == 405
+    centro = criar_centro("SETOR NOVO", "90")
+    r = client.post(ATIVO, {"formulario": "AB", "centro": [centro.pk], "ativo": "0"})
+    assert r.status_code == 403 and CentroCusto.objects.get(pk=centro.pk).ativo is True

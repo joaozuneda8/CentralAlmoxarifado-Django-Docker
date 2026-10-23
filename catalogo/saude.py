@@ -197,6 +197,14 @@ def _viaturas(ab: CatalogoAB) -> list[ItemSaude]:
                 "fica indisponível.",
             )
         )
+    elif not catalogo_efetivo(Formulario.VIATURAS):
+        saude.append(
+            ItemSaude(
+                "erro",
+                f"{FORMULARIO_VIATURAS}: todos os materiais foram retirados do formulário; ele "
+                "fica indisponível.",
+            )
+        )
     else:
         pecas = "1 peça" if len(lista) == 1 else f"{numero(len(lista))} peças"
         materiais = "1 material" if do_ab == 1 else f"{numero(do_ab)} materiais"

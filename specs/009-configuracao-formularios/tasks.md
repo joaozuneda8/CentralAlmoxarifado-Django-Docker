@@ -249,3 +249,12 @@ Se, na implementação, aparecer decisão operacional não coberta (por exemplo,
 | SC-008 | T041 |
 | SC-009 | T001, T018, T050 |
 | SC-010 | T052 |
+
+## Phase 10: Convergence
+
+**Purpose**: o que o `/speckit-converge` achou entre o código e a spec, o plano e as tarefas (2026-10-23). O que está construído e conferido por teste não aparece aqui; sobraram quatro lacunas parciais.
+
+- [x] T053 Mostrar, na aba Centros de custo (`catalogo/templates/catalogo/_formularios_centros.html`, `catalogo/views_formularios.py`), em **quais outros formulários** cada linha de centro é destino (selos em texto, uma consulta só para a página: `CentroFormulario` das linhas listadas), com teste em `tests/test_config_telas.py`, per FR-005 e US1 (partial)
+- [x] T054 Acrescentar à aba Centros de custo o atalho **"Criar centro" e "Editar" no admin** (`admin:catalogo_centrocusto_add` e `_change`), só a quem o admin permite (`has_perm`), com teste em `tests/test_config_telas.py`, per FR-009 e T046 (partial)
+- [x] T055 Cobrir com teste (`tests/test_config_catalogo.py`) que **retirar uma peça das viaturas a tira da folha** (`carrinho.pecas_da_folha` sobre o catálogo com exceções) e que a peça **acrescentada** fica fora da folha e depois da lista, per FR-023a (partial)
+- [x] T056 Fazer a saúde das viaturas (`catalogo/saude.py`, `_viaturas`) contar o catálogo **efetivo** (`catalogo_efetivo`) para dizer "formulário indisponível: nenhum material" quando as exceções esvaziam a lista e o AB, com teste em `tests/test_config_saude.py`, per FR-039 (partial)

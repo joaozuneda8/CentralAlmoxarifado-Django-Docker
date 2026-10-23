@@ -92,7 +92,7 @@ def _ids(valores) -> list[int]:
 # --- A página ----------------------------------------------------------------------------------
 
 
-def _contexto_centros(origem: str, termo: str, pode_alterar: bool) -> dict:
+def _contexto_centros(origem: str, termo: str, usuario) -> dict:
     habilitadas = set(
         CentroFormulario.objects.filter(formulario=origem).values_list("centro_id", flat=True)
     )
@@ -104,13 +104,25 @@ def _contexto_centros(origem: str, termo: str, pode_alterar: bool) -> dict:
             | Q(placa__icontains=palavra)
         )
     modo = MODO_DESTINO[origem]
+    # Em quais OUTROS formulários cada linha é destino (uma consulta só, na ordem dos formulários).
+    outros: dict[int, list[str]] = {}
+    ordem = {valor: i for i, valor in enumerate(Formulario.values)}
+    pares = CentroFormulario.objects.exclude(formulario=origem).values_list(
+        "centro_id", "formulario"
+    )
+    for centro_id, formulario in sorted(pares, key=lambda par: ordem[par[1]]):
+        outros.setdefault(centro_id, []).append(Formulario(formulario).label)
     grupos = []
     for descricao, conjunto in groupby(linhas, key=lambda c: c.descricao):
-        itens = [{"centro": c, "habilitada": c.pk in habilitadas} for c in conjunto]
+        itens = [
+            {"centro": c, "habilitada": c.pk in habilitadas, "outros": outros.get(c.pk, [])}
+            for c in conjunto
+        ]
         grupos.append(
             {
                 "descricao": descricao,
                 "linhas": itens,
+                "outros": list(dict.fromkeys(f for i in itens for f in i["outros"])),
                 "ids": [i["centro"].pk for i in itens],
                 "n_habilitadas": sum(1 for i in itens if i["habilitada"]),
                 "n_inativas": sum(1 for i in itens if not i["centro"].ativo),
@@ -125,7 +137,9 @@ def _contexto_centros(origem: str, termo: str, pode_alterar: bool) -> dict:
         "total_linhas": sum(len(g["linhas"]) for g in grupos),
         "total_habilitadas": sum(g["n_habilitadas"] for g in grupos),
         "termo": termo,
-        "pode_alterar_centros": pode_alterar,
+        "pode_alterar_centros": pode_alterar_centros(usuario),
+        "pode_criar_centro": usuario.is_staff and usuario.has_perm("catalogo.add_centrocusto"),
+        "pode_editar_centro": usuario.is_staff and usuario.has_perm("catalogo.change_centrocusto"),
         "sem_centros": not CentroCusto.objects.exists(),
     }
 
@@ -194,7 +208,7 @@ def formularios(request):
         "lista_de_formularios": [(f.value, f.label) for f in Formulario],
         "aba": aba,
         "abas": ABAS,
-        **_contexto_centros(origem, texto(request.GET.get("qc")), pode_alterar_centros(usuario)),
+        **_contexto_centros(origem, texto(request.GET.get("qc")), usuario),
         **_contexto_materiais(request, origem, pode_alterar_materiais(usuario)),
         "pode_alterar_algo": pode_alterar_centros(usuario) or pode_alterar_materiais(usuario),
     }

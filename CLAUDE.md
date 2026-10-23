@@ -413,8 +413,9 @@ transações precisam se comportar como no servidor.
   e `MaterialEpi` ficam no banco, sem valer. `tests/regra_antiga.py` é a cópia congelada da regra
   anterior (referência de `test_config_equivalencia.py`); nos testes, `tests/config_cenario.py`
   (`criar_centro`, `habilitar`, `excecao`) e `montar_cenario` habilitam os centros como as regras
-  antigas ofereciam. A saúde avisa formulário sem destino, centro ativo sem formulário (por linha) e
-  exceção sem efeito.
+  antigas ofereciam. A saúde avisa formulário sem destino, centro ativo sem formulário (por linha),
+  exceção sem efeito e formulário esvaziado por exceções. A aba Centros mostra em quais outros
+  formulários cada linha é destino e leva ao admin para criar e editar o centro.
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,
   `PecaViatura`, `CentroCusto` (com o estado `ativo`) e `Opcao` são mantidos à mão no

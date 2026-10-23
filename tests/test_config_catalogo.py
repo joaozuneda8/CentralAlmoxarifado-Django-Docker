@@ -162,3 +162,26 @@ def test_consultas_do_catalogo_sao_poucas(django_assert_max_num_queries):
     formulario_ab()  # esquenta o que o teste não mede
     with django_assert_max_num_queries(12):
         formulario_ab()
+
+
+def test_retirar_uma_peca_das_viaturas_a_tira_da_folha_e_a_acrescentada_fica_fora_dela():
+    """FR-023a: a folha é a lista de peças que está no catálogo; o acrescentado vem depois da lista
+    e nunca entra na folha."""
+    from catalogo.catalogos import folha_viaturas
+    from pedidos import carrinho
+    from pedidos.fluxos import FLUXOS
+
+    PecaViatura.objects.create(material=mat(FITA), ordem=1)
+    PecaViatura.objects.create(material=mat(BOTINA), ordem=2)
+    fluxo = FLUXOS["viaturas"]
+
+    def folha():
+        return codigos(carrinho.pecas_da_folha(fluxo, formulario_viaturas()))
+
+    assert folha() == [FITA, BOTINA] == folha_viaturas()
+    excecao(Formulario.VIATURAS, mat(FITA), False)
+    assert folha() == [BOTINA] and FITA not in codigos(formulario_viaturas())
+    novo = material("900.000.007", "TESOURA", "ALMOX")
+    excecao(Formulario.VIATURAS, novo, True)
+    assert folha() == [BOTINA]  # o acrescentado não entra na folha
+    assert codigos(formulario_viaturas())[-1] == "900.000.007"  # e vem depois da lista e do AB

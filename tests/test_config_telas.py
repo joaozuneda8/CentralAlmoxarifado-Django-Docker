@@ -608,3 +608,60 @@ def test_a_previa_diz_os_filtros_em_palavras(admin):
     assert (
         "Grupo EPI" in t and "No formulário Disponíveis no formulário" in t and "Busca botina" in t
     )
+
+
+# --- Convergência: outros formulários do centro e atalho para o admin ---------------------------
+
+
+def test_cada_linha_mostra_em_quais_outros_formularios_o_centro_e_destino(admin):
+    criar_centro(
+        "SETOR EM TRES", "70", formularios=[Formulario.LIMPEZA, Formulario.OFICINA, Formulario.EPIS]
+    )
+    criar_centro("SETOR SO AQUI", "71", formularios=[Formulario.AB])
+    painel = admin.get(PAGINA, {"formulario": "LIMPEZA", "aba": "centros", "qc": "SETOR"}).text
+    painel = painel.split('id="painel-centros"')[1].split('id="painel-materiais"')[0]
+    tres = painel.split("SETOR EM TRES")[1].split("</tr>")[0]
+    assert "Também em: Oficina mecânica, Equipamentos de proteção individual (EPIs)" in texto_do(
+        tres
+    )
+    aqui = painel.split("SETOR SO AQUI")[1].split("</tr>")[0]
+    assert "Não é destino" in aqui and "Também em: Ferramentas, peças e materiais" in texto_do(aqui)
+
+
+def test_o_centro_so_deste_formulario_nao_tem_a_linha_tambem_em(admin):
+    criar_centro("SETOR SOZINHO", "72", formularios=[Formulario.LIMPEZA])
+    painel = admin.get(PAGINA, {"formulario": "LIMPEZA", "aba": "centros", "qc": "SOZINHO"}).text
+    assert "Também em" not in painel
+
+
+def test_nas_viaturas_o_tambem_em_junta_as_linhas_da_descricao(admin):
+    from tests.viaturas_cenario import EQUIPE, montar_viaturas
+
+    montar_viaturas()
+    painel = admin.get(PAGINA, {"formulario": "VIATURAS", "aba": "centros", "qc": EQUIPE}).text
+    linha = painel.split("<tbody>")[1].split("</tr>")[0]
+    assert "Também em: Limpeza, copa e escritório, Ferramentas, peças e materiais" in texto_do(
+        linha
+    )
+
+
+def test_o_atalho_de_criar_e_editar_centro_aparece_a_quem_o_admin_permite(client):
+    criar_centro("SETOR NOVO", "90", formularios=[Formulario.AB])
+    add = reverse("admin:catalogo_centrocusto_add")
+    client.force_login(usuarios()["admin"])
+    r = client.get(PAGINA, {"formulario": "AB", "aba": "centros", "qc": "SETOR NOVO"})
+    assert f'href="{add}"' in r.text and "Criar centro de custo" in texto(r)
+    centro = CentroCusto.objects.get(descricao="SETOR NOVO")
+    assert f'href="{reverse("admin:catalogo_centrocusto_change", args=[centro.pk])}"' in r.text
+    client.force_login(usuarios()["comum"])
+    r = client.get(PAGINA, {"formulario": "AB", "aba": "centros", "qc": "SETOR NOVO"})
+    assert f'href="{add}"' not in r.text and "Editar" not in texto(r)
+
+
+def test_o_atalho_nas_viaturas_leva_a_lista_do_admin_filtrada_pela_descricao(admin):
+    from tests.viaturas_cenario import EQUIPE, montar_viaturas
+
+    montar_viaturas()
+    r = admin.get(PAGINA, {"formulario": "VIATURAS", "aba": "centros", "qc": EQUIPE})
+    lista = reverse("admin:catalogo_centrocusto_changelist")
+    assert f'href="{lista}?q=EQUIPE%20NORTE"' in r.text

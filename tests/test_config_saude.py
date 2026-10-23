@@ -134,3 +134,16 @@ def test_formulario_sem_material_depois_das_excecoes_e_erro():
         in saude_do_catalogo()
     )
     assert ExcecaoMaterial.objects.count() == 3
+
+
+def test_viaturas_sem_material_depois_das_excecoes_e_erro():
+    from catalogo.catalogos import catalogo_efetivo
+
+    for item in catalogo_efetivo(Formulario.VIATURAS):
+        excecao(Formulario.VIATURAS, Material.objects.get(codigo=item.codigo), False)
+    criar_centro("EQUIPE", "51", formularios=[Formulario.VIATURAS])
+    assert (
+        "erro",
+        "Formulário de reposição de peças das viaturas: todos os materiais foram retirados do "
+        "formulário; ele fica indisponível.",
+    ) in textos()

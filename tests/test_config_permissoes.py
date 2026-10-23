@@ -57,10 +57,11 @@ def entrar(client, usuario):
 
 def test_anonimo_vai_ao_login_em_toda_rota(client, centro):
     assert "/entrar/" in client.get(PAGINA)["Location"]
+    antes = estado()
     for url, corpo in gravacoes(centro).values():
         r = client.post(url, corpo)
         assert r.status_code == 302 and "/entrar/" in r["Location"]
-    assert estado() == (CentroFormulario.objects.count(), 0)
+    assert estado() == antes
 
 
 def test_seguranca_do_trabalho_e_negada_como_toda_rota_interna(client, centro, cenario):

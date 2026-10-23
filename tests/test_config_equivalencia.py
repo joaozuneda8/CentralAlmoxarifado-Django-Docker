@@ -37,7 +37,7 @@ from tests.config_cenario import codigos, material
 
 pytestmark = pytest.mark.django_db
 
-MIGRACAO = importlib.import_module("catalogo.migrations.0006_configuracao_formularios")
+MIGRACAO = importlib.import_module("catalogo.migrations.0007_transcrever_configuracao")
 
 
 @pytest.fixture(autouse=True)

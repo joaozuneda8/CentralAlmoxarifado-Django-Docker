@@ -22,13 +22,15 @@ Esperado: os testes novos (estado, catálogo, centros, tela, permissões, lote, 
 
 ## 2. Preparar o ambiente de desenvolvimento
 
-1. `uv run python manage.py migrate` (aplica `catalogo/0006`, que transcreve as regras antigas; ele falha
-   se a transcrição não reproduzir os destinos de hoje).
+1. `uv run python manage.py migrate` (aplica `catalogo/0006`, o esquema, e `catalogo/0007`, que transcreve as
+   regras antigas; a 0007 falha se a transcrição não reproduzir os destinos de hoje, e uma nova
+   tentativa roda só ela).
 2. Importar cadastro e estoque de teste (`importar_cadastro`, `importar_estoque` com `--arquivo` e os CSV de
    `tests/fixtures/scpi/`).
-3. Criar três usuários: um superusuário; um do almoxarifado comum (sem `is_staff`); um do grupo Segurança do
-   Trabalho. Para testar o staff comum, dar a ele no admin as permissões `change_centrocusto` e
-   `change_excecaomaterial` (o superusuário já as tem).
+3. Criar quatro usuários: um superusuário; um do almoxarifado comum (sem `is_staff`); um **staff comum**
+   (`is_staff` marcado, sem ser superusuário), a quem se dão no admin, conforme o passo do roteiro, as
+   permissões `change_centrocusto` e `change_excecaomaterial` (o superusuário já as tem); e um do grupo
+   Segurança do Trabalho.
 
 ## 3. Roteiro ponta a ponta (US1 a US6)
 
@@ -37,7 +39,7 @@ Esperado: os testes novos (estado, catálogo, centros, tela, permissões, lote, 
 | 1 | Antes de mexer em nada, abrir os cinco formulários públicos | Destinos e materiais **idênticos** aos de antes (o teste de equivalência cobre o mesmo) |
 | 2 | Entrar como superusuário e abrir **Formulários** no menu | Seletor dos cinco formulários; abas Centros de custo e Materiais |
 | 3 | Aba Centros de custo, formulário Limpeza: desabilitar um centro | O centro some do destino da Limpeza e continua nos outros formulários |
-| 4 | Enviar o formulário do AB direto com o destino desabilitado no AB (cliente HTTP) | Recusado com "não está na lista de centros de custo"; nenhum pedido |
+| 4 | Enviar o formulário da **Limpeza** direto com o destino desabilitado nela no passo 3 (cliente HTTP); para o AB, desabilitar antes o mesmo centro no AB e repetir | Recusado com "não está na lista de centros de custo"; nenhum pedido |
 | 5 | Inativar o centro (global) | Some de todos os formulários; um pedido antigo com esse destino segue íntegro; o atendimento dele e a saída avulsa **editada** ainda o resolvem; a saída avulsa **nova** não o oferece |
 | 6 | No admin, criar um centro novo | Aparece na aba como "sem formulário", e a saúde avisa; habilitar em um formulário o faz aparecer ali |
 | 7 | Aba Materiais, formulário AB: buscar um material que o AB oferece e **Retirar** | Some da busca do AB; envio direto com ele é recusado ("não está mais no catálogo"); continua nas viaturas |

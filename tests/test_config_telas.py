@@ -116,7 +116,7 @@ def test_o_resumo_conta_as_linhas_do_formulario(admin):
 
 def test_a_busca_de_centros_filtra_por_descricao_codigo_ou_placa(admin):
     for termo, esperado, ausente in [
-        ("eta ii", "ETA II", "ETA I<"),
+        ("eta ii", "ETA II", "ETA I <span"),
         ("ABC1D23", "PICKUP 01", "RETRO A"),
         ("41", "RETRO A", "PICKUP 01"),
     ]:

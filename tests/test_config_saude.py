@@ -145,5 +145,18 @@ def test_viaturas_sem_material_depois_das_excecoes_e_erro():
     assert (
         "erro",
         "Formulário de reposição de peças das viaturas: todos os materiais foram retirados do "
-        "formulário; ele fica indisponível.",
+        "formulário; o formulário fica indisponível.",
     ) in textos()
+
+
+def test_viaturas_so_com_materiais_acrescentados_esta_disponivel_e_nao_e_erro():
+    """Sem peça na lista e sem material no AB, mas com acrescentado por exceção: o formulário
+    oferece algo, então a saúde não pode dizer que ele está indisponível."""
+    from catalogo.models import ItemLimpeza, SaidaSCPI
+
+    SaidaSCPI.objects.all().delete()
+    ItemLimpeza.objects.all().delete()
+    criar_centro("EQUIPE", "51", formularios=[Formulario.VIATURAS])
+    excecao(Formulario.VIATURAS, material("900.000.009", "TESOURA", "ALMOX"), True)
+    avisos = [(n, t) for n, t in textos() if t.startswith("Formulário de reposição de peças")]
+    assert avisos and all(n != "erro" for n, _ in avisos)

@@ -181,6 +181,7 @@ def _viaturas(ab: CatalogoAB) -> list[ItemSaude]:
     saude = []
     lista = {i.codigo for i in catalogo_viaturas()}
     do_ab = sum(1 for i in ab.itens if i.codigo not in lista)
+    efetivo = catalogo_efetivo(Formulario.VIATURAS, ab)
     if not centros_do_formulario(Formulario.VIATURAS):
         saude.append(
             ItemSaude(
@@ -189,21 +190,15 @@ def _viaturas(ab: CatalogoAB) -> list[ItemSaude]:
                 "formulário fica indisponível.",
             )
         )
-    elif not lista and not do_ab:
+    elif not efetivo:
+        # O que o formulário oferece de fato (regra mais exceções): só está vazio se a lista, o AB
+        # e os acrescentados estão; o texto diz qual dos dois casos é.
+        if not lista and not do_ab:
+            motivo = "nenhuma peça na lista nem material no AB"
+        else:
+            motivo = "todos os materiais foram retirados do formulário"
         saude.append(
-            ItemSaude(
-                "erro",
-                f"{FORMULARIO_VIATURAS}: nenhuma peça na lista nem material no AB; o formulário "
-                "fica indisponível.",
-            )
-        )
-    elif not catalogo_efetivo(Formulario.VIATURAS):
-        saude.append(
-            ItemSaude(
-                "erro",
-                f"{FORMULARIO_VIATURAS}: todos os materiais foram retirados do formulário; ele "
-                "fica indisponível.",
-            )
+            ItemSaude("erro", f"{FORMULARIO_VIATURAS}: {motivo}; o formulário fica indisponível.")
         )
     else:
         pecas = "1 peça" if len(lista) == 1 else f"{numero(len(lista))} peças"
@@ -341,7 +336,7 @@ FORMULARIOS_SEM_AVISO_PROPRIO = {
 }
 
 
-def _destinos_e_excecoes() -> list[ItemSaude]:
+def _destinos_e_excecoes(ab: CatalogoAB | None = None) -> list[ItemSaude]:
     """A configuração por formulário (spec 009, FR-039): formulário sem destino (as viaturas e a
     oficina já dizem o seu), centro ativo que não é destino de nenhum e exceção sem efeito. Só
     roda o cálculo das regras de origem para o formulário que tem exceção."""
@@ -375,7 +370,7 @@ def _destinos_e_excecoes() -> list[ItemSaude]:
     for formulario in Formulario.values:
         if formulario not in com_excecao:
             continue
-        situacao = situacao_do_formulario(formulario)
+        situacao = situacao_do_formulario(formulario, ab)
         sem_efeito = sorted(
             codigo
             for codigo, habilitado in situacao.excecoes.items()
@@ -495,7 +490,7 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
             )
         )
     else:
-        saude += _destinos_e_excecoes()
+        saude += _destinos_e_excecoes(ab)
     return saude
 
 

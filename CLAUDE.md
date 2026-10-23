@@ -318,7 +318,7 @@ transações precisam se comportar como no servidor.
   `HX-Trigger: folha-aplicada` (o `pedidos.js` fecha o diálogo e anuncia). Os destinos são só os
   centros habilitados nas viaturas na página Formulários, sem placa (modo `sem_placa` de
   `catalogos.centros_do_formulario`, pelo `Fluxo.centros`; antes era a marca `equipe_manutencao`,
-  transcrita pela migration `catalogo/0006`, spec 009); sem nenhum habilitado, o formulário fica
+  transcrita pela migration `catalogo/0007`, spec 009); sem nenhum habilitado, o formulário fica
   indisponível. `Pedido.ocorrencia`
   (até 20 caracteres, opcional, só onde `Fluxo.pede_ocorrencia`) entra na conferência de reenvio
   (`cabecalho_enviado` das origens públicas tem 4 campos), aparece na tela de sucesso, no detalhe, no
@@ -406,7 +406,8 @@ transações precisam se comportar como no servidor.
   de todo usuário do almoxarifado; gravar exige `is_staff` mais `catalogo.change_centrocusto` (centros)
   ou `catalogo.change_excecaomaterial` (materiais), recusado com 403 no servidor
   (`catalogo/acesso.py`); a Segurança do Trabalho é negada pelo middleware (rotas fora da lista). A
-  migration `catalogo/0006` transcreve as regras antigas (todos os centros em limpeza, AB e EPIs; as
+  migration `catalogo/0007` (a 0006 é só o esquema, separada porque o DDL do MySQL não é transacional)
+  transcreve as regras antigas (todos os centros em limpeza, AB e EPIs; as
   linhas de `equipe_manutencao` nas viaturas; a linha sem placa de OFICINA MECÂNICA e as com placa na
   oficina; `MaterialOficina` e `MaterialEpi` como exceções que acrescentam) e **se verifica**: levanta
   erro se um formulário não oferecer o mesmo; nada é apagado, e `equipe_manutencao`, `MaterialOficina`

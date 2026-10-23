@@ -25,7 +25,7 @@ description: "Tarefas da funcionalidade 009: configuração das opções por for
 
 - Nomes de código, textos e commits em pt-BR; textos ao usuário em português correto, em linguagem do almoxarifado.
 - `pedidos/servicos.py` continua o único lugar que grava pedidos; a configuração grava só em `catalogo`. Robô do SCPI, `LinhaSaida`, estoque e cadastro de materiais não mudam.
-- Migration **nova** e aditiva (`catalogo/0006`); nunca regenerar as existentes, nem `migrate catalogo zero`.
+- Migration **nova** e aditiva (`catalogo/0006`, o esquema, e `0007`, os dados, separadas após a revisão: o DDL do MySQL não é transacional); nunca regenerar as existentes, nem `migrate catalogo zero`.
 - Nenhuma condição por nome de formulário no núcleo (`carrinho.py`, `regras.py`, `views/materiais.py`, `views/publico.py`): a única tabela por origem é o modo de destino em `catalogo/catalogos.py` ([configuracao-fluxo.md](contracts/configuracao-fluxo.md)).
 - Teste primeiro: escrever o teste da tarefa, vê-lo falhar, implementar.
 - Código Python investigado e editado com o Serena (CLAUDE.md); templates, JS e CSS com Read/Edit.

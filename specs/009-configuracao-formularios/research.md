@@ -111,7 +111,10 @@ um centro inativado virar `ERRO` (Princípio III e Princípio IV: nada que o rob
 
 ## R6. Migração inicial e verificação
 
-**Decisão**: `catalogo/0006_configuracao_formularios` (aditiva), em duas partes na mesma migration:
+**Decisão**: duas migrations aditivas, `catalogo/0006_configuracao_formularios` (o esquema) e
+`catalogo/0007_transcrever_configuracao` (os dados), separadas porque o DDL do MySQL não é
+transacional: se a transcrição falhar, o esquema já está concluído e a nova tentativa roda só a
+transcrição, idempotente. Em duas partes:
 esquema (`ativo`, `CentroFormulario`, `ExcecaoMaterial`) e dados (`transcrever`, uma função de módulo
 chamável `(apps, schema_editor)`, como `carregar_unidades` da 0002, reversível por apagar as linhas novas):
 

@@ -32,7 +32,7 @@ permissões em [contracts/](contracts/).
 **Primary Dependencies**: Django, HTMX 4.0.0 (vendorizado, só pelos componentes existentes), waitress;
 nenhuma dependência nova
 
-**Storage**: MariaDB 11.4 / MySQL 8; uma migration (`catalogo/0006_configuracao_formularios`): coluna
+**Storage**: MariaDB 11.4 / MySQL 8; duas migrations (`catalogo/0006_configuracao_formularios`, o esquema, e `0007_transcrever_configuracao`, os dados): coluna
 `ativo`, duas tabelas e a carga de dados; nada apagado
 
 **Testing**: pytest contra MariaDB/MySQL (`config.settings_test`), sem navegador; a migration de dados
@@ -202,7 +202,7 @@ catalogo/
 ├── forms.py             # filtros da tela e do lote
 ├── templates/catalogo/  # formularios.html, _formularios_centros.html, _formularios_materiais.html, _lote_previa.html, formularios_material.html
 ├── static/catalogo/css/catalogo.css   # só o que a tela precisar (reuso primeiro)
-└── migrations/0006_configuracao_formularios.py
+└── migrations/0006_configuracao_formularios.py, 0007_transcrever_configuracao.py
 pedidos/
 ├── fluxos.py            # as cinco entradas com centros=partial(centros_do_formulario, ...)
 ├── servicos.py          # centros_ativos; _validar_saida_avulsa recebe a lista de centros

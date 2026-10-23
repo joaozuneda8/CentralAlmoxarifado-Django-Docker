@@ -1,4 +1,4 @@
-"""A carga inicial da configuração (migration 0006 do catálogo, spec 009).
+"""A carga inicial da configuração (migration 0007 do catálogo, spec 009; o esquema é a 0006).
 
 A migration transcreve as regras antigas para as tabelas novas, confere o resultado no próprio banco
 e nunca altera os cadastros antigos. Chamada como em `test_migracao_unidades.py`: a função de módulo
@@ -22,7 +22,7 @@ from tests.config_cenario import material
 
 pytestmark = pytest.mark.django_db
 
-MIGRACAO = importlib.import_module("catalogo.migrations.0006_configuracao_formularios")
+MIGRACAO = importlib.import_module("catalogo.migrations.0007_transcrever_configuracao")
 
 
 def centros_do(formulario) -> set[tuple[str, str | None]]:

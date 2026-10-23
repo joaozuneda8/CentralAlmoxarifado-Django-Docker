@@ -1,6 +1,7 @@
 # Modelo de dados: Configuração das opções por formulário
 
-Aplicação `catalogo`. Uma migration aditiva (`0006_configuracao_formularios`), sem alterar nem apagar
+Aplicação `catalogo`. Duas migrations aditivas (`0006_configuracao_formularios`, o esquema, e `0007_transcrever_configuracao`, a
+carga dos dados), sem alterar nem apagar
 coluna existente.
 
 ## `Formulario` (TextChoices, sem tabela)

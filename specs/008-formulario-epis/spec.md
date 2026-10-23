@@ -229,7 +229,7 @@ um número que não existe.
 3. **Given** um número que não existe ou que é de pedido de outro formulário, **When** o servidor o
    consulta, **Then** vê a mesma mensagem neutra nos dois casos.
 4. **Given** muitas consultas em sequência da mesma origem, **When** o limite é atingido, **Then** a
-   consulta é recusada com a mensagem de limite dos formulários públicos.
+   consulta é recusada com uma mensagem própria da consulta, que manda procurar o almoxarifado.
 
 ---
 
@@ -281,6 +281,17 @@ só a fila de autorização funciona, e as demais são negadas.
 - **EPI entregue pela saída avulsa.** A saída avulsa continua sem autorização: ela é o registro do
   balcão pelo próprio almoxarifado e não é objeto desta funcionalidade (Fora do escopo).
 - **Decisão de dois usuários ao mesmo tempo.** Vale a primeira; a segunda é recusada (US2-6).
+- **Usuário da Segurança do Trabalho pede EPI para si mesmo.** Ele pode usar o formulário público como
+  qualquer pessoa, e o sistema não impede que decida o próprio pedido, porque o nome do pedido é texto
+  livre e não se liga a uma conta. Evitar a autoautorização é procedimento do SAEP, não regra do sistema
+  (pendência (j) em "A esclarecer"); a decisão fica gravada com o usuário, o que permite a conferência
+  depois.
+- **Recebedor diferente do solicitante.** Hoje o atendimento aceita qualquer nome como recebedor (há
+  só um atalho para repetir o solicitante). O sistema não impõe que o recebedor do EPI seja o servidor
+  do pedido (pendência (i) em "A esclarecer"); o recibo assinado em papel é o que identifica quem
+  recebeu.
+- **Motivo da recusa com dado sensível.** O motivo é texto livre e aparece na consulta pública; o aviso
+  da tela de decisão (FR-012) é a única proteção do sistema.
 
 ## Requirements *(mandatory)*
 
@@ -313,7 +324,8 @@ só a fila de autorização funciona, e as demais são negadas.
   própria que o identifique na lista e no filtro por origem do painel, e DEVE nascer na situação
   **"Aguardando autorização"**.
 - **FR-009**: A tela de sucesso do envio DEVE dizer que o pedido aguarda a autorização da Segurança do
-  Trabalho e que ainda não há entrega garantida. O texto do recibo e as mensagens DEVEM distinguir
+  Trabalho e que a entrega só acontece depois dela, no atendimento do almoxarifado; NÃO DEVE dizer nem
+  sugerir que o EPI já será entregue. As mensagens ao servidor e ao almoxarifado DEVEM distinguir
   solicitação, autorização, entrega e recebimento (Contexto).
 - **FR-010**: Um pedido de EPI DEVE ter exatamente uma destas situações de autorização: aguardando,
   autorizado ou recusado. Autorizado e recusado são definitivos: a decisão não é desfeita nem refeita, e
@@ -324,7 +336,9 @@ só a fila de autorização funciona, e as demais são negadas.
 - **FR-011**: O sistema DEVE oferecer uma fila dos pedidos de EPI aguardando decisão, ordenada do mais
   antigo para o mais novo, e o detalhe de cada pedido com cabeçalho, materiais e quantidades pedidas.
 - **FR-012**: Quem autoriza DEVE poder **autorizar** ou **recusar** o pedido. A recusa DEVE exigir um
-  motivo em texto, de tamanho limitado como as outras observações; a autorização não pede motivo.
+  motivo em texto, de tamanho limitado como as outras observações; a autorização não pede motivo. A tela
+  da recusa DEVE avisar quem decide que o motivo será visto pelo servidor na consulta (FR-031) e pelo
+  almoxarifado, para não escrever ali dado sensível.
 - **FR-013**: A decisão DEVE gravar quem decidiu (o usuário), quando e, na recusa, o motivo, e esses
   dados DEVEM aparecer no detalhe do pedido para o almoxarifado e para a Segurança do Trabalho.
 - **FR-014**: Quem autoriza NÃO DEVE poder alterar materiais, quantidades, destinatário, destino nem
@@ -453,6 +467,12 @@ só a fila de autorização funciona, e as demais são negadas.
 - O robô do SCPI, o tipo de saída lançado e as regras de estoque não mudam. O estoque não é reservado nem
   conferido na autorização.
 - O acesso da Segurança do Trabalho é concedido por quem administra os usuários, como os outros acessos.
+- O usuário da Segurança do Trabalho, estando ou não logado, continua podendo abrir as páginas públicas
+  (formulários e consulta) como qualquer pessoa; a restrição vale para a parte interna.
+- Dados pessoais tratados: o nome do servidor (que o pedido já guarda hoje), a decisão e o motivo. A
+  consulta pública não os expõe além da situação e do motivo; o prazo de guarda é pendência de
+  validação externa (item 5 da seção normativa).
+- O atendimento, a edição e o recibo continuam como hoje, inclusive o recebedor em texto livre.
 
 ### A esclarecer (não resolvido por suposição)
 
@@ -468,6 +488,10 @@ reversão da decisão. Ficaram fora da cota de 5 perguntas, para o plano ou uma 
   recibo por enquanto.
 - (h) Se a Segurança do Trabalho vê, na fila, também os pedidos já decididos (histórico), ou só os
   aguardando. Por enquanto, os aguardando em destaque e os já decididos consultáveis, de leitura.
+- (i) Se o recebedor do EPI deve ser sempre o servidor do pedido, ou se outra pessoa pode retirar por
+  ele (hoje: texto livre, sem regra).
+- (j) Se o SAEP quer que o sistema impeça o usuário da Segurança do Trabalho de decidir um pedido feito
+  em seu próprio nome (hoje: impossível de detectar de forma confiável, porque o nome é texto livre).
 
 ## Referências normativas e pendências de validação externa
 

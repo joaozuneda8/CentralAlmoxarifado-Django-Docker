@@ -8,6 +8,7 @@ sem grupo).
 """
 
 import time
+import uuid
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -16,7 +17,10 @@ from django.urls import reverse
 
 from catalogo.models import CentroCusto, Material, MaterialEpi, Opcao
 from contas.acesso import GRUPO_SEGURANCA_TRABALHO
+from pedidos.models import Pedido
 from pedidos.protecao import emitir
+from pedidos.regras import EPIS, EnvioPedido, ItemEnviado
+from pedidos.servicos import registrar_pedido
 from tests.cenario import montar_cenario
 
 LUVA = "013.005.100"
@@ -89,3 +93,18 @@ def enviar(client, itens, *, destino=DESTINO, solicitante="Marcos Pereira", toke
         },
         HTTP_HX_REQUEST="true",
     )
+
+
+def registrar(solicitante="Marcos Pereira", itens=((LUVA, "2"),), destino=DESTINO) -> Pedido:
+    """Registra um pedido de EPIs pelo serviço (sem passar pela tela) e devolve o pedido."""
+    resposta = registrar_pedido(
+        EPIS,
+        uuid.uuid4(),
+        EnvioPedido(
+            solicitante=solicitante,
+            destino=destino,
+            itens=tuple(ItemEnviado(c, q) for c, q in itens),
+        ),
+    )
+    assert resposta.ok, resposta.mensagem
+    return resposta.pedido

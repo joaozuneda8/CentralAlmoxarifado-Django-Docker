@@ -103,7 +103,10 @@ def formulario(request, fluxo):
         envio.id,
         pedido,
         ip=request.META.get("REMOTE_ADDR"),
-        url_painel=request.build_absolute_uri(reverse("pedidos:painel")),
+        # Botão do aviso: a fila de autorização (a Segurança do Trabalho recebe) ou o painel.
+        url_painel=request.build_absolute_uri(
+            reverse("pedidos:autorizacoes" if fluxo.exige_autorizacao else "pedidos:painel")
+        ),
     )
     if resposta.ok:
         # `_sucesso.html` lista só o que o funcionário pediu (filtro por segurança).

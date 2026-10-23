@@ -120,7 +120,7 @@ def _dados_do_atendimento(post) -> tuple[DadosSaida, bool]:
 
 def _pedido(numero):
     consulta = Pedido.objects.select_related(
-        "atendimento", "atendimento__atendido_por", "registrado_por"
+        "atendimento", "atendimento__atendido_por", "registrado_por", "autorizacao"
     ).prefetch_related("itens", "atendimento__linhas")
     return get_object_or_404(consulta, numero=numero)
 
@@ -156,13 +156,17 @@ def _contexto_edicao(pedido) -> dict:
 
 
 def _contexto_detalhe(pedido, **extra) -> dict:
+    autorizacao = pedido.autorizacao_ou_none
     contexto = {
         "pedido": pedido,
         "atendivel": False,
+        "autorizacao": autorizacao,
         "unidades_scpi": unidades_scpi([pedido]),
         **_contexto_edicao(pedido),
     }
-    if pedido.origem != AVULSA and pedido.atendimento_ou_none is None:
+    # O pedido de EPI só abre o atendimento depois de autorizado (spec 008).
+    sem_bloqueio = autorizacao is None or autorizacao.situacao == "AUTORIZADO"
+    if pedido.origem != AVULSA and pedido.atendimento_ou_none is None and sem_bloqueio:
         opcoes = opcoes_saida()
         contexto.update(
             atendivel=True,
@@ -512,8 +516,12 @@ def _pedido_com_atendimento_aberto(numero):
     acrescenta ou troca material."""
     pedido = _pedido(numero)
     atendido = pedido.atendimento_ou_none is not None
-    if pedido.origem == AVULSA or (
-        atendido and not edicao_permitida(True, pedido.linhas).permitida
+    autorizacao = pedido.autorizacao_ou_none
+    if (
+        pedido.origem == AVULSA
+        or (atendido and not edicao_permitida(True, pedido.linhas).permitida)
+        # Pedido de EPI aguardando ou recusado não tem atendimento aberto (spec 008).
+        or (autorizacao is not None and autorizacao.situacao != "AUTORIZADO")
     ):
         raise Http404("Pedido sem atendimento aberto.")
     return pedido

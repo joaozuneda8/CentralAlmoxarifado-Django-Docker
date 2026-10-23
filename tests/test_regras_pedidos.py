@@ -323,7 +323,7 @@ def test_erros_de_material_nao_tem_campo():
 
 
 def test_a_origem_de_epis_e_publica_como_as_outras():
-    """A origem nova vale para o limite por nome e a conferência de reenvio sem mudança nas regras."""
+    """A origem nova vale para o limite por nome e o reenvio sem mudar as regras."""
     from pedidos.regras import AVULSA, EPIS, cabecalho_enviado, origem_publica
 
     assert origem_publica(EPIS) and not origem_publica(AVULSA)

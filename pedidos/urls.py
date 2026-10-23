@@ -1,6 +1,6 @@
 from django.urls import path
 
-from pedidos.views import almoxarifado, materiais, publico
+from pedidos.views import almoxarifado, autorizacao, materiais, publico
 
 app_name = "pedidos"
 
@@ -31,4 +31,11 @@ urlpatterns = [
     ),
     path("painel/saida-avulsa/carrinho/", almoxarifado.avulsa_carrinho, name="avulsa_carrinho"),
     path("painel/recibos/impressos/", almoxarifado.marcar_impressos, name="marcar_impressos"),
+    path("painel/autorizacoes/", autorizacao.autorizacoes, name="autorizacoes"),
+    path("painel/autorizacoes/<str:numero>/", autorizacao.autorizacao, name="autorizacao"),
+    path(
+        "painel/autorizacoes/<str:numero>/decidir/",
+        autorizacao.decidir,
+        name="decidir",
+    ),
 ]

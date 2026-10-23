@@ -9,6 +9,8 @@ from pedidos.regras import LIMPEZA, frase_diferenca
 register = template.Library()
 
 _SITUACAO = {
+    "aguardando_autorizacao": "selo-aviso",
+    "recusado": "selo-erro",
     "aguardando": "selo-info",
     "atendido": "selo-ok",
     "parcial": "selo-aviso",
@@ -64,6 +66,13 @@ def proximos_passos(pedido) -> list[str]:
     """O que o almoxarifado ainda precisa fazer neste estágio do pedido (texto da tela; as regras
     de situação ficam em `regras.py`)."""
     chave = pedido.situacao.chave
+    if chave == "aguardando_autorizacao":
+        return [
+            "Aguarde a autorização da Segurança do Trabalho: o pedido ainda não pode ser atendido.",
+            "O aviso do pedido chega ao almoxarifado depois que ela autorizar.",
+        ]
+    if chave == "recusado":
+        return ["Pedido recusado pela Segurança do Trabalho: está encerrado e não há o que fazer."]
     if chave == "aguardando":
         return [
             "Confira e preencha as quantidades separadas na tabela de materiais.",

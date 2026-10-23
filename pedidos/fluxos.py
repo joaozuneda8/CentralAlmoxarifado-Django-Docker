@@ -21,6 +21,7 @@ from catalogo.catalogos import (
     folha_viaturas,
     formulario_ab,
     formulario_avulsa,
+    formulario_epis,
     formulario_limpeza,
     formulario_oficina,
     formulario_viaturas,
@@ -28,6 +29,7 @@ from catalogo.catalogos import (
 from pedidos.regras import (
     AB,
     AVULSA,
+    EPIS,
     LIMPEZA,
     OFICINA,
     REGRA_LIVRE,
@@ -132,6 +134,16 @@ FLUXOS: dict[str, Fluxo] = {
         icone="caixa-check",
         exemplo_destino="Oficina mecânica ou placa da viatura",
         centros=centros_oficina,
+    ),
+    "epis": Fluxo(
+        nome="epis",
+        origem=EPIS,
+        titulo="Equipamentos de proteção individual (EPIs)",
+        catalogo=formulario_epis,
+        exemplo_busca="Ex.: luva, capacete, óculos",
+        exemplo_inicio="Ex.: luva, botina, capacete, protetor auricular",
+        icone="escudo",
+        exige_autorizacao=True,
     ),
     "avulsa": Fluxo(
         nome="avulsa",

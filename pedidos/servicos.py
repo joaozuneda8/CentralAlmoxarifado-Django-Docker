@@ -19,11 +19,13 @@ from django.utils import timezone
 
 from catalogo.catalogos import ItemCatalogo
 from catalogo.models import CentroCusto, Opcao
+from contas.acesso import da_seguranca_trabalho
 from pedidos.fluxos import fluxo_da_origem
 from pedidos.models import (
     TRAVA_LANCAMENTO,
     AlteracaoPedido,
     Atendimento,
+    AutorizacaoPedido,
     ExecucaoRobo,
     ItemPedido,
     LinhaSaida,
@@ -65,7 +67,7 @@ from pedidos.regras import (
     validar_pedido,
     validar_saida,
 )
-from pedidos.telegram import notificar_pedido
+from pedidos.telegram import notificar_autorizacao_pendente, notificar_pedido
 from scpi.execucao import trava
 
 logger = logging.getLogger("pedidos")
@@ -82,8 +84,11 @@ class Resposta:
     divergente: bool = False
     pedido: Pedido | None = None
     telegram: str = ""
-    motivo: str = ""  # recusa da edição: "lancamento" ou "versao"
+    # Por que a operação foi recusada: na edição, "lancamento" ou "versao"; na decisão da
+    # autorização, "grupo", "decisao", "motivo", "nao_encontrada" ou "ja_decidida".
+    motivo: str = ""
     diferencas: list[dict] = field(default_factory=list)
+    autorizacao: AutorizacaoPedido | None = None  # a decisão gravada (ou já gravada) do pedido
 
 
 def mensagem_divergente(numero: str) -> str:
@@ -277,12 +282,109 @@ def registrar_pedido(
             ocorrencia=texto(envio.ocorrencia),
         )
         _gravar_itens(pedido, v.validos)
+        if fluxo.exige_autorizacao:
+            # Na mesma transação do pedido: não existe pedido de EPI sem autorização (spec 008).
+            AutorizacaoPedido.objects.create(pedido=pedido)
         resposta = Resposta(ok=True, numero=pedido.numero, pedido=pedido)
 
         def avisar():
-            resposta.telegram = notificar_pedido(pedido, url_painel)
+            if fluxo.exige_autorizacao:
+                # O almoxarifado só é avisado depois de autorizado (`decidir_autorizacao`);
+                # agora quem precisa saber é a Segurança do Trabalho, com o botão para a fila.
+                resposta.telegram = notificar_autorizacao_pendente(pedido, url_painel)
+            else:
+                resposta.telegram = notificar_pedido(pedido, url_painel)
 
         transaction.on_commit(avisar)
+    return resposta
+
+
+def _nome_do_usuario(usuario) -> str:
+    return usuario.get_full_name().strip() or usuario.get_username()
+
+
+def _ja_decidida(pedido: Pedido, autorizacao: AutorizacaoPedido) -> Resposta:
+    """A decisão que já estava gravada: quem e quando (nada é alterado)."""
+    decisao = (
+        "autorizado"
+        if autorizacao.situacao == AutorizacaoPedido.Situacao.AUTORIZADO
+        else "recusado"
+    )
+    quando = timezone.localtime(autorizacao.decidido_em).strftime("%d/%m/%Y %H:%M")
+    quem = _nome_do_usuario(autorizacao.decidido_por)
+    return Resposta(
+        ok=False,
+        motivo="ja_decidida",
+        mensagem=f"Este pedido já foi {decisao} por {quem} em {quando}.",
+        numero=pedido.numero,
+        pedido=pedido,
+        autorizacao=autorizacao,
+    )
+
+
+def decidir_autorizacao(
+    numero: str, decisao: str, motivo: str, usuario, *, url_painel: str = ""
+) -> Resposta:
+    """A Segurança do Trabalho autoriza ou recusa um pedido de EPI (spec 008, FR-011 a FR-016).
+
+    `decisao` é "autorizar" ou "recusar"; a recusa exige o `motivo`. Só quem é do grupo da
+    Segurança do Trabalho decide (nem o administrador, FR-021). A decisão é definitiva e vale a
+    primeira: o pedido é travado como no atendimento, e a segunda tentativa devolve a decisão já
+    gravada sem alterar nada. Ao autorizar, o almoxarifado é avisado depois do commit (nunca
+    desfaz a decisão), e o pedido passa a poder ser atendido."""
+    if not da_seguranca_trabalho(usuario):
+        return Resposta(
+            ok=False,
+            motivo="grupo",
+            mensagem="Só a Segurança do Trabalho pode autorizar ou recusar pedidos de EPI.",
+        )
+    if decisao not in ("autorizar", "recusar"):
+        return Resposta(ok=False, motivo="decisao", mensagem="Escolha autorizar ou recusar.")
+    motivo = texto(motivo) if decisao == "recusar" else ""
+    if decisao == "recusar":
+        if not motivo:
+            return Resposta(ok=False, motivo="motivo", mensagem="Informe o motivo da recusa.")
+        if len(motivo) > settings.PEDIDOS_MAX_TEXTO:
+            return Resposta(
+                ok=False,
+                motivo="motivo",
+                mensagem=f"Motivo da recusa: no máximo {settings.PEDIDOS_MAX_TEXTO} caracteres.",
+            )
+    with transaction.atomic():
+        # O mesmo travamento do atendimento: decidir e atender o mesmo pedido não se cruzam.
+        pedido = Pedido.objects.select_for_update().filter(numero=numero).first()
+        autorizacao = (
+            AutorizacaoPedido.objects.select_for_update()
+            .select_related("decidido_por")
+            .filter(pedido=pedido)
+            .first()
+            if pedido is not None
+            else None
+        )
+        if autorizacao is None:
+            return Resposta(
+                ok=False,
+                motivo="nao_encontrada",
+                mensagem="Pedido de EPIs não encontrado.",
+            )
+        if autorizacao.situacao != AutorizacaoPedido.Situacao.AGUARDANDO:
+            return _ja_decidida(pedido, autorizacao)
+        autorizacao.situacao = (
+            AutorizacaoPedido.Situacao.AUTORIZADO
+            if decisao == "autorizar"
+            else AutorizacaoPedido.Situacao.RECUSADO
+        )
+        autorizacao.decidido_por = usuario
+        autorizacao.decidido_em = timezone.now()
+        autorizacao.motivo = motivo
+        autorizacao.save()
+        resposta = Resposta(ok=True, numero=pedido.numero, pedido=pedido, autorizacao=autorizacao)
+        if decisao == "autorizar":
+
+            def avisar():
+                resposta.telegram = notificar_pedido(pedido, url_painel)
+
+            transaction.on_commit(avisar)
     return resposta
 
 
@@ -606,6 +708,23 @@ def estado_enviado(
     )
 
 
+def _recusa_por_falta_de_autorizacao(pedido: Pedido) -> str:
+    """O motivo de o atendimento não poder seguir por causa da autorização da Segurança do
+    Trabalho, ou "" (o pedido não exige autorização, ou já está autorizado)."""
+    autorizacao = pedido.autorizacao_ou_none
+    if autorizacao is None or autorizacao.situacao == AutorizacaoPedido.Situacao.AUTORIZADO:
+        return ""
+    if autorizacao.situacao == AutorizacaoPedido.Situacao.RECUSADO:
+        return (
+            f"O pedido {pedido.numero} foi recusado pela Segurança do Trabalho e está encerrado. "
+            "Nada foi gravado."
+        )
+    return (
+        f"O pedido {pedido.numero} ainda não foi autorizado pela Segurança do Trabalho e não "
+        "pode ser atendido. Nada foi gravado."
+    )
+
+
 def confirmar_atendimento(
     pedido_id: uuid.UUID,
     atendimento_id: uuid.UUID,
@@ -653,6 +772,11 @@ def confirmar_atendimento(
                 "Nada foi gravado.",
             )
 
+        # O portão da autorização (spec 008): antes de qualquer gravação, na mesma transação que
+        # trava o pedido, para o pedido de EPI aguardando ou recusado nunca virar atendimento nem
+        # linha de saída (o robô só lê as linhas).
+        if mensagem := _recusa_por_falta_de_autorizacao(pedido):
+            return Resposta(ok=False, mensagem=mensagem)
         unicos, catalogo, erros = _validar_atendimento(
             pedido,
             itens,

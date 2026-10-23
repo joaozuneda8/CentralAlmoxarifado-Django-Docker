@@ -76,6 +76,14 @@ def test_sem_o_centro_da_oficina_so_as_viaturas_e_aviso():
     )
 
 
+def test_sem_o_centro_e_sem_material_mostra_as_duas_pendencias():
+    CentroCusto.objects.filter(descricao=OFICINA).delete()
+    Opcao.objects.filter(lista=Opcao.Lista.GRUPO_OFICINA).delete()
+    MaterialOficina.objects.all().delete()
+    assert texto_de(f"{FORMULARIO}: nenhum material").nivel == "erro"
+    assert texto_de(f"{FORMULARIO}: centro").nivel == "aviso"
+
+
 def test_sem_saldo_importado_nada_da_oficina():
     Material.objects.update(estoque_em=None)
     assert not itens_de(FORMULARIO) and not itens_de("Grupos da oficina")

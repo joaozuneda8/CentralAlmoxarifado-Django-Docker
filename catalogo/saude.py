@@ -246,14 +246,14 @@ def _oficina() -> list[ItemSaude]:
     else:
         materiais = "1 material" if n == 1 else f"{numero(n)} materiais"
         saude.append(ItemSaude("ok", f"{FORMULARIO_OFICINA}: {materiais}."))
-        if all(c.so_com_placa for c in centros):
-            saude.append(
-                ItemSaude(
-                    "aviso",
-                    f"{FORMULARIO_OFICINA}: centro OFICINA MECÂNICA não cadastrado; só as viaturas "
-                    "são oferecidas como destino.",
-                )
+    if centros and all(c.so_com_placa for c in centros):
+        saude.append(
+            ItemSaude(
+                "aviso",
+                f"{FORMULARIO_OFICINA}: centro OFICINA MECÂNICA não cadastrado; só as viaturas "
+                "são oferecidas como destino.",
             )
+        )
     visiveis = {
         _grupo(g)
         for g in Material.objects.filter(oculto=False).values_list("grupo", flat=True).distinct()

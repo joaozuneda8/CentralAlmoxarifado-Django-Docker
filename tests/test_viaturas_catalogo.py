@@ -7,13 +7,14 @@ import pytest
 
 from catalogo.catalogos import (
     catalogo_ab,
-    centros_equipe_manutencao,
+    centros_do_formulario,
     folha_viaturas,
     formulario_viaturas,
 )
 from catalogo.models import CentroCusto, ItemLimpeza, Material, PecaViatura, SaidaSCPI
-from pedidos.regras import Centro
+from pedidos.regras import VIATURAS, Centro
 from tests.cenario import montar_cenario
+from tests.config_cenario import criar_centro, habilitar
 
 pytestmark = pytest.mark.django_db
 
@@ -96,13 +97,11 @@ def test_a_folha_e_a_lista_visivel_na_ordem(lista):
     assert folha_viaturas() == [FITA, TEE, CAFE]
 
 
-def test_centros_de_equipe_sao_os_marcados_sem_placa():
+def test_centros_de_equipe_sao_os_habilitados_sem_placa():
     montar_cenario()
-    assert centros_equipe_manutencao() == []
-    CentroCusto.objects.filter(descricao="ETA I").update(equipe_manutencao=True)
-    # Centro com placa: uma linha marcada basta, e a placa não vai para o destino.
-    CentroCusto.objects.create(descricao="EQUIPE NORTE", codigo="51", placa="AAA1A11")
-    CentroCusto.objects.create(
-        descricao="EQUIPE NORTE", codigo="51", placa="BBB2B22", equipe_manutencao=True
-    )
-    assert centros_equipe_manutencao() == [Centro("EQUIPE NORTE", "51"), Centro("ETA I", "12")]
+    assert centros_do_formulario(VIATURAS) == []
+    habilitar(CentroCusto.objects.filter(descricao="ETA I"), VIATURAS)
+    # Centro com placa: uma linha habilitada basta, e a placa não vai para o destino.
+    criar_centro("EQUIPE NORTE", "51", "AAA1A11")
+    criar_centro("EQUIPE NORTE", "51", "BBB2B22", formularios=[VIATURAS])
+    assert centros_do_formulario(VIATURAS) == [Centro("EQUIPE NORTE", "51"), Centro("ETA I", "12")]

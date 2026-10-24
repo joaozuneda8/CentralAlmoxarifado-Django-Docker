@@ -1,12 +1,12 @@
-"""Manutenção da lista de peças e da marca dos centros no admin (spec 006, US3, FR-007, FR-011,
-SC-003): vale no próximo acesso ao formulário, sem nova publicação."""
+"""Manutenção da lista de peças no admin (spec 006, US3, FR-011, SC-003): vale no próximo acesso ao
+formulário, sem nova publicação. A marca dos centros saiu do admin na spec 009."""
 
 import re
 
 import pytest
 from django.urls import reverse
 
-from catalogo.models import CentroCusto, Material, PecaViatura
+from catalogo.models import Material, PecaViatura
 from tests.viaturas_cenario import FITA, ISOLANTE, TUBO, montar_viaturas
 
 pytestmark = pytest.mark.django_db
@@ -51,12 +51,9 @@ def test_incluir_retirar_e_reordenar_valem_no_proximo_acesso(client):
     assert "Tubo PVC 3/4 Soldável Marrom (metro)" not in nomes
 
 
-def test_a_marca_dos_centros_no_admin(admin_client):
+def test_a_marca_antiga_dos_centros_saiu_do_admin(admin_client):
+    """Spec 009: os destinos das viaturas se definem na página Formulários; a marca de equipe de
+    manutenção deixou de valer e não aparece mais, nem como coluna nem como filtro."""
     html = admin_client.get(reverse("admin:catalogo_centrocusto_changelist")).text
-    assert "Equipe de manutenção" in html
-    assert "equipe_manutencao__exact" in html  # o filtro
-    marcados = admin_client.get(
-        reverse("admin:catalogo_centrocusto_changelist"), {"equipe_manutencao__exact": "1"}
-    ).text
-    assert "BBB2B22" in marcados and "ETA II" not in marcados
-    assert CentroCusto.objects.filter(equipe_manutencao=True).count() == 1
+    assert "Equipe de manutenção" not in html and "equipe_manutencao" not in html
+    assert "ativo" in html  # o estado global do centro, no lugar

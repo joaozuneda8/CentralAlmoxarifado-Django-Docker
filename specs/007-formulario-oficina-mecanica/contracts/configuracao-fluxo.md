@@ -1,5 +1,10 @@
 # Contrato: a entrada `oficina` de `FLUXOS`
 
+> **Nota (spec 009, 2026-10-23):** `centros` agora é definido nas cinco entradas públicas, como
+> `partial(catalogos.centros_do_formulario, ORIGEM)`, que lê a configuração da página Formulários (a
+> marca `equipe_manutencao` e os avulsos do formulário foram transcritos e saíram do admin). Veja
+> [009 / configuracao-fluxo.md](../../009-configuracao-formularios/contracts/configuracao-fluxo.md).
+
 Usa o contrato da spec 005
 ([configuracao-fluxo.md](../../005-consistencia-formularios-publicos/contracts/configuracao-fluxo.md))
 e os campos opcionais da spec 006

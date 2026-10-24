@@ -15,13 +15,14 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.urls import reverse
 
-from catalogo.models import CentroCusto, Material, MaterialEpi, Opcao
+from catalogo.models import CentroCusto, Formulario, Material, Opcao
 from contas.acesso import GRUPO_SEGURANCA_TRABALHO
 from pedidos.models import Pedido
 from pedidos.protecao import emitir
 from pedidos.regras import EPIS, EnvioPedido, ItemEnviado
 from pedidos.servicos import registrar_pedido
 from tests.cenario import montar_cenario
+from tests.config_cenario import excecao, habilitar
 
 LUVA = "013.005.100"
 CAPACETE = "013.001.001"
@@ -53,8 +54,12 @@ def montar_epis() -> None:
             },
         )
     Opcao.objects.get_or_create(lista=Opcao.Lista.GRUPO_EPI, valor="Material de Segurança e EPI")
-    MaterialEpi.objects.get_or_create(material=Material.objects.get(codigo=OCULOS))
-    CentroCusto.objects.get_or_create(descricao="ETA I", codigo="12", defaults={"placa": None})
+    # O avulso dos EPIs é uma exceção da configuração (spec 009), que acrescenta os óculos.
+    excecao(Formulario.EPIS, Material.objects.get(codigo=OCULOS), True)
+    centro, _ = CentroCusto.objects.get_or_create(
+        descricao="ETA I", codigo="12", defaults={"placa": None}
+    )
+    habilitar(centro, Formulario.EPIS)
 
 
 def usuarios() -> dict:

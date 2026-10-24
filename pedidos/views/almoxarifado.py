@@ -84,9 +84,12 @@ def painel(request):
     return resposta
 
 
-def opcoes_saida() -> dict:
-    """Listas dos campos de uma saída: funcionários, centros, placas e tipos."""
-    linhas = list(CentroCusto.objects.all())
+def opcoes_saida(*, so_ativos: bool = False) -> dict:
+    """Listas dos campos de uma saída: funcionários, centros, placas e tipos. Com `so_ativos` (a
+    saída avulsa nova), o centro inativo não é oferecido; o atendimento e a edição listam todos
+    (spec 009)."""
+    consulta = CentroCusto.objects.filter(ativo=True) if so_ativos else CentroCusto.objects.all()
+    linhas = list(consulta)
     return {
         "funcionarios": Opcao.valores(Opcao.Lista.FUNCIONARIO),
         "centros": list(dict.fromkeys((c.descricao, c.codigo) for c in linhas)),
@@ -634,7 +637,7 @@ def avulsa(request):
         "filtros": [],
         **contexto_busca(fluxo, catalogo or []),
         **urls_do_fluxo(fluxo),
-        **opcoes_saida(),
+        **opcoes_saida(so_ativos=True),
     }
     if request.method != "POST":
         return render(request, "pedidos/avulsa.html", contexto)

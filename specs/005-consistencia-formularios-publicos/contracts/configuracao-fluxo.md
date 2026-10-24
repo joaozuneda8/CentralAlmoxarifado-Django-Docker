@@ -1,5 +1,10 @@
 # Contrato: o que um formulário informa (`Fluxo`)
 
+> **Nota (spec 009, 2026-10-23):** `centros` agora é definido nas cinco entradas públicas, como
+> `partial(catalogos.centros_do_formulario, ORIGEM)`, que lê a configuração da página Formulários (a
+> marca `equipe_manutencao` e os avulsos do formulário foram transcritos e saíram do admin). Veja
+> [009 / configuracao-fluxo.md](../../009-configuracao-formularios/contracts/configuracao-fluxo.md).
+
 Cada formulário, atual ou novo, é uma entrada de `FLUXOS` em `pedidos/fluxos.py`. O núcleo
 (busca, carrinho, envio, proteções, recibo, atendimento) lê só isto. Criar um formulário novo exige
 **esta entrada, uma função de catálogo e (fora desta funcionalidade) um valor novo em

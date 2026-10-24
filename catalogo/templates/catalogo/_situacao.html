@@ -98,8 +98,8 @@ importação termina.
     <div class="cartao cartao-sutil">
       <p class="texto-secundario">Formulário de ferramentas, peças e materiais</p>
       {% if situacao.ab %}
-      <p class="metrica">{{ situacao.ab.itens|length|floatformat:"0g" }} {% if situacao.ab.itens|length == 1 %}item{% else %}itens{% endif %}</p>
-      <p class="campo-dica">De {{ situacao.ab.codigos|floatformat:"0g" }} códigos com saída no SCPI: {{ situacao.ab.na_limpeza|floatformat:"0g" }} já estão no formulário de limpeza e {{ situacao.ab.ocultos|floatformat:"0g" }} estão ocultos ou em grupo oculto.</p>
+      <p class="metrica">{{ situacao.ab_oferecidos|floatformat:"0g" }} {% if situacao.ab_oferecidos == 1 %}item{% else %}itens{% endif %}</p>
+      <p class="campo-dica">Pela regra, de {{ situacao.ab.codigos|floatformat:"0g" }} códigos com saída no SCPI: {{ situacao.ab.na_limpeza|floatformat:"0g" }} já estão no formulário de limpeza e {{ situacao.ab.ocultos|floatformat:"0g" }} estão ocultos ou em grupo oculto.</p>
       {% else %}
       <p class="metrica">Indisponível</p>
       <p class="campo-dica">Falta importar o saldo de estoque.</p>

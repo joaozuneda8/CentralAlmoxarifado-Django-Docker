@@ -1,11 +1,12 @@
-"""Manutenção da escolha da oficina no admin (spec 007, US3, FR-012, FR-012a, SC-004): vale no
-próximo acesso ao formulário, sem nova publicação."""
+"""Manutenção da escolha da oficina no admin (spec 007, US3, FR-012, SC-004): a lista de grupos vale
+no próximo acesso ao formulário, sem nova publicação. Os avulsos saíram do admin na spec 009."""
 
 import pytest
-from django.urls import reverse
+from django.contrib import admin
+from django.urls import NoReverseMatch, reverse
 
-from catalogo.models import Material, MaterialOficina, Opcao
-from tests.oficina_cenario import FILTRO, FITA, OLEO, montar_oficina
+from catalogo.models import MaterialOficina, Opcao
+from tests.oficina_cenario import FILTRO, montar_oficina
 
 pytestmark = pytest.mark.django_db
 
@@ -21,29 +22,12 @@ def acha(client, q, codigo):
     return f'data-codigo="{codigo}"' in client.get(BUSCA, {"q": q}).text
 
 
-def test_os_materiais_da_oficina_no_admin(admin_client):
-    url = reverse("admin:catalogo_materialoficina_changelist")
-    assert "ÓLEO LUBRIFICANTE 15W40" in admin_client.get(url).text
-    assert admin_client.get(url, {"q": OLEO}).status_code == 200
-    fita = Material.objects.get(codigo=FITA)
-    r = admin_client.post(reverse("admin:catalogo_materialoficina_add"), {"material": fita.pk})
-    assert r.status_code == 302 and MaterialOficina.objects.filter(material=fita).exists()
-    # De novo: recusado.
-    r = admin_client.post(reverse("admin:catalogo_materialoficina_add"), {"material": fita.pk})
-    assert r.status_code == 200 and MaterialOficina.objects.filter(material=fita).count() == 1
-
-
-def test_autocomplete_do_material():
-    from django.contrib import admin
-
-    assert admin.site._registry[MaterialOficina].autocomplete_fields == ["material"]
-
-
-def test_incluir_um_avulso_vale_no_proximo_acesso(client, admin_client):
-    assert not acha(client, "fita", FITA)
-    fita = Material.objects.get(codigo=FITA)
-    admin_client.post(reverse("admin:catalogo_materialoficina_add"), {"material": fita.pk})
-    assert acha(client, "fita", FITA)
+def test_os_avulsos_da_oficina_saíram_do_admin():
+    """Spec 009: o material avulso da oficina é uma exceção da configuração (página Formulários);
+    o cadastro antigo ficou no banco, sem tela."""
+    assert MaterialOficina not in admin.site._registry
+    with pytest.raises(NoReverseMatch):
+        reverse("admin:catalogo_materialoficina_changelist")
 
 
 def test_a_lista_de_grupos_no_admin(client, admin_client):

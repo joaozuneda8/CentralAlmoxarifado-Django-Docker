@@ -26,6 +26,7 @@ ITENS_MENU: tuple[ItemMenu, ...] = (
     ItemMenu("Saída avulsa", "pedidos:avulsa", "saida"),
     ItemMenu("Automações", "automacoes:pagina", "robo"),
     ItemMenu("Curva ABC", "catalogo:curva", "grafico"),
+    ItemMenu("Formulários", "catalogo:formularios", "caixa-check"),
     ItemMenu("Cadastros", "admin:index", "cadastros", so_equipe=True),
     ItemMenu("Autorizações", "pedidos:autorizacoes", "escudo", para="seguranca"),
 )

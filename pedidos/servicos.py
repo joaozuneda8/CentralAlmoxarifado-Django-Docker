@@ -394,7 +394,17 @@ def decidir_autorizacao(
 
 
 def centros() -> list[Centro]:
+    """Todas as linhas do cadastro de centros, ativas ou não: é o que o atendimento, a edição e o
+    robô do SCPI resolvem (spec 009, FR-012)."""
     return [Centro(c.descricao, c.codigo, c.placa or "") for c in CentroCusto.objects.all()]
+
+
+def centros_ativos() -> list[Centro]:
+    """As linhas de centro ativas: o que a saída avulsa **nova** oferece e aceita. O centro
+    inativo continua resolvido por `centros()` onde já foi usado (spec 009, FR-008)."""
+    return [
+        Centro(c.descricao, c.codigo, c.placa or "") for c in CentroCusto.objects.filter(ativo=True)
+    ]
 
 
 def centros_do_fluxo(fluxo) -> list[Centro]:
@@ -1080,13 +1090,17 @@ def _limites_de_estoque(catalogo: dict, gravados=(), base: dict | None = None) -
     return limites
 
 
-def _validar_saida_avulsa(envio: EnvioSaida, *, hoje: date, catalogo: dict, limites: dict):
-    """Regras da saída avulsa (e da edição dela). Devolve a soma por código e os erros."""
+def _validar_saida_avulsa(
+    envio: EnvioSaida, *, hoje: date, catalogo: dict, limites: dict, so_ativos: bool = False
+):
+    """Regras da saída avulsa (e da edição dela). Devolve a soma por código e os erros. Com
+    `so_ativos` (a saída nova), o centro inativo não está na lista; a edição de uma saída já
+    registrada aceita qualquer centro."""
     soma = somar_por_codigo(envio.itens, parse_qtd_br)
     v = validar_saida(
         envio.dados,
         [ItemSaida(c, soma.soma[c], estoque=limites.get(c)) for c in soma.ordem],
-        centros=centros(),
+        centros=centros_ativos() if so_ativos else centros(),
         tipos=tipos_saida(),
         hoje=hoje,
         catalogo=catalogo,
@@ -1156,6 +1170,7 @@ def registrar_saida_avulsa(
             hoje=hoje or timezone.localdate(),
             catalogo=por_codigo,
             limites=_limites_de_estoque(por_codigo),
+            so_ativos=True,
         )
         if erros:
             return Resposta(ok=False, mensagem="Corrija os itens abaixo.", erros=erros)

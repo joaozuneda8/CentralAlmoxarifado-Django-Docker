@@ -316,8 +316,10 @@ transações precisam se comportar como no servidor.
   vazia ou zero tira do pedido, o que veio da busca não muda; com erro, a resposta é a própria folha
   (`HX-Retarget: #folha-conteudo`) com o erro por linha, e sem erro é o carrinho com
   `HX-Trigger: folha-aplicada` (o `pedidos.js` fecha o diálogo e anuncia). Os destinos são só os
-  centros com alguma linha marcada `equipe_manutencao`, sem placa (`centros_equipe_manutencao`,
-  pelo `Fluxo.centros`); sem nenhum marcado, o formulário fica indisponível. `Pedido.ocorrencia`
+  centros habilitados nas viaturas na página Formulários, sem placa (modo `sem_placa` de
+  `catalogos.centros_do_formulario`, pelo `Fluxo.centros`; antes era a marca `equipe_manutencao`,
+  transcrita pela migration `catalogo/0007`, spec 009); sem nenhum habilitado, o formulário fica
+  indisponível. `Pedido.ocorrencia`
   (até 20 caracteres, opcional, só onde `Fluxo.pede_ocorrencia`) entra na conferência de reenvio
   (`cabecalho_enviado` das origens públicas tem 4 campos), aparece na tela de sucesso, no detalhe, no
   recibo e na lista do painel e é achada pela busca do painel; não vai no Telegram nem muda na edição. A saúde do
@@ -328,12 +330,13 @@ transações precisam se comportar como no servidor.
   placeholder do destino (antes deduzido de `fluxo.centros`). O catálogo
   (`catalogos.formulario_oficina`) são os materiais visíveis dos grupos da lista `Opcao`
   `GRUPO_OFICINA` ("Grupos (oficina)", comparados por `_grupo`, como os ocultos do AB; lista vazia =
-  nenhum grupo) mais os avulsos de `MaterialOficina` (um por material, `OneToOne` com `PROTECT`; para
-  os óleos e filtros do grupo `GERAL`, que não entra inteiro), uma vez cada, pelo nome, com a regra
-  de quantidade e de estoque dos formulários públicos. Os destinos (`catalogos.centros_oficina`) são
-  o centro `OFICINA MECÂNICA` (`regras.CENTRO_OFICINA`, o mesmo de `resolver_centro_custo`) e cada
-  centro com placa, este só como "centro — placa": `regras.Centro.so_com_placa` tira a descrição
-  sozinha de `opcoes_destino` (padrão `False`, os outros formulários não mudam). O atendimento já
+  nenhum grupo) mais os avulsos (exceções da configuração, spec 009: antes um cadastro
+  `MaterialOficina`, que ficou no banco, sem valer; servem aos óleos e filtros do grupo `GERAL`, que
+  não entra inteiro), uma vez cada, pelo nome, com a regra de quantidade e de estoque dos
+  formulários públicos. Os destinos (modo `oficina` de `catalogos.centros_do_formulario`) são o centro
+  `OFICINA MECÂNICA` (`regras.CENTRO_OFICINA`, o mesmo de `resolver_centro_custo`) e cada centro com
+  placa, este só como "centro — placa": `regras.Centro.so_com_placa` tira a descrição sozinha de
+  `opcoes_destino` (padrão `False`, os outros formulários não mudam). O atendimento já
   sugere centro e placa pelo destino (`_saida_do_destino`). A saúde (`saude._oficina`) diz quanto o
   formulário oferece, por que está indisponível, os grupos sem material visível, os avulsos ocultos
   e a falta do centro da oficina; a visão geral de Automações mostra a contagem
@@ -350,8 +353,9 @@ transações precisam se comportar como no servidor.
   dado extra de EPI (CA, tamanho, motivo) no pedido: está fora do escopo. `regras.situacao_pedido(...,
   autorizacao)` ganha `aguardando_autorizacao` e `recusado`; `filtrar_situacao("aguardando")` exclui
   os dois (o atalho "Atender" só conta o atendível) e o painel tem o filtro Autorização, à parte da
-  situação; o recibo não muda. O catálogo é `Opcao.Lista.GRUPO_EPI` + `MaterialEpi`, como o da
-  oficina, que não foi tocada (`catalogos.catalogo_epis`, `saude._epis`, `Situacao.epis`).
+  situação; o recibo não muda. O catálogo é `Opcao.Lista.GRUPO_EPI` mais os avulsos, que desde a spec 009 são exceções da
+  configuração (o cadastro `MaterialEpi` ficou no banco, sem valer), como o da oficina
+  (`catalogos.catalogo_epis`, `saude._epis`, `Situacao.epis`).
   **Acesso**: o grupo `Segurança do Trabalho` (criado por migration de dados de `contas`; o acesso é
   participar do grupo, nunca `is_staff`, e o administrador o dá no formulário do usuário no admin) e o
   `contas.middleware.RestringirSegurancaTrabalho`, que em `process_view` **nega por padrão** tudo o
@@ -369,10 +373,55 @@ transações precisam se comportar como no servidor.
   exceção ao desenho de o número do pedido não virar página pública; exigir também o nome completo
   foi proposto e **não adotado** (decisão do usuário). A spec lista as pendências de validação
   normativa (NR-6) que o sistema não resolve.
+- Configuração das opções por formulário (spec `specs/009-configuracao-formularios/`): a página
+  **Formulários** (`/painel/catalogo/formularios/`, `catalogo:formularios`, `views_formularios.py`,
+  item do menu) diz, para cada um dos cinco formulários públicos (`catalogo.models.Formulario`, os
+  valores de `Pedido.Origem`; a saída avulsa não entra), quais centros de custo são destino e quais
+  materiais são oferecidos. **Centros**: `CentroCusto.ativo` (global) e `CentroFormulario` (a linha do
+  cadastro, centro mais placa, é destino do formulário; a presença da linha basta). `Fluxo.centros` das
+  cinco entradas públicas é `partial(catalogos.centros_do_formulario, ORIGEM)`, que lê as linhas ativas
+  e habilitadas e as apresenta pelo **modo de destino** do formulário (`MODO_DESTINO`: `padrao` em
+  limpeza, AB e EPIs; `sem_placa` nas viaturas; `oficina`), característica do formulário, não
+  configurável. A saída avulsa segue com `centros=None`. **O inativo some só dos formulários públicos e
+  da saída avulsa nova** (`servicos.centros_ativos`, `opcoes_saida(so_ativos=True)`,
+  `_validar_saida_avulsa(so_ativos=True)`); `servicos.centros()` devolve todas as linhas e é o que o
+  atendimento, a edição (também de saída avulsa já registrada) e o robô do SCPI usam, para pedido e lote
+  pendente nunca travarem. Centro novo nasce ativo e **sem formulário** (a saúde avisa). **Materiais**:
+  `ExcecaoMaterial` (material e formulário únicos; `habilitado` verdadeiro acrescenta, falso retira)
+  é uma camada **sobre a regra de origem**, que continua nas funções de `catalogos.py` (lista de
+  limpeza, curva ABC do AB, lista das viaturas mais o AB, grupos da oficina e dos EPIs: estes dois, só
+  os grupos). Sem exceção, vale exatamente a regra de antes (o AB segue calculado); a disponibilidade
+  efetiva, `(regra − retirados) ∪ acrescentados` sem os ocultos, é calculada (`aplicar_excecoes`,
+  `catalogo_efetivo`; `disponibilidade.estado` é a regra pura), nunca guardada. `formulario_*` devolve a
+  base com as exceções, então busca, carrinho e `validar_pedido` validam contra ela sem mudar. Os
+  acrescentados vêm ao fim, em ordem alfabética (oficina e EPIs, na ordem do banco); `oculto` nunca
+  entra e `duplicado` aparece bloqueado; estoque, teto e regra de quantidade seguem como eram.
+  Serviços em `catalogo/disponibilidade.py` (`definir_excecao`, `aplicar_em_lote` atômico e em blocos,
+  `habilitar_centros`, `definir_ativo`); o `bulk_create(update_conflicts=True)` no MySQL/MariaDB não
+  aceita `unique_fields`, e o `update_or_create` falha na corrida (duas gravações simultâneas deixam uma
+  linha). A tela tem as abas Centros de custo e Materiais (busca, grupo, subgrupo e estado; 50 por
+  página no servidor), o **lote em duas telas** (`formularios_lote`: prévia com número exato, POST com o
+  `total` visto, recusa se o filtro mudou, "ciente" sem filtro), a consulta **por material**
+  (`formularios_material`) e as gravações em POST, mensagem e redirecionamento. **Permissões**: ver é
+  de todo usuário do almoxarifado; gravar exige `is_staff` mais `catalogo.change_centrocusto` (centros)
+  ou `catalogo.change_excecaomaterial` (materiais), recusado com 403 no servidor
+  (`catalogo/acesso.py`); a Segurança do Trabalho é negada pelo middleware (rotas fora da lista). A
+  migration `catalogo/0007` (a 0006 é só o esquema, separada porque o DDL do MySQL não é transacional)
+  transcreve as regras antigas (todos os centros em limpeza, AB e EPIs; as
+  linhas de `equipe_manutencao` nas viaturas; a linha sem placa de OFICINA MECÂNICA e as com placa na
+  oficina; `MaterialOficina` e `MaterialEpi` como exceções que acrescentam) e **se verifica**: levanta
+  erro se um formulário não oferecer o mesmo; nada é apagado, e `equipe_manutencao`, `MaterialOficina`
+  e `MaterialEpi` ficam no banco, sem valer. `tests/regra_antiga.py` é a cópia congelada da regra
+  anterior (referência de `test_config_equivalencia.py`); nos testes, `tests/config_cenario.py`
+  (`criar_centro`, `habilitar`, `excecao`) e `montar_cenario` habilitam os centros como as regras
+  antigas ofereciam. A saúde avisa formulário sem destino, centro ativo sem formulário (por linha),
+  exceção sem efeito e formulário esvaziado por exceções. A aba Centros mostra em quais outros
+  formulários cada linha é destino e leva ao admin para criar e editar o centro.
 - `catalogo` guarda os cadastros. `Material` e `SaidaSCPI` vêm do SCPI pelos importadores e
   são só leitura no admin, como o registro de cada execução (`Importacao`). `ItemLimpeza`,
-  `PecaViatura`, `MaterialOficina`, `CentroCusto` (com a marca `equipe_manutencao`) e `Opcao` são mantidos à mão no
-  admin. A placa do `CentroCusto` é normalizada
+  `PecaViatura`, `CentroCusto` (com o estado `ativo`) e `Opcao` são mantidos à mão no
+  admin; os avulsos da oficina e dos EPIs e a marca de equipe de manutenção saíram do admin (spec 009).
+  A placa do `CentroCusto` é normalizada
   (`norm_placa`), única no banco, e vazia vira NULL. `catalogos.py` monta os catálogos dos
   formulários (limpeza, AB pelo número de saídas consolidadas pelo de/para, avulsa) direto do
   banco, sem cache;

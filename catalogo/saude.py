@@ -16,20 +16,17 @@ from catalogo.catalogos import (
     CatalogoAB,
     _grupo,
     catalogo_ab,
-    catalogo_epis,
-    catalogo_limpeza,
-    catalogo_oficina,
+    catalogo_efetivo,
     catalogo_viaturas,
-    centros_equipe_manutencao,
-    centros_oficina,
+    centros_do_formulario,
 )
 from catalogo.models import (
     CentroCusto,
+    ExcecaoMaterial,
+    Formulario,
     Importacao,
     ItemLimpeza,
     Material,
-    MaterialEpi,
-    MaterialOficina,
     Opcao,
     PecaViatura,
 )
@@ -184,21 +181,24 @@ def _viaturas(ab: CatalogoAB) -> list[ItemSaude]:
     saude = []
     lista = {i.codigo for i in catalogo_viaturas()}
     do_ab = sum(1 for i in ab.itens if i.codigo not in lista)
-    if not centros_equipe_manutencao():
+    efetivo = catalogo_efetivo(Formulario.VIATURAS, ab)
+    if not centros_do_formulario(Formulario.VIATURAS):
         saude.append(
             ItemSaude(
                 "erro",
-                f"{FORMULARIO_VIATURAS}: nenhum centro de custo marcado como de equipe de "
-                "manutenção; o formulário fica indisponível.",
+                f"{FORMULARIO_VIATURAS}: nenhum centro de custo habilitado como destino; o "
+                "formulário fica indisponível.",
             )
         )
-    elif not lista and not do_ab:
+    elif not efetivo:
+        # O que o formulário oferece de fato (regra mais exceções): só está vazio se a lista, o AB
+        # e os acrescentados estão; o texto diz qual dos dois casos é.
+        if not lista and not do_ab:
+            motivo = "nenhuma peça na lista nem material no AB"
+        else:
+            motivo = "todos os materiais foram retirados do formulário"
         saude.append(
-            ItemSaude(
-                "erro",
-                f"{FORMULARIO_VIATURAS}: nenhuma peça na lista nem material no AB; o formulário "
-                "fica indisponível.",
-            )
+            ItemSaude("erro", f"{FORMULARIO_VIATURAS}: {motivo}; o formulário fica indisponível.")
         )
     else:
         pecas = "1 peça" if len(lista) == 1 else f"{numero(len(lista))} peças"
@@ -227,8 +227,8 @@ def _oficina() -> list[ItemSaude]:
     os grupos da lista sem material visível, os avulsos ocultos e a falta do centro da oficina
     (o saldo já foi importado)."""
     saude = []
-    centros = centros_oficina()
-    n = len(catalogo_oficina())
+    centros = centros_do_formulario(Formulario.OFICINA)
+    n = len(catalogo_efetivo(Formulario.OFICINA))
     if not centros:
         saude.append(
             ItemSaude(
@@ -252,8 +252,8 @@ def _oficina() -> list[ItemSaude]:
         saude.append(
             ItemSaude(
                 "aviso",
-                f"{FORMULARIO_OFICINA}: centro OFICINA MECÂNICA não cadastrado; só as viaturas "
-                "são oferecidas como destino.",
+                f"{FORMULARIO_OFICINA}: centro OFICINA MECÂNICA não está habilitado como destino "
+                "(ou não está cadastrado); só as viaturas são oferecidas.",
             )
         )
     visiveis = {
@@ -270,9 +270,9 @@ def _oficina() -> list[ItemSaude]:
             )
         )
     ocultos = list(
-        MaterialOficina.objects.filter(material__oculto=True).values_list(
-            "material__codigo", flat=True
-        )
+        ExcecaoMaterial.objects.filter(
+            formulario=Formulario.OFICINA, habilitado=True, material__oculto=True
+        ).values_list("material__codigo", flat=True)
     )
     if ocultos:
         saude.append(
@@ -293,7 +293,7 @@ def _epis() -> list[ItemSaude]:
     qualquer centro de custo, como nos formulários de limpeza e AB, então não há aviso de destino
     aqui (o aviso geral de "nenhum centro de custo cadastrado" já cobre)."""
     saude = []
-    n = len(catalogo_epis())
+    n = len(catalogo_efetivo(Formulario.EPIS))
     if not n:
         saude.append(
             ItemSaude(
@@ -315,7 +315,9 @@ def _epis() -> list[ItemSaude]:
             ItemSaude("aviso", f"Grupos de EPIs sem material visível: {lista_curta(sem_material)}.")
         )
     ocultos = list(
-        MaterialEpi.objects.filter(material__oculto=True).values_list("material__codigo", flat=True)
+        ExcecaoMaterial.objects.filter(
+            formulario=Formulario.EPIS, habilitado=True, material__oculto=True
+        ).values_list("material__codigo", flat=True)
     )
     if ocultos:
         saude.append(
@@ -324,6 +326,64 @@ def _epis() -> list[ItemSaude]:
                 f"Materiais de EPIs ocultos no SCPI (não aparecem): {lista_curta(ocultos)}.",
             )
         )
+    return saude
+
+
+FORMULARIOS_SEM_AVISO_PROPRIO = {
+    Formulario.LIMPEZA: "Formulário de limpeza",
+    Formulario.AB: "Formulário AB",
+    Formulario.EPIS: FORMULARIO_EPIS,
+}
+
+
+def _destinos_e_excecoes(ab: CatalogoAB | None = None) -> list[ItemSaude]:
+    """A configuração por formulário (spec 009, FR-039): formulário sem destino (as viaturas e a
+    oficina já dizem o seu), centro ativo que não é destino de nenhum e exceção sem efeito. Só
+    roda o cálculo das regras de origem para o formulário que tem exceção."""
+    from catalogo.disponibilidade import situacao_do_formulario
+
+    saude = []
+    for formulario, nome in FORMULARIOS_SEM_AVISO_PROPRIO.items():
+        if not centros_do_formulario(formulario):
+            saude.append(
+                ItemSaude(
+                    "erro",
+                    f"{nome}: nenhum centro de custo habilitado como destino; o formulário "
+                    "fica indisponível.",
+                )
+            )
+    sem_formulario = sorted(
+        {
+            f"{c.descricao} — {c.placa}" if c.placa else c.descricao
+            for c in CentroCusto.objects.filter(ativo=True, formularios__isnull=True)
+        }
+    )
+    if sem_formulario:
+        saude.append(
+            ItemSaude(
+                "aviso",
+                "Centros de custo ativos sem nenhum formulário (não são destino de nenhum): "
+                f"{lista_curta(sem_formulario)}.",
+            )
+        )
+    com_excecao = set(ExcecaoMaterial.objects.values_list("formulario", flat=True))
+    for formulario in Formulario.values:
+        if formulario not in com_excecao:
+            continue
+        situacao = situacao_do_formulario(formulario, ab)
+        sem_efeito = sorted(
+            codigo
+            for codigo, habilitado in situacao.excecoes.items()
+            if habilitado == (codigo in situacao.na_regra)
+        )
+        if sem_efeito:
+            saude.append(
+                ItemSaude(
+                    "aviso",
+                    f"Exceções sem efeito em {Formulario(formulario).label} (a regra já dá o "
+                    f"resultado): {lista_curta(sem_efeito)}.",
+                )
+            )
     return saude
 
 
@@ -365,7 +425,7 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
                 )
             )
 
-    itens_limpeza = len(catalogo_limpeza())
+    itens_limpeza = len(catalogo_efetivo(Formulario.LIMPEZA))
     if itens_limpeza:
         saude.append(ItemSaude("ok", f"Formulário de limpeza: {itens_limpeza} itens."))
     else:
@@ -393,10 +453,29 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
             f"{ab.na_limpeza} também na lista de limpeza, que prevalece; "
             f"{ab.ocultos} ocultos ou em grupo oculto"
         )
-        if ab.itens:
+        # O que o formulário oferece de fato (regra mais exceções); a regra do AB segue como
+        # informação separada, no texto.
+        efetivo = catalogo_efetivo(Formulario.AB, ab)
+        if efetivo and not ExcecaoMaterial.objects.filter(formulario=Formulario.AB).exists():
             saude.append(
                 ItemSaude(
-                    "ok", f"Formulário AB: {len(ab.itens)} itens de {com_saida} ({descartados})."
+                    "ok", f"Formulário AB: {len(efetivo)} itens de {com_saida} ({descartados})."
+                )
+            )
+        elif efetivo:
+            saude.append(
+                ItemSaude(
+                    "ok",
+                    f"Formulário AB: {len(efetivo)} itens, contadas as exceções do administrador "
+                    f"({len(ab.itens)} pela regra, de {com_saida}; {descartados}).",
+                )
+            )
+        elif ab.itens:
+            saude.append(
+                ItemSaude(
+                    "erro",
+                    "Formulário AB: todos os materiais foram retirados do formulário; o "
+                    "formulário fica indisponível.",
                 )
             )
         else:
@@ -429,6 +508,8 @@ def _demais(agora: datetime, ab: CatalogoAB | None, total: int, ocultos: int) ->
                 "registrar saídas.",
             )
         )
+    else:
+        saude += _destinos_e_excecoes(ab)
     return saude
 
 
@@ -538,6 +619,7 @@ class Situacao:
     avisos: list[ItemSaude]  # o que não é de uma importação e precisa de atenção
     limpeza: int
     ab: CatalogoAB | None
+    ab_oferecidos: int = 0  # o que o formulário AB oferece de fato (regra mais exceções)
     viaturas: int = 0  # peças visíveis na lista do formulário de viaturas (spec 006)
     oficina: int = 0  # materiais do formulário da oficina mecânica (spec 007)
     epis: int = 0  # materiais do formulário de EPIs (spec 008)
@@ -574,9 +656,10 @@ def situacao_do_catalogo(agora: datetime | None = None) -> Situacao:
     return Situacao(
         fontes=[_fonte(tipo, agora, total, ocultos) for tipo in _tipos()],
         avisos=[i for i in _demais(agora, ab, total, ocultos) if i.nivel != "ok"],
-        limpeza=len(catalogo_limpeza()),
+        limpeza=len(catalogo_efetivo(Formulario.LIMPEZA)),
         ab=ab,
+        ab_oferecidos=len(catalogo_efetivo(Formulario.AB, ab)) if ab is not None else 0,
         viaturas=len(catalogo_viaturas()),
-        oficina=len(catalogo_oficina()),
-        epis=len(catalogo_epis()),
+        oficina=len(catalogo_efetivo(Formulario.OFICINA)),
+        epis=len(catalogo_efetivo(Formulario.EPIS)),
     )

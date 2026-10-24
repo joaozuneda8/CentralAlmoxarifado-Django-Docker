@@ -213,12 +213,22 @@ def test_a_regra_do_fluxo_vale_no_carrinho_e_no_envio(
         assert f"Estoque disponível: {maximo} UN." in enviar(client, [(PORCA, "3")], "Bia").text
 
 
-def test_folha_destinos_e_ocorrencia_sao_opcionais_e_desligados_nos_fluxos_antigos():
-    """Os campos da spec 006 têm padrão neutro: limpeza, AB e saída avulsa não ganham folha, não
-    restringem destinos e não pedem o número da ocorrência."""
+def test_folha_e_ocorrencia_sao_opcionais_e_desligadas_nos_fluxos_antigos():
+    """Os campos da spec 006 têm padrão neutro: limpeza, AB e saída avulsa não ganham folha e não
+    pedem o número da ocorrência."""
     for nome in ("limpeza", "ab", "avulsa"):
         fluxo = fluxos.FLUXOS[nome]
-        assert fluxo.folha is None and fluxo.centros is None and not fluxo.pede_ocorrencia
+        assert fluxo.folha is None and not fluxo.pede_ocorrencia
+
+
+def test_os_destinos_dos_formularios_publicos_vem_da_configuracao_e_os_da_avulsa_nao():
+    """Spec 009: cada formulário público lê os destinos da configuração (`centros`); a saída
+    avulsa, que não faz parte dela, segue com todos os centros (`None`)."""
+    assert fluxos.FLUXOS["avulsa"].centros is None
+    for fluxo in fluxos.fluxos_publicos():
+        assert callable(fluxo.centros)
+        assert fluxo.centros.func.__name__ == "centros_do_formulario"
+        assert fluxo.centros.args == (fluxo.origem,)
 
 
 def test_a_autorizacao_e_so_do_formulario_que_a_exige():

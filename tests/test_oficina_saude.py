@@ -6,7 +6,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from catalogo.models import CentroCusto, Material, MaterialOficina, Opcao
+from catalogo.models import CentroCusto, ExcecaoMaterial, Material, Opcao
 from catalogo.saude import ItemSaude, saude_do_catalogo, situacao_do_catalogo
 from tests.oficina_cenario import OFICINA, OLEO, montar_oficina
 
@@ -45,7 +45,7 @@ def test_sem_destino_fica_indisponivel():
 
 def test_sem_material_fica_indisponivel():
     Opcao.objects.filter(lista=Opcao.Lista.GRUPO_OFICINA).delete()
-    MaterialOficina.objects.all().delete()
+    ExcecaoMaterial.objects.all().delete()
     assert texto_de(FORMULARIO) == ItemSaude(
         "erro",
         f"{FORMULARIO}: nenhum material nos grupos nem entre os materiais da oficina; o "
@@ -71,15 +71,15 @@ def test_sem_o_centro_da_oficina_so_as_viaturas_e_aviso():
     CentroCusto.objects.filter(descricao=OFICINA).delete()
     assert texto_de(f"{FORMULARIO}: centro") == ItemSaude(
         "aviso",
-        f"{FORMULARIO}: centro OFICINA MECÂNICA não cadastrado; só as viaturas são oferecidas "
-        "como destino.",
+        f"{FORMULARIO}: centro OFICINA MECÂNICA não está habilitado como destino (ou não está "
+        "cadastrado); só as viaturas são oferecidas.",
     )
 
 
 def test_sem_o_centro_e_sem_material_mostra_as_duas_pendencias():
     CentroCusto.objects.filter(descricao=OFICINA).delete()
     Opcao.objects.filter(lista=Opcao.Lista.GRUPO_OFICINA).delete()
-    MaterialOficina.objects.all().delete()
+    ExcecaoMaterial.objects.all().delete()
     assert texto_de(f"{FORMULARIO}: nenhum material").nivel == "erro"
     assert texto_de(f"{FORMULARIO}: centro").nivel == "aviso"
 
